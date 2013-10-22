@@ -4,6 +4,17 @@
  *      See COPYRIGHT in top-level directory.
  */
 
+#ifndef REMOVE_HACKING
+/*these have to go before the MPICH headers since they include these without the GNU macro set */
+#  define _GNU_SOURCE
+#  define __USE_GNU
+#  include <unistd.h>
+#  include <sched.h>
+#  if !defined(CPU_ZERO) || !defined(CPU_SET)
+#  error CPU_ZERO and/or CPU_SET not defined
+#  endif
+#endif
+
 #include "mpiimpl.h"
 #include "mpi_init.h"
 #include "mpiu_thread.h"
@@ -21,6 +32,25 @@ static volatile int progress_thread_done = 0;
  * for communicating with the progress thread. */
 #define WAKE_TAG 100
 
+/* Jeff: from http://stackoverflow.com/questions/1407786/how-to-set-cpu-affinity-of-a-particular-pthread */
+static void bind_thread_to_core(void) {
+    int num_cores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+    int core_id = num_cores-1;
+
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+
+    pthread_t current_thread = pthread_self();
+    int rc = pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+    if (rc!=0) fprintf(stderr, "pthread_setaffinity_np rc = %d \n", rc);
+    else       fprintf(stderr,"bound async thread to core %d \n", core_id);
+
+    return;
+}
+
+/**************************/
+
 #undef FUNCNAME
 #define FUNCNAME progress_fn
 #undef FCNAME
@@ -31,11 +61,19 @@ static void progress_fn(void * data)
     MPID_Request *request_ptr = NULL;
     MPI_Request request;
     MPI_Status status;
+    int same = 0;
 
     /* Explicitly add CS_ENTER/EXIT since this thread is created from
      * within an internal function and will call NMPI functions
      * directly. */
     MPIU_THREAD_CS_ENTER(ALLFUNC,);
+
+    /* JEFF: this is where to put the affinity code to pin async CHT
+             to core N-1 on an N-core system                          */
+
+    MPL_env2bool("MPICH_ASYNC_PLACE_SAME", &same);
+    if (same>0)
+        bind_thread_to_core();
 
     /* FIXME: We assume that waiting on some request forces progress
      * on all requests. With fine-grained threads, will this still
