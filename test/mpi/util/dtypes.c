@@ -226,6 +226,9 @@ void MTestDatatype2Generate( MPI_Datatype *types, void **inbufs, void **outbufs,
 #ifdef HAVE_LONG_DOUBLE
     SETUPBASICTYPE(MPI_LONG_DOUBLE,long double,typecnt);
 #endif
+#ifdef HAVE_GCC_FLOAT128
+    SETUPBASICTYPE(MPIX_GCC_FLOAT128,__float128,typecnt);
+#endif
     nbasic_types = cnt;
 
     if (basic_only) {
@@ -250,6 +253,9 @@ void MTestDatatype2Generate( MPI_Datatype *types, void **inbufs, void **outbufs,
 #ifdef HAVE_LONG_DOUBLE
     SETUPCONTIGTYPE(MPI_LONG_DOUBLE,long double,typecnt);
 #endif
+#ifdef HAVE_GCC_FLOAT128
+    SETUPCONTIGTYPE(MPIX_GCC_FLOAT128,__float128,typecnt);
+#endif
 
     /* Generate vector items */
     SETUPVECTORTYPE(MPI_CHAR,char,typecnt,stride,"MPI_CHAR");
@@ -269,6 +275,9 @@ void MTestDatatype2Generate( MPI_Datatype *types, void **inbufs, void **outbufs,
 #ifdef HAVE_LONG_DOUBLE
     SETUPVECTORTYPE(MPI_LONG_DOUBLE,long double,typecnt,stride,"MPI_LONG_DOUBLE");
 #endif
+#ifdef HAVE_GCC_FLOAT128
+    SETUPVECTORTYPE(MPIX_GCC_FLOAT128,__float128,typecnt);
+#endif
 
     /* Generate indexed items */
     SETUPINDEXTYPE(MPI_CHAR,char,typecnt,"MPI_CHAR");
@@ -287,6 +296,9 @@ void MTestDatatype2Generate( MPI_Datatype *types, void **inbufs, void **outbufs,
 #endif
 #ifdef HAVE_LONG_DOUBLE
     SETUPINDEXTYPE(MPI_LONG_DOUBLE,long double,typecnt,"MPI_LONG_DOUBLE");
+#endif
+#ifdef HAVE_GCC_FLOAT128
+    SETUPINDEXTYPE(MPIX_GCC_FLOAT128,__float128,typecnt);
 #endif
 
     /* Generate struct items */
