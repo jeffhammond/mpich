@@ -40,6 +40,13 @@ typedef struct MPIR_longdoubleint_loctype {
 } MPIR_longdoubleint_loctype;
 #endif
 
+#if defined(HAVE_GCC_FLOAT128)
+typedef struct MPIR_gccfloat128int_loctype {
+  __float128    value;
+  int           loc;
+} MPIR_gccfloat128int_loctype;
+#endif
+
 /* Note a subtlety in these two macros which avoids compiler warnings.
    The compiler complains about using == on floats, but the standard
    requires that we set loc to min of the locs if the two values are
@@ -100,6 +107,9 @@ void MPIR_MINLOC(
 #if defined(HAVE_LONG_DOUBLE)
     case MPI_LONG_DOUBLE_INT: MPIR_MINLOC_C_CASE(MPIR_longdoubleint_loctype);
 #endif
+#if defined(HAVE_GCC_FLOAT128)
+    case MPIX_GCC_FLOAT128_INT: MPIR_MINLOC_C_CASE(MPIR_gccfloat128int_loctype);
+#endif
 
     /* now the Fortran types */
 #ifdef HAVE_FORTRAN_BINDING
@@ -142,6 +152,9 @@ int MPIR_MINLOC_check_dtype( MPI_Datatype type )
     case MPI_DOUBLE_INT: 
 #if defined(HAVE_LONG_DOUBLE)
     case MPI_LONG_DOUBLE_INT: 
+#endif
+#if defined(HAVE_GCC_FLOAT128)
+    case MPIX_GCC_FLOAT128_INT:
 #endif
    /* now the Fortran types */
 #ifdef HAVE_FORTRAN_BINDING
