@@ -111,6 +111,7 @@ typedef int MPI_Datatype;
 #define MPI_LONG_LONG_INT  ((MPI_Datatype)@MPI_LONG_LONG@)
 #define MPI_UNSIGNED_LONG_LONG ((MPI_Datatype)@MPI_UNSIGNED_LONG_LONG@)
 #define MPI_LONG_LONG      MPI_LONG_LONG_INT
+#define MPIX_GCC_FLOAT128  ((MPI_Datatype)@MPIX_GCC_FLOAT128@)
 
 #ifdef MPICH_DEFINE_ATTR_TYPE_TYPES
 static const MPI_Datatype mpich_mpi_char               MPICH_ATTR_TYPE_TAG(char)               = MPI_CHAR;
@@ -131,6 +132,9 @@ static const MPI_Datatype mpich_mpi_long_double        MPICH_ATTR_TYPE_TAG(long 
 #endif
 static const MPI_Datatype mpich_mpi_long_long_int      MPICH_ATTR_TYPE_TAG(long long int)      = MPI_LONG_LONG_INT;
 static const MPI_Datatype mpich_mpi_unsigned_long_long MPICH_ATTR_TYPE_TAG(unsigned long long) = MPI_UNSIGNED_LONG_LONG;
+#if @MPIX_GCC_FLOAT128@ != 0x0c000000
+static const MPI_Datatype mpich_mpix_gcc_float128      MPICH_ATTR_TYPE_TAG(__float128)         = MPIX_GCC_FLOAT128;
+#endif
 #endif
 
 #define MPI_PACKED         ((MPI_Datatype)@MPI_PACKED@)
@@ -151,6 +155,7 @@ static const MPI_Datatype mpich_mpi_unsigned_long_long MPICH_ATTR_TYPE_TAG(unsig
 #define MPI_SHORT_INT         ((MPI_Datatype)@MPI_SHORT_INT@)
 #define MPI_2INT              ((MPI_Datatype)@MPI_2INT@)
 #define MPI_LONG_DOUBLE_INT   ((MPI_Datatype)@MPI_LONG_DOUBLE_INT@)
+#define MPIX_GCC_FLOAT128_INT ((MPI_Datatype)@MPI_GCC_FLOAT128_INT@)
 
 #ifdef MPICH_DEFINE_ATTR_TYPE_TYPES
 struct mpich_struct_mpi_float_int       { float f; int i; };
@@ -160,6 +165,9 @@ struct mpich_struct_mpi_short_int       { short s; int i; };
 struct mpich_struct_mpi_2int            { int i1; int i2; };
 #if @MPI_LONG_DOUBLE_INT@ != 0x0c000000
 struct mpich_struct_mpi_long_double_int { long double ld; int i; };
+#endif
+#if @MPIX_GCC_FLOAT128@ != 0x0c000000
+struct mpich_struct_mpix_gcc_float128_int { __float128 ld; int i; };
 #endif
 
 static const MPI_Datatype mpich_mpi_float_int       MPICH_ATTR_TYPE_TAG_LAYOUT_COMPATIBLE(struct mpich_struct_mpi_float_int)       = MPI_FLOAT_INT;
