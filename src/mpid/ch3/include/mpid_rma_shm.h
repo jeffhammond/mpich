@@ -90,6 +90,13 @@ static inline int shm_copy(const void *src, int scount, MPI_Datatype stype,
             ASSIGN_COPY(src, dest, scount, long double);
 
 #if 0
+            /* FIXME: we need a configure check to define HAVE_GCC_FLOAT128 before
+             * this can be enabled */
+        case MPIX_GCC_FLOAT128:
+            ASSIGN_COPY(src, dest, scount, __float128);
+#endif
+
+#if 0
             /* FIXME: we need a configure check to define HAVE_WCHAR_T before
              * this can be enabled */
         case MPI_WCHAR:
