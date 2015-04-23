@@ -136,7 +136,7 @@ int main( int argc, char *argv[] )
     int p, r;
     int errs = 0;
     int err;
-    int i, nLoop = 1;
+    int i, j, nLoop = 1;
     MPI_Datatype newtype;
 
     MTest_Init(0,0);
