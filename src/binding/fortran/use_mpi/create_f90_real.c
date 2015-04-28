@@ -13,6 +13,7 @@
 /* Assume only 4 and 8 byte IEEE reals available */
 #define MPIR_F90_REAL_MODEL 6, 37
 #define MPIR_F90_DOUBLE_MODEL 15, 307
+#define MPIR_F90_QUAD_MODEL 33, 4931
 #endif
 
 /* -- Begin Profiling Symbol Block for routine MPI_Type_create_f90_real */
@@ -71,9 +72,10 @@ int MPI_Type_create_f90_real( int precision, int range, MPI_Datatype *newtype )
     int mpi_errno = MPI_SUCCESS;
     MPI_Datatype basetype;
     static int setupPredefTypes = 1;
-    static realModel f90_real_model[2] = { 
+    static realModel f90_real_model[3] = { 
 	{ MPIR_F90_REAL_MODEL, MPI_REAL},
-	{ MPIR_F90_DOUBLE_MODEL, MPI_DOUBLE_PRECISION } };
+	{ MPIR_F90_DOUBLE_MODEL, MPI_DOUBLE_PRECISION },
+	{ MPIR_F90_QUAD_MODEL, MPIX_QUAD_PRECISION } };
     MPIU_THREADPRIV_DECL;
     MPID_MPI_STATE_DECL(MPID_STATE_MPI_TYPE_CREATE_F90_REAL);
 
