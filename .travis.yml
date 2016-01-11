@@ -48,7 +48,7 @@ install:
   - make install
 before_script:
   - make check
-  - $TRAVIS_ROOT/bin/mpiexec -n 2 ./cpi
+  - $TRAVIS_ROOT/bin/mpiexec -n 2 ./examples/cpi
 script:
   - cd test/mpi
   - echo '!util:all' > testlist
