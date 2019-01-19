@@ -4,7 +4,7 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#if !defined(MPIR_REFCOUNT_H_INCLUDED)
+#ifndef MPIR_REFCOUNT_H_INCLUDED
 #define MPIR_REFCOUNT_H_INCLUDED
 
 #include "mpi.h"
@@ -14,7 +14,9 @@
 
 #if MPICH_THREAD_GRANULARITY == MPICH_THREAD_GRANULARITY__GLOBAL
 #include "mpir_refcount_global.h"
-#elif MPICH_THREAD_GRANULARITY == MPICH_THREAD_GRANULARITY__POBJ
+/* For the VNI granularity, is this overkill? */
+#elif MPICH_THREAD_GRANULARITY == MPICH_THREAD_GRANULARITY__POBJ || \
+      MPICH_THREAD_GRANULARITY == MPICH_THREAD_GRANULARITY__VNI
 #include "mpir_refcount_pobj.h"
 #endif
 
@@ -23,4 +25,4 @@
 
 #endif
 
-#endif /* !defined(MPIR_REFCOUNT_H_INCLUDED) */
+#endif /* MPIR_REFCOUNT_H_INCLUDED */

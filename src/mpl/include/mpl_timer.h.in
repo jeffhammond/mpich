@@ -36,10 +36,13 @@ int usleep(useconds_t usec);
 #define MPL_TIMER_KIND__DEVICE                  9
 #define MPL_TIMER_KIND__WIN64_CYCLE             10
 #define MPL_TIMER_KIND__MACH_ABSOLUTE_TIME      11
+#define MPL_TIMER_KIND__PPC64_CYCLE             12
 #define MPL_TIMER_KIND @MPL_TIMER_KIND@
 
 /* Define a time stamp */
+/* *INDENT-OFF* */
 typedef @MPL_TIMER_TYPE@ MPL_time_t;
+/* *INDENT-ON* */
 
 /* The timer code is allowed to return "NOT_INITIALIZED" before the
  * device is initialized.  Once the device is initialized, it must
@@ -66,6 +69,8 @@ typedef @MPL_TIMER_TYPE@ MPL_time_t;
 #include "mpl_timer_device.h"
 #elif MPL_TIMER_KIND == MPL_TIMER_KIND__MACH_ABSOLUTE_TIME
 #include "mpl_timer_mach_absolute_time.h"
+#elif MPL_TIMER_KIND == MPL_TIMER_KIND__PPC64_CYCLE
+#include "mpl_timer_ppc64_cycle.h"
 #endif
 
 /*
@@ -136,7 +141,7 @@ int MPL_wtime(MPL_time_t * timeval);
   Module:
   Timer
   @*/
-int MPL_wtime_diff( MPL_time_t *t1, MPL_time_t *t2, double *diff );
+int MPL_wtime_diff(MPL_time_t * t1, MPL_time_t * t2, double *diff);
 
 /*@
   MPL_wtime_acc - Accumulate time values
@@ -158,7 +163,7 @@ int MPL_wtime_diff( MPL_time_t *t1, MPL_time_t *t2, double *diff );
   Module:
   Timer
   @*/
-int MPL_wtime_acc( MPL_time_t *t1, MPL_time_t *t2, MPL_time_t *t3 );
+int MPL_wtime_acc(MPL_time_t * t1, MPL_time_t * t2, MPL_time_t * t3);
 
 /*@
   MPL_wtime_todouble - Converts a timestamp to a double
@@ -174,7 +179,7 @@ int MPL_wtime_acc( MPL_time_t *t1, MPL_time_t *t2, MPL_time_t *t3 );
   suitable for 'MPI_Wtime'.
 
   @*/
-int MPL_wtime_todouble( MPL_time_t *timeval, double *seconds );
+int MPL_wtime_todouble(MPL_time_t * timeval, double *seconds);
 
 /*@
   MPL_wtick - Provide the resolution of the 'MPL_wtime' timer
@@ -241,4 +246,4 @@ static void init_wtick(void)
     }
 }
 
-#endif  /* !defined(MPL_TIMER_H_INCLUDED) */
+#endif /* !defined(MPL_TIMER_H_INCLUDED) */

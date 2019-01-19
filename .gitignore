@@ -106,8 +106,6 @@ summary.tap
 tags
 apply-xfail.sh
 
-# the hooks dir shouldn't be accidentally committed
-/maint/hooks
 /maint/getfuncstack
 
 # directories copied by autogen.sh from other directories and (generally) should
@@ -118,10 +116,16 @@ apply-xfail.sh
 /src/pm/hydra/confdb
 /src/pm/hydra/mpl
 /src/pm/hydra/mpl/confdb
+/src/pm/hydra/tools/topo/hwloc/hwloc
+/src/pm/hydra2/confdb
+/src/pm/hydra2/mpl
+/src/pm/hydra2/mpl/confdb
+/src/pm/hydra2/libhydra/topo/hwloc/hwloc
 /src/mpi/romio/mpl
 /src/mpi/romio/mpl/confdb
 /src/mpi/romio/version.m4
 /src/pm/hydra/version.m4
+/src/pm/hydra2/version.m4
 /test/mpi/version.m4
 
 # created by the build process in the test dirs
@@ -375,7 +379,6 @@ Makefile.am-stamp
 /maint/createcoverage
 /maint/showsizes
 /maint/getcross
-/maint/f77tof90
 /maint/makerpm
 /maint/clmake
 /maint/conftimestamp
@@ -598,7 +601,3 @@ Makefile.am-stamp
 
 # /test/util/timer/
 /test/util/timer/timertest
-
-# /src/mpid/ch4/include
-/src/mpid/ch4/include/netmodpre.h
-/src/mpid/ch4/include/shmpre.h

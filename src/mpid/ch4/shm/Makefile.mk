@@ -11,14 +11,11 @@
 ##  Contributor License Agreement dated February 8, 2012.
 ##
 
-if BUILD_CH4_SHM
-
-AM_CPPFLAGS += -I$(top_srcdir)/src/mpid/ch4/shm/include
+AM_CPPFLAGS += -I$(top_srcdir)/src/mpid/ch4/shm/include \
+               -I$(top_srcdir)/src/mpid/ch4/shm/posix
 
 noinst_HEADERS += src/mpid/ch4/shm/include/shm.h
-noinst_HEADERS += src/mpid/ch4/shm/include/shm_impl.h
 
+include $(top_srcdir)/src/mpid/ch4/shm/src/Makefile.mk
 include $(top_srcdir)/src/mpid/ch4/shm/stubshm/Makefile.mk
 include $(top_srcdir)/src/mpid/ch4/shm/posix/Makefile.mk
-
-endif

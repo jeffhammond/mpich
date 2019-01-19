@@ -4,8 +4,8 @@
  *      See COPYRIGHT in top-level directory.
  *
  */
-#ifndef NETMOD_PTL_DATATYPE_H_INCLUDED
-#define NETMOD_PTL_DATATYPE_H_INCLUDED
+#ifndef PTL_DATATYPE_H_INCLUDED
+#define PTL_DATATYPE_H_INCLUDED
 
 #include "ptl_impl.h"
 
@@ -14,9 +14,9 @@ static inline int MPIDI_NM_mpi_type_free_hook(MPIR_Datatype * datatype_p)
     return 0;
 }
 
-static inline int MPIDI_NM_mpi_type_create_hook(MPIR_Datatype * datatype_p)
+static inline int MPIDI_NM_mpi_type_commit_hook(MPIR_Datatype * datatype_p)
 {
     return 0;
 }
 
-#endif /* NETMOD_PTL_DATATYPE_H_INCLUDED */
+#endif /* PTL_DATATYPE_H_INCLUDED */

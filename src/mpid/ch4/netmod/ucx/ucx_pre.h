@@ -6,17 +6,13 @@
  *  Portions of this code were written by Mellanox Technologies Ltd.
  *  Copyright (C) Mellanox Technologies Ltd. 2016. ALL RIGHTS RESERVED
  */
-#ifndef NETMOD_UCX_PRE_H_INCLUDED
-#define NETMOD_UCX_PRE_H_INCLUDED
+#ifndef UCX_PRE_H_INCLUDED
+#define UCX_PRE_H_INCLUDED
 
 #include <ucp/api/ucp.h>
 
-#define HAVE_MPIDI_NM_type_create_hook
-#define HAVE_MPIDI_NM_type_free_hook
-
 #define MPIDI_UCX_KVSAPPSTRLEN 4096
 
-//#define MPIDI_UCX_NAME_LEN             (512)
 typedef struct {
     void *req;
 } MPIDI_UCX_ucp_request_t;
@@ -49,16 +45,21 @@ typedef struct MPIDI_UCX_win_info {
     uint32_t disp;
 } __attribute__ ((packed)) MPIDI_UCX_win_info_t;
 
+typedef enum {
+    MPIDI_UCX_WIN_SYNC_UNSET = 0,
+    MPIDI_UCX_WIN_SYNC_FLUSH_LOCAL = 1, /* need both local and remote flush */
+    MPIDI_UCX_WIN_SYNC_FLUSH = 2        /* need only remote flush */
+} MPIDI_UCX_win_sync_flag_t;
+
+typedef struct MPIDI_UCX_win_target_sync {
+    MPIDI_UCX_win_sync_flag_t need_sync;        /* flag for op completion */
+} MPIDI_UCX_win_target_sync_t;
 
 typedef struct {
     MPIDI_UCX_win_info_t *info_table;
     ucp_mem_h mem_h;
-    int need_local_flush;
+    MPIDI_UCX_win_target_sync_t *target_sync;
 } MPIDI_UCX_win_t;
-
-typedef struct {
-    char addr[MPIDI_UCX_KVSAPPSTRLEN];
-} MPIDI_UCX_gpid_t;
 
 typedef struct {
     ucp_ep_h dest;
@@ -72,4 +73,4 @@ typedef struct {
     int dummy;
 } MPIDI_UCX_op_t;
 
-#endif /* NETMOD_UCX_PRE_H_INCLUDED */
+#endif /* UCX_PRE_H_INCLUDED */

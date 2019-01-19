@@ -6,8 +6,6 @@
 
 #include "mpidimpl.h"
 
-/* FIXME: HOMOGENEOUS SYSTEMS ONLY -- no data conversion is performed */
-
 /* FIXME: The routines MPID_Isend, MPID_Issend, MPID_Irsend are nearly 
    identical. It would be better if these did roughly:
 
@@ -34,7 +32,7 @@ int MPID_Isend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank
     intptr_t data_sz;
     int dt_contig;
     MPI_Aint dt_true_lb;
-    MPIDU_Datatype* dt_ptr;
+    MPIR_Datatype* dt_ptr;
     MPIR_Request * sreq;
     MPIDI_VC_t * vc=0;
 #if defined(MPID_USE_SEQUENCE_NUMBERS)
@@ -52,8 +50,8 @@ int MPID_Isend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank
 
     /* Check to make sure the communicator hasn't already been revoked */
     if (comm->revoked &&
-            MPIR_AGREE_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_Process.tagged_coll_mask) &&
-            MPIR_SHRINK_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_Process.tagged_coll_mask)) {
+            MPIR_AGREE_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_TAG_COLL_BIT) &&
+            MPIR_SHRINK_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_TAG_COLL_BIT)) {
         MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"Communicator revoked. MPID_ISEND returning");
         MPIR_ERR_SETANDJUMP(mpi_errno,MPIX_ERR_REVOKED,"**revoked");
     }
@@ -151,7 +149,7 @@ int MPID_Isend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank
 	    /* If we're not complete, then add a reference to the datatype */
 	    if (sreq) {
 		sreq->dev.datatype_ptr = dt_ptr;
-		MPIDU_Datatype_add_ref(dt_ptr);
+        MPIR_Datatype_ptr_add_ref(dt_ptr);
 	    }
 	}
     }
@@ -171,7 +169,7 @@ int MPID_Isend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank
 	if (sreq && dt_ptr != NULL)
 	{
 	    sreq->dev.datatype_ptr = dt_ptr;
-	    MPIDU_Datatype_add_ref(dt_ptr);
+        MPIR_Datatype_ptr_add_ref(dt_ptr);
 	}
     }
 

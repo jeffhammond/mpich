@@ -8,31 +8,10 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_PTL_AM_H_INCLUDED
-#define NETMOD_PTL_AM_H_INCLUDED
+#ifndef PTL_AM_H_INCLUDED
+#define PTL_AM_H_INCLUDED
 
 #include "ptl_impl.h"
-
-#undef FUNCNAME
-#define FUNCNAME MPIDI_NM_am_reg_handler
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline int MPIDI_NM_am_reg_handler(int handler_id,
-                                          MPIDI_NM_am_origin_handler_fn origin_handler_fn,
-                                          MPIDI_NM_am_target_handler_fn target_handler_fn)
-{
-    int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_NETMOD_REG_HDR_HANDLER);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_REG_HDR_HANDLER);
-
-    MPIDI_PTL_global.am_handlers[handler_id] = target_handler_fn;
-    MPIDI_PTL_global.send_cmpl_handlers[handler_id] = origin_handler_fn;
-  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_NETMOD_REG_HDR_HANDLER);
-    return mpi_errno;
-  fn_fail:
-    goto fn_exit;
-}
 
 static inline int MPIDI_NM_am_isend(int rank,
                                     MPIR_Comm * comm,
@@ -40,9 +19,7 @@ static inline int MPIDI_NM_am_isend(int rank,
                                     const void *am_hdr,
                                     size_t am_hdr_sz,
                                     const void *data,
-                                    MPI_Count count,
-                                    MPI_Datatype datatype, MPIR_Request * sreq,
-                                    void *netmod_context)
+                                    MPI_Count count, MPI_Datatype datatype, MPIR_Request * sreq)
 {
     int mpi_errno = MPI_SUCCESS, ret, c;
     size_t data_sz;
@@ -57,15 +34,15 @@ static inline int MPIDI_NM_am_isend(int rank,
     MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_SEND_AM);
 
     match_bits = MPIDI_PTL_init_tag(comm->context_id, MPIDI_PTL_AM_TAG);
-    sreq->dev.ch4.ch4u.netmod_am.portals4.handler_id = handler_id;
+    sreq->dev.ch4.am.netmod_am.portals4.handler_id = handler_id;
 
     MPIR_cc_incr(sreq->cc_ptr, &c);
 
     /* fast path: there's no data to be sent */
     if (count == 0) {
-        send_buf = MPL_malloc(am_hdr_sz);
+        send_buf = MPL_malloc(am_hdr_sz, MPL_MEM_BUFFER);
         MPIR_Memcpy(send_buf, am_hdr, am_hdr_sz);
-        sreq->dev.ch4.ch4u.netmod_am.portals4.pack_buffer = send_buf;
+        sreq->dev.ch4.am.netmod_am.portals4.pack_buffer = send_buf;
 
         ptl_hdr = MPIDI_PTL_init_am_hdr(handler_id, 0);
 
@@ -84,9 +61,9 @@ static inline int MPIDI_NM_am_isend(int rank,
         ptl_md_t md;
         ptl_iovec_t iovec[2];
 
-        send_buf = MPL_malloc(am_hdr_sz);
+        send_buf = MPL_malloc(am_hdr_sz, MPL_MEM_BUFFER);
         MPIR_Memcpy(send_buf, am_hdr, am_hdr_sz);
-        sreq->dev.ch4.ch4u.netmod_am.portals4.pack_buffer = send_buf;
+        sreq->dev.ch4.am.netmod_am.portals4.pack_buffer = send_buf;
 
         iovec[0].iov_base = send_buf;
         iovec[0].iov_len = am_hdr_sz;
@@ -98,25 +75,24 @@ static inline int MPIDI_NM_am_isend(int rank,
         md.eq_handle = MPIDI_PTL_global.eqs[0];
         md.ct_handle = PTL_CT_NONE;
 
-        ret = PtlMDBind(MPIDI_PTL_global.ni, &md, &sreq->dev.ch4.ch4u.netmod_am.portals4.md);
-        ret = PtlPut(sreq->dev.ch4.ch4u.netmod_am.portals4.md, 0, am_hdr_sz + data_sz,
+        ret = PtlMDBind(MPIDI_PTL_global.ni, &md, &sreq->dev.ch4.am.netmod_am.portals4.md);
+        ret = PtlPut(sreq->dev.ch4.am.netmod_am.portals4.md, 0, am_hdr_sz + data_sz,
                      PTL_ACK_REQ, MPIDI_PTL_global.addr_table[rank].process,
                      MPIDI_PTL_global.addr_table[rank].pt, match_bits, 0, sreq, ptl_hdr);
-    }
-    else {
+    } else {
         /* copy everything into pack_buffer */
-        MPID_Segment *segment;
+        MPIR_Segment *segment;
         MPI_Aint last;
 
-        send_buf = MPL_malloc(am_hdr_sz + data_sz);
+        send_buf = MPL_malloc(am_hdr_sz + data_sz, MPL_MEM_BUFFER);
         MPIR_Memcpy(send_buf, am_hdr, am_hdr_sz);
-        segment = MPID_Segment_alloc();
-        MPID_Segment_init(data, count, datatype, segment, 0);
+        segment = MPIR_Segment_alloc();
+        MPIR_Segment_init(data, count, datatype, segment);
         last = data_sz;
-        MPID_Segment_pack(segment, 0, &last, send_buf + am_hdr_sz);
+        MPIR_Segment_pack(segment, 0, &last, send_buf + am_hdr_sz);
         MPIR_Assert(last == data_sz);
-        MPID_Segment_free(segment);
-        sreq->dev.ch4.ch4u.netmod_am.portals4.pack_buffer = send_buf;
+        MPIR_Segment_free(segment);
+        sreq->dev.ch4.am.netmod_am.portals4.pack_buffer = send_buf;
 
         ret = PtlPut(MPIDI_PTL_global.md, (ptl_size_t) send_buf, am_hdr_sz + data_sz,
                      PTL_ACK_REQ, MPIDI_PTL_global.addr_table[rank].process,
@@ -136,9 +112,7 @@ static inline int MPIDI_NM_am_isendv(int rank,
                                      struct iovec *am_hdr,
                                      size_t iov_len,
                                      const void *data,
-                                     MPI_Count count,
-                                     MPI_Datatype datatype,
-                                     MPIR_Request * sreq, void *netmod_context)
+                                     MPI_Count count, MPI_Datatype datatype, MPIR_Request * sreq)
 {
     MPIR_Assert(0);
     return MPI_SUCCESS;
@@ -171,7 +145,7 @@ static inline int MPIDI_NM_am_isend_reply(MPIR_Context_id_t context_id,
     MPIDI_Datatype_get_info(count, datatype, dt_contig, data_sz, dt_ptr, dt_true_lb);
     match_bits = MPIDI_PTL_init_tag(use_comm->context_id, MPIDI_PTL_AM_TAG);
     ptl_hdr = MPIDI_PTL_init_am_hdr(handler_id, data_sz);
-    sreq->dev.ch4.ch4u.netmod_am.portals4.handler_id = handler_id;
+    sreq->dev.ch4.am.netmod_am.portals4.handler_id = handler_id;
 
     MPIR_cc_incr(sreq->cc_ptr, &c);
 
@@ -180,9 +154,9 @@ static inline int MPIDI_NM_am_isend_reply(MPIR_Context_id_t context_id,
         ptl_md_t md;
         ptl_iovec_t iovec[2];
 
-        send_buf = MPL_malloc(am_hdr_sz);
+        send_buf = MPL_malloc(am_hdr_sz, MPL_MEM_BUFFER);
         MPIR_Memcpy(send_buf, am_hdr, am_hdr_sz);
-        sreq->dev.ch4.ch4u.netmod_am.portals4.pack_buffer = send_buf;
+        sreq->dev.ch4.am.netmod_am.portals4.pack_buffer = send_buf;
 
         iovec[0].iov_base = send_buf;
         iovec[0].iov_len = am_hdr_sz;
@@ -194,25 +168,24 @@ static inline int MPIDI_NM_am_isend_reply(MPIR_Context_id_t context_id,
         md.eq_handle = MPIDI_PTL_global.eqs[0];
         md.ct_handle = PTL_CT_NONE;
 
-        ret = PtlMDBind(MPIDI_PTL_global.ni, &md, &sreq->dev.ch4.ch4u.netmod_am.portals4.md);
-        ret = PtlPut(sreq->dev.ch4.ch4u.netmod_am.portals4.md, 0, am_hdr_sz + data_sz,
+        ret = PtlMDBind(MPIDI_PTL_global.ni, &md, &sreq->dev.ch4.am.netmod_am.portals4.md);
+        ret = PtlPut(sreq->dev.ch4.am.netmod_am.portals4.md, 0, am_hdr_sz + data_sz,
                      PTL_ACK_REQ, MPIDI_PTL_global.addr_table[src_rank].process,
                      MPIDI_PTL_global.addr_table[src_rank].pt, match_bits, 0, sreq, ptl_hdr);
-    }
-    else {
+    } else {
         /* copy everything into pack_buffer */
-        MPID_Segment *segment;
+        MPIR_Segment *segment;
         MPI_Aint last;
 
-        send_buf = MPL_malloc(am_hdr_sz + data_sz);
+        send_buf = MPL_malloc(am_hdr_sz + data_sz, MPL_MEM_BUFFER);
         MPIR_Memcpy(send_buf, am_hdr, am_hdr_sz);
-        segment = MPID_Segment_alloc();
-        MPID_Segment_init(data, count, datatype, segment, 0);
+        segment = MPIR_Segment_alloc();
+        MPIR_Segment_init(data, count, datatype, segment);
         last = data_sz;
-        MPID_Segment_pack(segment, 0, &last, send_buf + am_hdr_sz);
+        MPIR_Segment_pack(segment, 0, &last, send_buf + am_hdr_sz);
         MPIR_Assert(last == data_sz);
-        MPID_Segment_free(segment);
-        sreq->dev.ch4.ch4u.netmod_am.portals4.pack_buffer = send_buf;
+        MPIR_Segment_free(segment);
+        sreq->dev.ch4.am.netmod_am.portals4.pack_buffer = send_buf;
 
         ret = PtlPut(MPIDI_PTL_global.md, (ptl_size_t) send_buf, am_hdr_sz + data_sz,
                      PTL_ACK_REQ, MPIDI_PTL_global.addr_table[src_rank].process,
@@ -234,8 +207,7 @@ static inline size_t MPIDI_NM_am_hdr_max_sz(void)
 
 static inline int MPIDI_NM_am_send_hdr(int rank,
                                        MPIR_Comm * comm,
-                                       int handler_id,
-                                       const void *am_hdr, size_t am_hdr_sz, void *netmod_context)
+                                       int handler_id, const void *am_hdr, size_t am_hdr_sz)
 {
     int mpi_errno = MPI_SUCCESS, ret, c;
     ptl_hdr_data_t ptl_hdr;
@@ -251,10 +223,12 @@ static inline int MPIDI_NM_am_send_hdr(int rank,
 
     /* create an internal request for the inject */
     inject_req = MPIR_Request_create(MPIR_REQUEST_KIND__UNDEFINED);
+    MPIR_ERR_CHKANDSTMT((inject_req) == NULL, mpi_errno, MPIX_ERR_NOREQ, goto fn_fail,
+                        "**nomemreq");
     MPIDI_NM_am_request_init(inject_req);
-    send_buf = MPL_malloc(am_hdr_sz);
+    send_buf = MPL_malloc(am_hdr_sz, MPL_MEM_BUFFER);
     MPIR_Memcpy(send_buf, am_hdr, am_hdr_sz);
-    inject_req->dev.ch4.ch4u.netmod_am.portals4.pack_buffer = send_buf;
+    inject_req->dev.ch4.am.netmod_am.portals4.pack_buffer = send_buf;
 
     ret = PtlPut(MPIDI_PTL_global.md, (ptl_size_t) send_buf, am_hdr_sz,
                  PTL_ACK_REQ, MPIDI_PTL_global.addr_table[rank].process,
@@ -288,10 +262,12 @@ static inline int MPIDI_NM_am_send_hdr_reply(MPIR_Context_id_t context_id,
 
     /* create an internal request for the inject */
     inject_req = MPIR_Request_create(MPIR_REQUEST_KIND__UNDEFINED);
+    MPIR_ERR_CHKANDSTMT((inject_req) == NULL, mpi_errno, MPIX_ERR_NOREQ, goto fn_fail,
+                        "**nomemreq");
     MPIDI_NM_am_request_init(inject_req);
-    send_buf = MPL_malloc(am_hdr_sz);
+    send_buf = MPL_malloc(am_hdr_sz, MPL_MEM_BUFFER);
     MPIR_Memcpy(send_buf, am_hdr, am_hdr_sz);
-    inject_req->dev.ch4.ch4u.netmod_am.portals4.pack_buffer = send_buf;
+    inject_req->dev.ch4.am.netmod_am.portals4.pack_buffer = send_buf;
 
     ret = PtlPut(MPIDI_PTL_global.md, (ptl_size_t) send_buf, am_hdr_sz,
                  PTL_ACK_REQ, MPIDI_PTL_global.addr_table[src_rank].process,
@@ -310,4 +286,4 @@ static inline int MPIDI_NM_am_recv(MPIR_Request * req)
     return 0;
 }
 
-#endif /* NETMOD_PTL_AM_H_INCLUDED */
+#endif /* PTL_AM_H_INCLUDED */

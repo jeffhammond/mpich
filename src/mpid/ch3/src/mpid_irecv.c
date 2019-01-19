@@ -14,7 +14,7 @@ int MPID_Irecv(void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int 
 	       MPIR_Comm * comm, int context_offset,
                MPIR_Request ** request)
 {
-    MPIR_Request * rreq;
+    MPIR_Request * rreq = NULL;
     int found;
     int mpi_errno = MPI_SUCCESS;
     MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_IRECV);
@@ -33,8 +33,8 @@ int MPID_Irecv(void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int 
 
     /* Check to make sure the communicator hasn't already been revoked */
     if (comm->revoked &&
-            MPIR_AGREE_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_Process.tagged_coll_mask) &&
-            MPIR_SHRINK_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_Process.tagged_coll_mask)) {
+            MPIR_AGREE_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_TAG_COLL_BIT) &&
+            MPIR_SHRINK_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_TAG_COLL_BIT)) {
         MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"Comm has been revoked. Returning from MPID_IRECV.");
         MPIR_ERR_SETANDJUMP(mpi_errno,MPIX_ERR_REVOKED,"**revoked");
     }
@@ -106,8 +106,8 @@ int MPID_Irecv(void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int 
 		   entire message has arrived. */
 		if (HANDLE_GET_KIND(datatype) != HANDLE_KIND_BUILTIN)
 		{
-		    MPIDU_Datatype_get_ptr(datatype, rreq->dev.datatype_ptr);
-		    MPIDU_Datatype_add_ref(rreq->dev.datatype_ptr);
+		    MPIR_Datatype_get_ptr(datatype, rreq->dev.datatype_ptr);
+            MPIR_Datatype_ptr_add_ref(rreq->dev.datatype_ptr);
 		}
 	    
 	    }
@@ -120,8 +120,8 @@ int MPID_Irecv(void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int 
 	    if (mpi_errno) MPIR_ERR_POP( mpi_errno );
 	    if (HANDLE_GET_KIND(datatype) != HANDLE_KIND_BUILTIN)
 	    {
-		MPIDU_Datatype_get_ptr(datatype, rreq->dev.datatype_ptr);
-		MPIDU_Datatype_add_ref(rreq->dev.datatype_ptr);
+		MPIR_Datatype_get_ptr(datatype, rreq->dev.datatype_ptr);
+        MPIR_Datatype_ptr_add_ref(rreq->dev.datatype_ptr);
 	    }
 	}
 	else if (MPIDI_Request_get_msg_type(rreq) == MPIDI_REQUEST_SELF_MSG)
@@ -151,8 +151,8 @@ int MPID_Irecv(void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int 
 	
 	if (HANDLE_GET_KIND(datatype) != HANDLE_KIND_BUILTIN)
 	{
-	    MPIDU_Datatype_get_ptr(datatype, rreq->dev.datatype_ptr);
-	    MPIDU_Datatype_add_ref(rreq->dev.datatype_ptr);
+	    MPIR_Datatype_get_ptr(datatype, rreq->dev.datatype_ptr);
+        MPIR_Datatype_ptr_add_ref(rreq->dev.datatype_ptr);
 	}
 
 	rreq->dev.recv_pending_count = 1;
@@ -167,10 +167,11 @@ int MPID_Irecv(void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int 
     *request = rreq;
     MPL_DBG_MSG_P(MPIDI_CH3_DBG_OTHER,VERBOSE,"request allocated, handle=0x%08x",
 		   rreq->handle);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_IRECV);
+    return mpi_errno;
 
  fn_fail:
     MPL_DBG_MSG_D(MPIDI_CH3_DBG_OTHER,VERBOSE,"IRECV errno: 0x%08x", mpi_errno);
     MPL_DBG_MSG_D(MPIDI_CH3_DBG_OTHER,VERBOSE,"(class: %d)", MPIR_ERR_GET_CLASS(mpi_errno));
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_IRECV);
-    return mpi_errno;
+    goto fn_exit;
 }

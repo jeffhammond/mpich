@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include "mpitest.h"
 
 #define NUM_LOOPS  (128)
 
@@ -19,7 +20,7 @@ int main(int argc, char **argv)
     int count = 2;
     int *displs;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
@@ -32,6 +33,8 @@ int main(int argc, char **argv)
     for (i = 0; i < count; i++)
         displs[i] = i * 2;
 
+    req = (MPI_Request *) malloc(NUM_LOOPS * sizeof(MPI_Request));
+
     MPI_Barrier(MPI_COMM_WORLD);
 
     /* test isends */
@@ -39,11 +42,9 @@ int main(int argc, char **argv)
     MPI_Type_commit(&newtype);
 
     if (rank == 0) {
-        req = (MPI_Request *) malloc(NUM_LOOPS * sizeof(MPI_Request));
         for (i = 0; i < NUM_LOOPS; i++)
             MPI_Isend(snd_buf, 1, newtype, !rank, 0, MPI_COMM_WORLD, &req[i]);
-    }
-    else {
+    } else {
         for (i = 0; i < NUM_LOOPS; i++)
             MPI_Recv(rcv_buf, 1, newtype, !rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
@@ -58,11 +59,9 @@ int main(int argc, char **argv)
     MPI_Type_commit(&newtype);
 
     if (rank == 0) {
-        req = (MPI_Request *) malloc(NUM_LOOPS * sizeof(MPI_Request));
         for (i = 0; i < NUM_LOOPS; i++)
             MPI_Issend(snd_buf, 1, newtype, !rank, 0, MPI_COMM_WORLD, &req[i]);
-    }
-    else {
+    } else {
         for (i = 0; i < NUM_LOOPS; i++)
             MPI_Recv(rcv_buf, 1, newtype, !rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
@@ -76,13 +75,11 @@ int main(int argc, char **argv)
     MPI_Type_create_indexed_block(count, 1, displs, MPI_INT, &newtype);
     MPI_Type_commit(&newtype);
 
-    req = (MPI_Request *) malloc(NUM_LOOPS * sizeof(MPI_Request));
     if (rank == 0) {
         MPI_Barrier(MPI_COMM_WORLD);
         for (i = 0; i < NUM_LOOPS; i++)
             MPI_Irsend(snd_buf, 1, newtype, !rank, 0, MPI_COMM_WORLD, &req[i]);
-    }
-    else {
+    } else {
         for (i = 0; i < NUM_LOOPS; i++)
             MPI_Irecv(rcv_buf, 1, newtype, !rank, 0, MPI_COMM_WORLD, &req[i]);
         MPI_Barrier(MPI_COMM_WORLD);
@@ -92,10 +89,10 @@ int main(int argc, char **argv)
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    MPI_Finalize();
+    MTest_Finalize(0);
 
-    if (rank == 0)
-        printf(" No Errors\n");
+    free(displs);
+    free(req);
 
     return 0;
 }

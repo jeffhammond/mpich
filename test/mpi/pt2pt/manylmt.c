@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <mpi.h>
+#include "mpitest.h"
 
 #define N_TRY 32
 #define BLKSIZE (10*1024*1024)
@@ -29,7 +30,7 @@ int main(int argc, char *argv[])
     char *buff;
     MPI_Request reqs[N_TRY];
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     buff = malloc(N_TRY * BLKSIZE);
     memset(buff, -1, N_TRY * BLKSIZE);
@@ -41,21 +42,17 @@ int main(int argc, char *argv[])
 
     if (rank == 0) {
         for (i = 0; i < N_TRY; i++)
-            MPI_Isend(buff + BLKSIZE*i, BLKSIZE, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &reqs[i]);
+            MPI_Isend(buff + BLKSIZE * i, BLKSIZE, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &reqs[i]);
         MPI_Waitall(N_TRY, reqs, MPI_STATUSES_IGNORE);
-    }
-    else if (rank == dest) {
+    } else if (rank == dest) {
         for (i = 0; i < N_TRY; i++)
-            MPI_Irecv(buff + BLKSIZE*i, BLKSIZE, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &reqs[i]);
+            MPI_Irecv(buff + BLKSIZE * i, BLKSIZE, MPI_BYTE, 0, 0, MPI_COMM_WORLD, &reqs[i]);
         MPI_Waitall(N_TRY, reqs, MPI_STATUSES_IGNORE);
     }
 
     free(buff);
 
-    if (rank == 0)
-        puts(" No Errors");
-
-    MPI_Finalize();
+    MTest_Finalize(0);
 
     return 0;
 }

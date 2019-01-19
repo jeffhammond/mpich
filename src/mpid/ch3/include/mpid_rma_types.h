@@ -4,7 +4,7 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#if !defined(MPID_RMA_TYPES_H_INCLUDED)
+#ifndef MPID_RMA_TYPES_H_INCLUDED
 #define MPID_RMA_TYPES_H_INCLUDED
 
 #include "mpidi_ch3_impl.h"
@@ -27,6 +27,11 @@ typedef enum MPIDI_RMA_Pool_type {
     MPIDI_RMA_POOL_WIN = 6,
     MPIDI_RMA_POOL_GLOBAL = 7
 } MPIDI_RMA_Pool_type_t;
+
+typedef enum MPIDI_RMA_Acc_srcbuf_kind {
+    MPIDI_RMA_ACC_SRCBUF_DEFAULT,
+    MPIDI_RMA_ACC_SRCBUF_PACKED
+} MPIDI_RMA_Acc_srcbuf_kind_t;
 
 /* for keeping track of RMA ops, which will be executed at the next sync call */
 typedef struct MPIDI_RMA_Op {

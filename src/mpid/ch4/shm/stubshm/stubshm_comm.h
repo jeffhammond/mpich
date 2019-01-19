@@ -7,23 +7,32 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef SHM_STUBSHM_COMM_H_INCLUDED
-#define SHM_STUBSHM_COMM_H_INCLUDED
+#ifndef STUBSHM_COMM_H_INCLUDED
+#define STUBSHM_COMM_H_INCLUDED
 
 #include "stubshm_impl.h"
-static inline int MPIDI_SHM_mpi_comm_create_hook(MPIR_Comm * comm)
+
+static inline int MPIDI_STUBSHM_mpi_comm_create_hook(MPIR_Comm * comm)
 {
-    int mpi_errno = MPI_SUCCESS;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_STUBSHM_MPI_COMM_CREATE_HOOK);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_STUBSHM_MPI_COMM_CREATE_HOOK);
+
     MPIR_Assert(0);
-    return mpi_errno;
+
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_STUBSHM_MPI_COMM_CREATE_HOOK);
+    return MPI_SUCCESS;
 }
 
-static inline int MPIDI_SHM_mpi_comm_free_hook(MPIR_Comm * comm)
+static inline int MPIDI_STUBSHM_mpi_comm_free_hook(MPIR_Comm * comm)
 {
-    int mpi_errno = MPI_SUCCESS;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_STUBSHM_MPI_COMM_FREE_HOOK);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_STUBSHM_MPI_COMM_FREE_HOOK);
+
     MPIR_Assert(0);
-    return mpi_errno;
+
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_STUBSHM_MPI_COMM_FREE_HOOK);
+    return MPI_SUCCESS;
 }
 
 
-#endif /* SHM_STUBSHM_COMM_H_INCLUDED */
+#endif /* STUBSHM_COMM_H_INCLUDED */

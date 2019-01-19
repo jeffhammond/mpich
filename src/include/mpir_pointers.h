@@ -18,8 +18,14 @@
 /* This test is lame.  Should eventually include cookie test
    and in-range addresses */
 #define MPIR_Valid_ptr_class(kind,ptr,errclass,err) \
-  {if (!(ptr)) { err = MPIR_Err_create_code( MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, errclass, \
-                                             "**nullptrtype", "**nullptrtype %s", #kind ); } }
+    do {                                                                \
+        if (!(ptr)) {                                                   \
+            err = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, errclass, \
+                                       "**nullptrtype", "**nullptrtype %s", #kind); \
+            /* Explicitly tell Coverity that errclass != MPI_SUCCESS => err != MPI_SUCCESS */ \
+            MPIR_Assert((errclass) == MPI_SUCCESS || ((err) != MPI_SUCCESS)); \
+        }                                                               \
+    } while (0)
 
 #define MPIR_Info_valid_ptr(ptr,err) MPIR_Valid_ptr_class(Info,ptr,MPI_ERR_INFO,err)
 /* Check not only for a null pointer but for an invalid communicator,
@@ -73,7 +79,11 @@
  *
  * \param[in]  aint  Variable of type MPI_Aint
  */
+#ifndef SIZEOF_PTR_IS_AINT
 #define MPIR_Ensure_Aint_fits_in_pointer(aint) \
   MPIR_Assert((aint) == (MPI_Aint)(uintptr_t) MPIR_AINT_CAST_TO_VOID_PTR(aint));
+#else
+#define MPIR_Ensure_Aint_fits_in_pointer(aint) do {} while (0)
+#endif
 
 #endif /* MPIR_POINTERS_H_INCLUDED */

@@ -15,8 +15,8 @@
 #include "mpir_type_defs.h"
 #include "mpir_assert.h"
 #include "mpir_pointers.h"
-#include "mpir_utarray.h"
-#include "mpl_uthash.h"
+#include "utarray.h"
+#include "uthash.h"
 #include "mpir_objects.h"
 
 #ifdef HAVE_ERROR_CHECKING
@@ -32,7 +32,7 @@ typedef enum {
 /* MPI_T enum
  */
 typedef struct enum_item_s {
-    const char* name;
+    const char *name;
     int value;
 } enum_item_t;
 
@@ -58,7 +58,7 @@ typedef struct {
 typedef struct {
     const char *name;
     unsigned idx;
-    MPL_UT_hash_handle hh;  /* Makes this structure hashable */
+    UT_hash_handle hh;          /* Makes this structure hashable */
 } name2index_hash_t;
 
 /* MPI_T control variable (cvar)
@@ -75,7 +75,7 @@ typedef union MPIR_T_cvar_value_s {
     unsigned ul;
     unsigned ull;
     MPI_Count c;
-    char* str;
+    char *str;
     double f;
     MPIR_T_cvar_range_value_t range;
 } MPIR_T_cvar_value_t;
@@ -96,11 +96,11 @@ typedef struct cvar_table_entry_s {
     /* cvar data type */
     MPI_Datatype datatype;
 
-     /* Num. of elements of the cvar. May be ignored when get_count != NULL */
+    /* Num. of elements of the cvar. May be ignored when get_count != NULL */
     int count;
 
     /* Properties of the cvar */
-    MPI_T_enum  enumtype;
+    MPI_T_enum enumtype;
     MPIR_T_verbosity_t verbosity;
     MPIR_T_bind_t bind;
     MPIR_T_scope_t scope;
@@ -123,7 +123,7 @@ typedef struct MPIR_T_cvar_handle_s {
     MPIR_T_object_kind kind;
 #endif
 
-     /* Address and count of the cvar. Set at handle allocation time */
+    /* Address and count of the cvar. Set at handle allocation time */
     void *addr;
     int count;
 
@@ -132,12 +132,11 @@ typedef struct MPIR_T_cvar_handle_s {
     MPIR_T_scope_t scope;
 } MPIR_T_cvar_handle_t;
 
-void MPIR_T_CVAR_REGISTER_impl(
-    MPI_Datatype dtype, const char* name, const void *addr, int count,
-    MPIR_T_enum_t *etype, MPIR_T_verbosity_t verb, MPIR_T_bind_t bind,
-    MPIR_T_scope_t scope,MPIR_T_cvar_get_addr_cb get_addr,
-    MPIR_T_cvar_get_count_cb get_count, MPIR_T_cvar_value_t defaultval,
-    const char *cat, const char * desc);
+void MPIR_T_CVAR_REGISTER_impl(MPI_Datatype dtype, const char *name, const void *addr, int count,
+                               MPIR_T_enum_t * etype, MPIR_T_verbosity_t verb, MPIR_T_bind_t bind,
+                               MPIR_T_scope_t scope, MPIR_T_cvar_get_addr_cb get_addr,
+                               MPIR_T_cvar_get_count_cb get_count, MPIR_T_cvar_value_t defaultval,
+                               const char *cat, const char *desc);
 
 /* MPI_T performance variable (pvar)
  */
@@ -187,13 +186,13 @@ typedef struct {
     /* pvar data type */
     MPI_Datatype datatype;
 
-     /* Num. of elements of the pvar */
+    /* Num. of elements of the pvar */
     int count;
 
     /* Properties of the pvar */
     MPIR_T_pvar_class_t varclass;
     MPIR_T_verbosity_t verbosity;
-    MPIR_T_enum_t  *enumtype;
+    MPIR_T_enum_t *enumtype;
     MPIR_T_bind_t bind;
 
     /* Basic flags of the pvar */
@@ -344,11 +343,13 @@ typedef struct MPIR_T_pvar_session_s {
     MPIR_T_pvar_handle_t *hlist;
 } MPIR_T_pvar_session_t;
 
-extern void MPIR_T_PVAR_REGISTER_impl(
-    int varclass, MPI_Datatype dtype, const char* name, void *addr, int count,
-    MPIR_T_enum_t *etype, int verb, int bind, int flags,
-    MPIR_T_pvar_get_value_cb get_value, MPIR_T_pvar_get_count_cb get_count,
-    const char * cat, const char * desc);
+extern void MPIR_T_PVAR_REGISTER_impl(MPIR_T_pvar_class_t varclass, MPI_Datatype dtype,
+                                      const char *name, void *addr, int count,
+                                      MPIR_T_enum_t * etype, MPIR_T_verbosity_t verb,
+                                      MPIR_T_bind_t bind, int flags,
+                                      MPIR_T_pvar_get_value_cb get_value,
+                                      MPIR_T_pvar_get_count_cb get_count, const char *cat,
+                                      const char *desc);
 
 /* For static pvars (i.e., pvars with static storage), we embed their class name
  * into their variable name, so that users can declare pvars with the same name
@@ -378,7 +379,7 @@ extern void MPIR_T_PVAR_REGISTER_impl(
         /* Allowable datatypes only */ \
         MPIR_Assert((dtype_) == MPI_INT); \
         /* Double check if dtype_ and name_ match */ \
-        MPIR_Assert(sizeof(PVAR_STATE_##name_) == MPID_Datatype_get_basic_size(dtype_)); \
+        MPIR_Assert(sizeof(PVAR_STATE_##name_) == MPIR_Datatype_get_basic_size(dtype_)); \
         MPIR_Assert((flags_) & MPIR_T_PVAR_FLAG_CONTINUOUS); \
         /* State pvars should be describled further by an enum */ \
         MPIR_Assert((etype_) != MPI_T_ENUM_NULL); \
@@ -433,7 +434,7 @@ extern void MPIR_T_PVAR_REGISTER_impl(
         MPIR_Assert((dtype_) == MPI_UNSIGNED || (dtype_) == MPI_UNSIGNED_LONG || \
                     (dtype_) == MPI_UNSIGNED_LONG_LONG || (dtype_) == MPI_DOUBLE); \
         /* Double check if dtype_ and name_ match */ \
-        MPIR_Assert(sizeof(PVAR_LEVEL_##name_) == MPID_Datatype_get_basic_size(dtype_)); \
+        MPIR_Assert(sizeof(PVAR_LEVEL_##name_) == MPIR_Datatype_get_basic_size(dtype_)); \
         MPIR_Assert((flags_) & MPIR_T_PVAR_FLAG_CONTINUOUS); \
         PVAR_LEVEL_##name_ = (initval_); \
         addr_ = &PVAR_LEVEL_##name_; \
@@ -479,7 +480,7 @@ extern void MPIR_T_PVAR_REGISTER_impl(
         MPIR_Assert((dtype_) == MPI_UNSIGNED || (dtype_) == MPI_UNSIGNED_LONG || \
                     (dtype_) == MPI_UNSIGNED_LONG_LONG || (dtype_) == MPI_DOUBLE); \
         /* Double check if dtype_ and name_ match */ \
-        MPIR_Assert(sizeof(PVAR_SIZE_##name_) == MPID_Datatype_get_basic_size(dtype_)); \
+        MPIR_Assert(sizeof(PVAR_SIZE_##name_) == MPIR_Datatype_get_basic_size(dtype_)); \
         MPIR_Assert((flags_) & MPIR_T_PVAR_FLAG_CONTINUOUS); \
         PVAR_SIZE_##name_ = (initval_); \
         addr_ = &PVAR_SIZE_##name_; \
@@ -527,7 +528,7 @@ extern void MPIR_T_PVAR_REGISTER_impl(
         /* Allowable datatypes only */ \
         MPIR_Assert((dtype_) == MPI_DOUBLE); \
         /* Double check if dtype_ and name_ match */ \
-        MPIR_Assert(sizeof(PVAR_PERCENTAGE_##name_) == MPID_Datatype_get_basic_size(dtype_)); \
+        MPIR_Assert(sizeof(PVAR_PERCENTAGE_##name_) == MPIR_Datatype_get_basic_size(dtype_)); \
         MPIR_Assert((flags_) & MPIR_T_PVAR_FLAG_CONTINUOUS); \
         addr_ = &PVAR_PERCENTAGE_##name_; \
         PVAR_PERCENTAGE_##name_ = (initval_); \
@@ -579,7 +580,7 @@ extern void MPIR_T_PVAR_REGISTER_impl(
         MPIR_Assert((dtype_) == MPI_UNSIGNED || (dtype_) == MPI_UNSIGNED_LONG || \
                     (dtype_) == MPI_UNSIGNED_LONG_LONG); \
         /* Double check if dtype_ and name_ match*/ \
-        MPIR_Assert(sizeof(PVAR_COUNTER_##name_) == MPID_Datatype_get_basic_size(dtype_)); \
+        MPIR_Assert(sizeof(PVAR_COUNTER_##name_) == MPIR_Datatype_get_basic_size(dtype_)); \
         PVAR_COUNTER_##name_ = 0; \
         addr_ = &PVAR_COUNTER_##name_; \
         MPIR_T_PVAR_REGISTER_impl(MPI_T_PVAR_CLASS_COUNTER, dtype_, #name_, \
@@ -633,7 +634,7 @@ extern void MPIR_T_PVAR_REGISTER_impl(
         MPIR_Assert((dtype_) == MPI_UNSIGNED || (dtype_) == MPI_UNSIGNED_LONG || \
                     (dtype_) == MPI_UNSIGNED_LONG_LONG); \
         /* Double check if dtype_ and name_ match */ \
-        MPIR_Assert(sizeof(PVAR_COUNTER_##name_[0]) == MPID_Datatype_get_basic_size(dtype_)); \
+        MPIR_Assert(sizeof(PVAR_COUNTER_##name_[0]) == MPIR_Datatype_get_basic_size(dtype_)); \
         addr_ = PVAR_COUNTER_##name_; \
         MPIR_T_PVAR_COUNTER_ARRAY_INIT_impl(name_); \
         count_ = sizeof(PVAR_COUNTER_##name_)/sizeof(mpit_pvar_##name_[0]); \
@@ -671,7 +672,7 @@ extern void MPIR_T_PVAR_REGISTER_impl(
         MPIR_Assert((dtype_) == MPI_UNSIGNED || (dtype_) == MPI_UNSIGNED_LONG || \
                     (dtype_) == MPI_UNSIGNED_LONG_LONG || (dtype_) == MPI_DOUBLE); \
         /* Double check if dtype_ and name_ match*/ \
-        MPIR_Assert(sizeof(PVAR_AGGREGATE_##name_) == MPID_Datatype_get_basic_size(dtype_)); \
+        MPIR_Assert(sizeof(PVAR_AGGREGATE_##name_) == MPIR_Datatype_get_basic_size(dtype_)); \
         PVAR_AGGREGATE_##name_ = 0; \
         addr_ = &PVAR_AGGREGATE_##name_; \
         MPIR_T_PVAR_REGISTER_impl(MPI_T_PVAR_CLASS_AGGREGATE, dtype_, #name_, \
@@ -712,9 +713,9 @@ extern void MPIR_T_PVAR_REGISTER_impl(
     } while (0)
 #define MPIR_T_PVAR_TIMER_END_VAR_impl(ptr_) \
     do { \
-        MPID_Time_t tmp; \
-        MPID_Wtime(&tmp); \
-        MPID_Wtime_acc(&((ptr_)->curstart), &tmp, &((ptr_)->total)); \
+        MPID_Time_t tmp_; \
+        MPID_Wtime(&tmp_); \
+        MPID_Wtime_acc(&((ptr_)->curstart), &tmp_, &((ptr_)->total)); \
     } while (0)
 
 #define MPIR_T_PVAR_TIMER_INIT_impl(name_) \
@@ -730,8 +731,8 @@ extern void MPIR_T_PVAR_REGISTER_impl(
 
 /* Customized get_value() for MPIR_T_pvar_timer_t */
 static inline
-void get_timer_time_in_double(MPIR_T_pvar_timer_t *timer, void *obj_handle,
-                    int count, double *buf)
+    void get_timer_time_in_double(MPIR_T_pvar_timer_t * timer, void *obj_handle,
+                                  int count, double *buf)
 {
     int i;
     for (i = 0; i < count; i++)
@@ -1104,62 +1105,76 @@ void get_timer_time_in_double(MPIR_T_pvar_timer_t *timer, void *obj_handle,
         } \
     } while (0)
 
-static inline int MPIR_T_pvar_is_readonly(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_is_readonly(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags & MPIR_T_PVAR_FLAG_READONLY;
 }
 
-static inline int MPIR_T_pvar_is_continuous(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_is_continuous(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags & MPIR_T_PVAR_FLAG_CONTINUOUS;
 }
 
-static inline int MPIR_T_pvar_is_atomic(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_is_atomic(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags & MPIR_T_PVAR_FLAG_ATOMIC;
 }
 
-static inline int MPIR_T_pvar_is_sum(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_is_sum(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags & MPIR_T_PVAR_FLAG_SUM;
 }
 
-static inline int MPIR_T_pvar_is_watermark(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_is_watermark(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags & MPIR_T_PVAR_FLAG_WATERMARK;
 }
 
-static inline int MPIR_T_pvar_is_started(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_is_started(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags & MPIR_T_PVAR_FLAG_STARTED;
 }
 
-static inline void MPIR_T_pvar_set_started(MPIR_T_pvar_handle_t *handle) {
+static inline void MPIR_T_pvar_set_started(MPIR_T_pvar_handle_t * handle)
+{
     handle->flags |= (MPIR_T_PVAR_FLAG_STARTED | MPIR_T_PVAR_FLAG_ONCESTARTED);
 }
 
-static inline void MPIR_T_pvar_unset_started(MPIR_T_pvar_handle_t *handle) {
+static inline void MPIR_T_pvar_unset_started(MPIR_T_pvar_handle_t * handle)
+{
     handle->flags &= ~MPIR_T_PVAR_FLAG_STARTED;
 }
 
-static inline int MPIR_T_pvar_is_oncestarted(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_is_oncestarted(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags & MPIR_T_PVAR_FLAG_ONCESTARTED;
 }
 
-static inline void MPIR_T_pvar_unset_oncestarted(MPIR_T_pvar_handle_t *handle) {
+static inline void MPIR_T_pvar_unset_oncestarted(MPIR_T_pvar_handle_t * handle)
+{
     handle->flags &= ~MPIR_T_PVAR_FLAG_ONCESTARTED;
 }
 
-static inline int MPIR_T_pvar_is_first(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_is_first(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags & MPIR_T_PVAR_FLAG_FIRST;
 }
 
-static inline int MPIR_T_pvar_set_first(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_set_first(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags |= MPIR_T_PVAR_FLAG_FIRST;
 }
 
-static inline int MPIR_T_pvar_unset_first(MPIR_T_pvar_handle_t *handle) {
+static inline int MPIR_T_pvar_unset_first(MPIR_T_pvar_handle_t * handle)
+{
     return handle->flags &= ~MPIR_T_PVAR_FLAG_FIRST;
 }
 
 /* A counter that keeps track of the relative balance of calls to
  * MPI_T_init_thread and MPI_T_finalize */
 extern int MPIR_T_init_balance;
-static inline int MPIR_T_is_initialized() {
+static inline int MPIR_T_is_initialized()
+{
     return MPIR_T_init_balance > 0;
 }
 
@@ -1217,4 +1232,4 @@ extern MPID_Thread_mutex_t mpi_t_mutex;
 extern void MPIR_T_env_init(void);
 extern void MPIR_T_env_finalize(void);
 
-#endif
+#endif /* MPITIMPL_H_INCLUDED */

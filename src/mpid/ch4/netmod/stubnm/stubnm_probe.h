@@ -8,21 +8,16 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_STUBNM_PROBE_H_INCLUDED
-#define NETMOD_STUBNM_PROBE_H_INCLUDED
+#ifndef STUBNM_PROBE_H_INCLUDED
+#define STUBNM_PROBE_H_INCLUDED
 
 #include "stubnm_impl.h"
-
-static inline int MPIDI_NM_probe(int source,
-                                 int tag, MPIR_Comm * comm, int context_offset, MPI_Status * status)
-{
-    return MPIDI_CH4U_probe(source, tag, comm, context_offset, status);
-}
 
 static inline int MPIDI_NM_mpi_improbe(int source,
                                        int tag,
                                        MPIR_Comm * comm,
                                        int context_offset,
+                                       MPIDI_av_entry_t * addr,
                                        int *flag, MPIR_Request ** message, MPI_Status * status)
 {
     return MPIDI_CH4U_mpi_improbe(source, tag, comm, context_offset, flag, message, status);
@@ -31,9 +26,10 @@ static inline int MPIDI_NM_mpi_improbe(int source,
 static inline int MPIDI_NM_mpi_iprobe(int source,
                                       int tag,
                                       MPIR_Comm * comm,
-                                      int context_offset, int *flag, MPI_Status * status)
+                                      int context_offset,
+                                      MPIDI_av_entry_t * addr, int *flag, MPI_Status * status)
 {
     return MPIDI_CH4U_mpi_iprobe(source, tag, comm, context_offset, flag, status);
 }
 
-#endif /* NETMOD_STUBNM_PROBE_H_INCLUDED */
+#endif /* STUBNM_PROBE_H_INCLUDED */

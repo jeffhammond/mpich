@@ -17,6 +17,7 @@ ACLOCAL_AMFLAGS = -I confdb
 include_HEADERS = 
 nodist_include_HEADERS =
 noinst_HEADERS = 
+AM_CFLAGS = @VISIBILITY_CFLAGS@
 AM_CPPFLAGS =
 EXTRA_DIST =
 SUFFIXES = 
@@ -26,7 +27,7 @@ external_subdirs = @mpl_srcdir@
 external_dist_subdirs = @mpl_dist_srcdir@
 external_includes = @mpl_includedir@
 external_ldflags = @mpl_libdir@
-external_libs = -l$(MPLLIBNAME)
+external_libs = @mpl_lib@
 
 # ------------------------------------------------------------------------
 # variables to be populated by the included Makefile.mk fragments:
@@ -180,4 +181,12 @@ htmldoc:
 htmldoc-local: $(romio_mpi_sources:.c=.html-phony) $(doc1_src_txt:.txt=.html1-phony)
 
 # --------------------------------------------------------------------------
+
+# sometimes helpful when debugging macros to see the preprocessed output.
+# Also using '-CC' because comments provide useful landmarks
+
+SUFFIXES += .i
+
+.c.i:
+	$(COMPILE) -CC -E -o $@ $<
 

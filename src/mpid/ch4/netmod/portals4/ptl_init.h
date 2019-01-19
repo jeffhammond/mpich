@@ -8,8 +8,8 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_PTL_INIT_H_INCLUDED
-#define NETMOD_PTL_INIT_H_INCLUDED
+#ifndef PTL_INIT_H_INCLUDED
+#define PTL_INIT_H_INCLUDED
 
 #include "mpidch4r.h"
 #include "ptl_types.h"
@@ -46,10 +46,9 @@ static inline int MPIDI_PTL_append_overflow(size_t i)
 static inline int MPIDI_NM_mpi_init_hook(int rank,
                                          int size,
                                          int appnum,
-                                         int *tag_ub,
+                                         int *tag_bits,
                                          MPIR_Comm * comm_world,
-                                         MPIR_Comm * comm_self,
-                                         int spawned, int num_contexts, void **netmod_contexts)
+                                         MPIR_Comm * comm_self, int spawned, int *n_vnis_provided)
 {
     int mpi_errno = MPI_SUCCESS;
     int ret;
@@ -69,6 +68,8 @@ static inline int MPIDI_NM_mpi_init_hook(int rank,
     MPIR_Assert(((void *) &(((ptl_iovec_t *) 0)->iov_len)) ==
                 ((void *) &(((MPL_IOV *) 0)->MPL_IOV_LEN)));
     MPIR_Assert(sizeof(((ptl_iovec_t *) 0)->iov_len) == sizeof(((MPL_IOV *) 0)->MPL_IOV_LEN));
+
+    *n_vnis_provided = 1;
 
     /* init portals */
     ret = PtlInit();
@@ -122,11 +123,11 @@ static inline int MPIDI_NM_mpi_init_hook(int rank,
     ret = PMI_KVS_Get_key_length_max(&key_max_sz);
     ret = PMI_KVS_Get_value_length_max(&val_max_sz);
     ret = PMI_KVS_Get_name_length_max(&name_max_sz);
-    MPIDI_PTL_global.kvsname = MPL_malloc(name_max_sz);
+    MPIDI_PTL_global.kvsname = MPL_malloc(name_max_sz, MPL_MEM_ADDRESS);
     ret = PMI_KVS_Get_my_name(MPIDI_PTL_global.kvsname, name_max_sz);
 
-    keyS = MPL_malloc(key_max_sz);
-    valS = MPL_malloc(val_max_sz);
+    keyS = MPL_malloc(key_max_sz, MPL_MEM_ADDRESS);
+    valS = MPL_malloc(val_max_sz, MPL_MEM_ADDRES);
     buscard = valS;
     val_sz_left = val_max_sz;
 
@@ -141,16 +142,16 @@ static inline int MPIDI_NM_mpi_init_hook(int rank,
         MPL_str_add_binary_arg(&buscard, &val_sz_left, "PTI", (char *) &MPIDI_PTL_global.pt,
                                sizeof(MPIDI_PTL_global.pt));
 
-    sprintf(keyS, "PTL-%d", rank);
+    MPL_snprintf(keyS, key_max_sz * sizeof(char), "PTL-%d", rank);
     buscard = valS;
     ret = PMI_KVS_Put(MPIDI_PTL_global.kvsname, keyS, buscard);
     ret = PMI_KVS_Commit(MPIDI_PTL_global.kvsname);
     ret = PMI_Barrier();
 
     /* get and store business cards in address table */
-    MPIDI_PTL_global.addr_table = MPL_malloc(size * sizeof(MPIDI_PTL_addr_t));
+    MPIDI_PTL_global.addr_table = MPL_malloc(size * sizeof(MPIDI_PTL_addr_t), MPL_MEM_ADDRESS);
     for (i = 0; i < size; i++) {
-        sprintf(keyS, "PTL-%d", i);
+        MPL_snprintf(keyS, key_max_sz * sizeof(char), "PTL-%d", i);
         ret = PMI_KVS_Get(MPIDI_PTL_global.kvsname, keyS, valS, val_max_sz);
         MPL_str_get_binary_arg(valS, "NID",
                                (char *) &MPIDI_PTL_global.addr_table[i].process.phys.nid,
@@ -163,13 +164,15 @@ static inline int MPIDI_NM_mpi_init_hook(int rank,
     }
 
     /* Setup CH4R Active Messages */
-    MPIDI_CH4U_mpi_init(comm_world, comm_self, num_contexts, netmod_contexts);
+    MPIDIG_init(comm_world, comm_self, *n_vnis_provided);
     for (i = 0; i < MPIDI_PTL_NUM_OVERFLOW_BUFFERS; i++) {
-        MPIDI_PTL_global.overflow_bufs[i] = MPL_malloc(MPIDI_PTL_OVERFLOW_BUFFER_SZ);
+        MPIDI_PTL_global.overflow_bufs[i] =
+            MPL_malloc(MPIDI_PTL_OVERFLOW_BUFFER_SZ, MPL_MEM_BUFFER);
         MPIDI_PTL_append_overflow(i);
     }
 
-    MPIDI_PTL_global.node_map = MPL_malloc(size * sizeof(*MPIDI_PTL_global.node_map));
+    MPIDI_PTL_global.node_map =
+        MPL_malloc(size * sizeof(*MPIDI_PTL_global.node_map), MPL_MEM_ADDRESS);
     mpi_errno =
         MPIDI_CH4U_build_nodemap(rank, comm_world, size, MPIDI_PTL_global.node_map,
                                  &MPIDI_PTL_global.max_node_id);
@@ -191,7 +194,7 @@ static inline int MPIDI_NM_mpi_finalize_hook(void)
     MPIR_Comm_release(MPIR_Process.comm_world);
     MPIR_Comm_release(MPIR_Process.comm_self);
 
-    MPIDI_CH4U_mpi_finalize();
+    MPIDIG_finalize();
 
     for (i = 0; i < MPIDI_PTL_NUM_OVERFLOW_BUFFERS; i++) {
         ret = PtlMEUnlink(MPIDI_PTL_global.overflow_me_handles[i]);
@@ -211,28 +214,29 @@ static inline int MPIDI_NM_mpi_finalize_hook(void)
     return mpi_errno;
 }
 
+static inline int MPIDI_NM_get_vni_attr(int vni)
+{
+    MPIR_Assert(0 <= vni && vni < 1);
+    return MPIDI_VNI_TX | MPIDI_VNI_RX;
+}
 
 static inline int MPIDI_NM_comm_get_lpid(MPIR_Comm * comm_ptr,
-                                         int idx, int *lpid_ptr, MPL_bool is_remote)
+                                         int idx, int *lpid_ptr, bool is_remote)
 {
     MPIR_Assert(0);
     return MPI_SUCCESS;
 }
 
-static inline int MPIDI_NM_gpid_get(MPIR_Comm * comm_ptr, int rank, MPIR_Gpid * gpid)
+static inline int MPIDI_NM_get_local_upids(MPIR_Comm * comm, size_t ** local_upid_size,
+                                           char **local_upids)
 {
     MPIR_Assert(0);
     return MPI_SUCCESS;
 }
 
-static inline int MPIDI_NM_getallincomm(MPIR_Comm * comm_ptr,
-                                        int local_size, MPIR_Gpid local_gpids[], int *singleAVT)
-{
-    MPIR_Assert(0);
-    return MPI_SUCCESS;
-}
-
-static inline int MPIDI_NM_gpid_tolpidarray(int size, MPIR_Gpid gpid[], int lpid[])
+static inline int MPIDI_NM_upids_to_lupids(int size,
+                                           size_t * remote_upid_size,
+                                           char *remote_upids, int **remote_lupids)
 {
     MPIR_Assert(0);
     return MPI_SUCCESS;
@@ -256,4 +260,4 @@ static inline void *MPIDI_NM_mpi_alloc_mem(size_t size, MPIR_Info * info_ptr)
 }
 
 
-#endif /* NETMOD_PTL_INIT_H_INCLUDED */
+#endif /* PTL_INIT_H_INCLUDED */

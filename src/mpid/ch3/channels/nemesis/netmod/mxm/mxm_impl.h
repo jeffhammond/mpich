@@ -10,8 +10,8 @@
 
 
 
-#ifndef MX_MODULE_IMPL_H
-#define MX_MODULE_IMPL_H
+#ifndef MXM_IMPL_H_INCLUDED
+#define MXM_IMPL_H_INCLUDED
 #include "mpid_nem_impl.h"
 #include "pmi.h"
 #include <mxm/api/mxm_api.h>
@@ -234,7 +234,7 @@ static inline void list_grow_mxm_req(list_head_t * list_head)
     int count = MXM_MPICH_MAX_REQ;
 
     while (count--) {
-        mxm_req = (MPID_nem_mxm_req_t *) MPL_malloc(sizeof(MPID_nem_mxm_req_t));
+        mxm_req = (MPID_nem_mxm_req_t *) MPL_malloc(sizeof(MPID_nem_mxm_req_t), MPL_MEM_OBJECT);
         list_enqueue(list_head, &mxm_req->queue);
     }
 }
@@ -375,7 +375,7 @@ static inline void _dbg_mxm_hexdump(void *ptr, int buflen)
         return;
 
     len = 80 * (buflen / 16 + 1);
-    str = (char *) MPL_malloc(len);
+    str = (char *) MPL_malloc(len, MPL_MEM_STRINGS);
     for (i = 0; i < buflen; i += 16) {
         cur_len += MPL_snprintf(str + cur_len, len - cur_len, "%06x: ", i);
         for (j = 0; j < 16; j++)
@@ -444,4 +444,4 @@ static inline void _dbg_mxm_req(MPIR_Request * req)
 #define _dbg_mxm_output(level, ...)     ((void)0)
 #endif
 
-#endif
+#endif /* MXM_IMPL_H_INCLUDED */

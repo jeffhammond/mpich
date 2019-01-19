@@ -8,8 +8,8 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_PTL_IMPL_H_INCLUDED
-#define NETMOD_PTL_IMPL_H_INCLUDED
+#ifndef PTL_IMPL_H_INCLUDED
+#define PTL_IMPL_H_INCLUDED
 
 #include <mpidimpl.h>
 #include "portals4.h"
@@ -19,24 +19,24 @@
 static inline const char *MPIDI_PTL_strerror(int ret)
 {
     switch (ret) {
-        MPIDI_PTL_CASE_STR(PTL_OK);
-        MPIDI_PTL_CASE_STR(PTL_ARG_INVALID);
-        MPIDI_PTL_CASE_STR(PTL_CT_NONE_REACHED);
-        MPIDI_PTL_CASE_STR(PTL_EQ_DROPPED);
-        MPIDI_PTL_CASE_STR(PTL_EQ_EMPTY);
-        MPIDI_PTL_CASE_STR(PTL_FAIL);
-        MPIDI_PTL_CASE_STR(PTL_IN_USE);
-        MPIDI_PTL_CASE_STR(PTL_INTERRUPTED);
-        MPIDI_PTL_CASE_STR(PTL_IGNORED);
-        MPIDI_PTL_CASE_STR(PTL_LIST_TOO_LONG);
-        MPIDI_PTL_CASE_STR(PTL_NO_INIT);
-        MPIDI_PTL_CASE_STR(PTL_NO_SPACE);
-        MPIDI_PTL_CASE_STR(PTL_PID_IN_USE);
-        MPIDI_PTL_CASE_STR(PTL_PT_FULL);
-        MPIDI_PTL_CASE_STR(PTL_PT_EQ_NEEDED);
-        MPIDI_PTL_CASE_STR(PTL_PT_IN_USE);
-    default:
-        return "UNKNOWN";
+            MPIDI_PTL_CASE_STR(PTL_OK);
+            MPIDI_PTL_CASE_STR(PTL_ARG_INVALID);
+            MPIDI_PTL_CASE_STR(PTL_CT_NONE_REACHED);
+            MPIDI_PTL_CASE_STR(PTL_EQ_DROPPED);
+            MPIDI_PTL_CASE_STR(PTL_EQ_EMPTY);
+            MPIDI_PTL_CASE_STR(PTL_FAIL);
+            MPIDI_PTL_CASE_STR(PTL_IN_USE);
+            MPIDI_PTL_CASE_STR(PTL_INTERRUPTED);
+            MPIDI_PTL_CASE_STR(PTL_IGNORED);
+            MPIDI_PTL_CASE_STR(PTL_LIST_TOO_LONG);
+            MPIDI_PTL_CASE_STR(PTL_NO_INIT);
+            MPIDI_PTL_CASE_STR(PTL_NO_SPACE);
+            MPIDI_PTL_CASE_STR(PTL_PID_IN_USE);
+            MPIDI_PTL_CASE_STR(PTL_PT_FULL);
+            MPIDI_PTL_CASE_STR(PTL_PT_EQ_NEEDED);
+            MPIDI_PTL_CASE_STR(PTL_PT_IN_USE);
+        default:
+            return "UNKNOWN";
     }
 }
 
@@ -55,4 +55,4 @@ static inline const char *MPIDI_PTL_strerror(int ret)
                               MPIDI_PTL_strerror(STATUS));      \
     } while (0)
 
-#endif /* NETMOD_PTL_IMPL_H_INCLUDED */
+#endif /* PTL_IMPL_H_INCLUDED */

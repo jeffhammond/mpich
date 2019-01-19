@@ -15,7 +15,7 @@ noinst_HEADERS +=                      \
     adio/include/adioi_errmsg.h        \
     adio/include/adioi_error.h         \
     adio/include/adioi_fs_proto.h      \
-    adio/include/heap-sort.h           \
+    adio/include/heap_sort.h           \
     adio/include/mpio_error.h          \
     adio/include/mpipr.h               \
     adio/include/mpiu_greq.h           \
@@ -35,5 +35,5 @@ include $(top_srcdir)/adio/ad_pvfs2/Makefile.mk
 include $(top_srcdir)/adio/ad_testfs/Makefile.mk
 include $(top_srcdir)/adio/ad_ufs/Makefile.mk
 include $(top_srcdir)/adio/ad_xfs/Makefile.mk
+include $(top_srcdir)/adio/ad_ime/Makefile.mk
 include $(top_srcdir)/adio/common/Makefile.mk
-

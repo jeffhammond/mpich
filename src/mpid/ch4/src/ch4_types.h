@@ -14,31 +14,18 @@
 #include <mpidimpl.h>
 #include <stdio.h>
 #include "mpir_cvars.h"
-#include "pmi.h"
+#include "ch4i_workq_types.h"
 
 /* Macros and inlines */
-/* match/ignore bit manipulation
- *
- * 0123 4567 01234567 0123 4567 01234567 0123 4567 01234567 01234567 01234567
- *     |                  |                  |
- * ^   |    context id    |       source     |       message tag
- * |   |                  |                  |
- * +---- protocol
- */
-#define MPIDI_CH4U_PROTOCOL_MASK (0x9000000000000000ULL)
-#define MPIDI_CH4U_CONTEXT_MASK  (0x0FFFF00000000000ULL)
-#define MPIDI_CH4U_SOURCE_MASK   (0x00000FFFF0000000ULL)
-#define MPIDI_CH4U_TAG_MASK      (0x000000000FFFFFFFULL)
-#define MPIDI_CH4U_DYNPROC_SEND  (0x4000000000000000ULL)
-#define MPIDI_CH4U_TAG_SHIFT     (28)
-#define MPIDI_CH4U_SOURCE_SHIFT  (16)
-#define MPIDI_CH4U_SOURCE_SHIFT_UNPACK (sizeof(int)*8 - MPIDI_CH4U_SOURCE_SHIFT)
-#define MPIDI_CH4U_TAG_SHIFT_UNPACK (sizeof(int)*8 - MPIDI_CH4U_TAG_SHIFT)
+#define MPIDI_CH4U_MAP_NOT_FOUND      ((void*)(-1UL))
 
-#define MPIDI_CH4I_MAP_NOT_FOUND      ((void*)(-1UL))
-
-#define MAX_NETMOD_CONTEXTS 8
 #define MAX_PROGRESS_HOOKS 4
+
+/* VNI attributes */
+enum {
+    MPIDI_VNI_TX = 0x1,         /* Can send */
+    MPIDI_VNI_RX = 0x2, /* Can receive */
+};
 
 #define MPIDI_CH4I_BUF_POOL_NUM (1024)
 #define MPIDI_CH4I_BUF_POOL_SZ (256)
@@ -48,6 +35,21 @@ typedef struct progress_hook_slot {
     progress_func_ptr_t func_ptr;
     int active;
 } progress_hook_slot_t;
+
+/* Flags for MPIDI_Progress_test
+ *
+ * Flags argument allows to control execution of different parts of progress function,
+ * for aims of prioritization of different transports and reentrant-safety of progress call.
+ *
+ * MPIDI_PROGRESS_HOOKS - enables progress on progress hooks. Hooks may invoke upper-level logic internaly,
+ *      that's why MPIDI_Progress_test call with MPIDI_PROGRESS_HOOKS set isn't reentrant safe, and shouldn't be called from netmod's fallback logic.
+ * MPIDI_PROGRESS_NM and MPIDI_PROGRESS_SHM enables progress on transports only, and guarantee reentrant-safety.
+ */
+#define MPIDI_PROGRESS_HOOKS  (1)
+#define MPIDI_PROGRESS_NM     (1<<1)
+#define MPIDI_PROGRESS_SHM    (1<<2)
+
+#define MPIDI_PROGRESS_ALL (MPIDI_PROGRESS_HOOKS|MPIDI_PROGRESS_NM|MPIDI_PROGRESS_SHM)
 
 enum {
     MPIDI_CH4U_SEND = 0,        /* Eager send */
@@ -73,7 +75,12 @@ enum {
     MPIDI_CH4U_ACC_IOV_REQ,
     MPIDI_CH4U_ACC_DAT_REQ,
     MPIDI_CH4U_ACC_IOV_ACK,
+
+    MPIDI_CH4U_GET_ACC_REQ,
     MPIDI_CH4U_GET_ACC_ACK,
+    MPIDI_CH4U_GET_ACC_IOV_REQ,
+    MPIDI_CH4U_GET_ACC_DAT_REQ,
+    MPIDI_CH4U_GET_ACC_IOV_ACK,
 
     MPIDI_CH4U_CSWAP_REQ,
     MPIDI_CH4U_CSWAP_ACK,
@@ -88,7 +95,9 @@ enum {
     MPIDI_CH4U_WIN_LOCKALL,
     MPIDI_CH4U_WIN_LOCKALL_ACK,
     MPIDI_CH4U_WIN_UNLOCKALL,
-    MPIDI_CH4U_WIN_UNLOCKALL_ACK
+    MPIDI_CH4U_WIN_UNLOCKALL_ACK,
+
+    MPIDI_CH4U_COMM_ABORT
 };
 
 enum {
@@ -107,9 +116,16 @@ enum {
     MPIDI_CH4R_SHM = 1
 };
 
+/* Enum for src buffer kind when computing accumulate op */
+enum {
+    MPIDI_CH4U_ACC_SRCBUF_DEFAULT = 0,
+    MPIDI_CH4U_ACC_SRCBUF_PACKED = 1
+};
+
 typedef struct MPIDI_CH4U_hdr_t {
-    uint64_t msg_tag;
     int src_rank;
+    int tag;
+    MPIR_Context_id_t context_id;
 } MPIDI_CH4U_hdr_t;
 
 typedef struct MPIDI_CH4U_send_long_req_msg_t {
@@ -158,11 +174,13 @@ typedef struct MPIDI_CH4U_put_iov_ack_msg_t {
     uint64_t origin_preq_ptr;
 } MPIDI_CH4U_put_iov_ack_msg_t;
 typedef MPIDI_CH4U_put_iov_ack_msg_t MPIDI_CH4U_acc_iov_ack_msg_t;
+typedef MPIDI_CH4U_put_iov_ack_msg_t MPIDI_CH4U_get_acc_iov_ack_msg_t;
 
 typedef struct MPIDI_CH4U_put_dat_msg_t {
     uint64_t preq_ptr;
 } MPIDI_CH4U_put_dat_msg_t;
 typedef MPIDI_CH4U_put_dat_msg_t MPIDI_CH4U_acc_dat_msg_t;
+typedef MPIDI_CH4U_put_dat_msg_t MPIDI_CH4U_get_acc_dat_msg_t;
 
 typedef struct MPIDI_CH4U_put_ack_msg_t {
     uint64_t preq_ptr;
@@ -203,15 +221,18 @@ typedef struct MPIDI_CH4U_acc_req_msg_t {
     int target_count;
     MPI_Datatype target_datatype;
     MPI_Op op;
-    int do_get;
     MPI_Aint target_disp;
     uint64_t result_data_sz;
     int n_iov;
 } MPIDI_CH4U_acc_req_msg_t;
 
+typedef struct MPIDI_CH4U_acc_req_msg_t MPIDI_CH4U_get_acc_req_msg_t;
+
 typedef struct MPIDI_CH4U_acc_ack_msg_t {
     uint64_t req_ptr;
 } MPIDI_CH4U_acc_ack_msg_t;
+
+typedef MPIDI_CH4U_acc_ack_msg_t MPIDI_CH4U_get_acc_ack_msg_t;
 
 typedef struct MPIDI_CH4U_comm_req_list_t {
     MPIR_Comm *comm[2][4];
@@ -224,7 +245,7 @@ typedef struct MPIU_buf_pool_t {
     void *memory_region;
     struct MPIU_buf_pool_t *next;
     struct MPIU_buf_t *head;
-    pthread_mutex_t lock;
+    MPID_Thread_mutex_t lock;
 } MPIU_buf_pool_t;
 
 typedef struct MPIU_buf_t {
@@ -234,11 +255,26 @@ typedef struct MPIU_buf_t {
 } MPIU_buf_t;
 
 typedef struct {
+    int mmapped_size;
     int max_n_avts;
     int n_avts;
     int next_avtid;
     int *free_avtid;
 } MPIDI_CH4_avt_manager;
+
+typedef struct {
+    uint64_t key;
+    void *value;
+    UT_hash_handle hh;          /* makes this structure hashable */
+} MPIDI_CH4U_map_entry_t;
+
+typedef struct MPIDI_CH4U_map_t {
+    MPIDI_CH4U_map_entry_t *head;
+} MPIDI_CH4U_map_t;
+
+typedef struct {
+    unsigned mt_model;
+} MPIDI_CH4_configurations_t;
 
 typedef struct MPIDI_CH4_Global_t {
     MPIR_Request *request_test;
@@ -247,17 +283,16 @@ typedef struct MPIDI_CH4_Global_t {
     int pname_len;
     char pname[MPI_MAX_PROCESSOR_NAME];
     int is_initialized;
-    int allocated_max_n_avts;
     MPIDI_CH4_avt_manager avt_mgr;
     int is_ch4u_initialized;
-    MPID_Node_id_t **node_map, max_node_id;
+    int **node_map, max_node_id;
     MPIDI_CH4U_comm_req_list_t *comm_req_lists;
     OPA_int_t active_progress_hooks;
     MPIR_Commops MPIR_Comm_fns_store;
     progress_hook_slot_t progress_hooks[MAX_PROGRESS_HOOKS];
-    MPID_Thread_mutex_t m[2];
-    MPIR_Win *win_hash;
-    int jobid;
+    MPID_Thread_mutex_t m[3];
+    MPIDI_CH4U_map_t *win_map;
+    char *jobid;
 #ifndef MPIDI_CH4U_USE_PER_COMM_QUEUE
     MPIDI_CH4U_rreq_t *posted_list;
     MPIDI_CH4U_rreq_t *unexp_list;
@@ -265,16 +300,29 @@ typedef struct MPIDI_CH4_Global_t {
     MPIDI_CH4U_req_ext_t *cmpl_list;
     OPA_int_t exp_seq_no;
     OPA_int_t nxt_seq_no;
-    void *netmod_context[8];
     MPIU_buf_pool_t *buf_pool;
+#ifdef HAVE_SIGNAL
+    void (*prev_sighandler) (int);
+    volatile int sigusr1_count;
+    int my_sigusr1_count;
+#endif
+    OPA_int_t progress_count;
+
+    MPID_Thread_mutex_t vni_lock;
+#if defined(MPIDI_CH4_USE_WORK_QUEUES)
+    MPIDI_workq_t workqueue;
+#endif
+    MPIDI_CH4_configurations_t settings;
 } MPIDI_CH4_Global_t;
 extern MPIDI_CH4_Global_t MPIDI_CH4_Global;
 #ifdef MPL_USE_DBG_LOGGING
 extern MPL_dbg_class MPIDI_CH4_DBG_GENERAL;
 extern MPL_dbg_class MPIDI_CH4_DBG_MAP;
+extern MPL_dbg_class MPIDI_CH4_DBG_COMM;
 extern MPL_dbg_class MPIDI_CH4_DBG_MEMORY;
 #endif
 #define MPIDI_CH4I_THREAD_PROGRESS_MUTEX  MPIDI_CH4_Global.m[0]
 #define MPIDI_CH4I_THREAD_PROGRESS_HOOK_MUTEX  MPIDI_CH4_Global.m[1]
+#define MPIDI_CH4I_THREAD_UTIL_MUTEX  MPIDI_CH4_Global.m[2]
 
 #endif /* CH4_TYPES_H_INCLUDED */

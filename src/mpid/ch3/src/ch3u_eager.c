@@ -121,10 +121,10 @@ int MPIDI_CH3_EagerNoncontigSend( MPIR_Request **sreq_p,
     MPL_DBG_MSGPKT(vc,tag,eager_pkt->match.parts.context_id,rank,data_sz,
                     "Eager");
 	    
-    sreq->dev.segment_ptr = MPIDU_Segment_alloc( );
-    MPIR_ERR_CHKANDJUMP1((sreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIDU_Segment_alloc");
+    sreq->dev.segment_ptr = MPIR_Segment_alloc( );
+    MPIR_ERR_CHKANDJUMP1((sreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIR_Segment_alloc");
 
-    MPIDU_Segment_init(buf, count, datatype, sreq->dev.segment_ptr, 0);
+    MPIR_Segment_init(buf, count, datatype, sreq->dev.segment_ptr);
     sreq->dev.segment_first = 0;
     sreq->dev.segment_size = data_sz;
 	    
@@ -288,7 +288,7 @@ int MPIDI_CH3_EagerContigShortSend( MPIR_Request **sreq_p,
 #define FUNCNAME MPIDI_CH3_PktHandler_EagerShortSend
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIDI_CH3_PktHandler_EagerShortSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, 
+int MPIDI_CH3_PktHandler_EagerShortSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, void *data ATTRIBUTE((unused)),
 					 intptr_t *buflen, MPIR_Request **rreqp )
 {
     MPIDI_CH3_Pkt_eagershort_send_t * eagershort_pkt = &pkt->eagershort_send;
@@ -332,7 +332,7 @@ int MPIDI_CH3_PktHandler_EagerShortSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
        The packet handler returns null for a request that requires
        no further communication */
     *rreqp = NULL;
-    *buflen = sizeof(MPIDI_CH3_Pkt_t);
+    *buflen = 0;
 
     /* Extract the data from the packet */
     /* Note that if the data size if zero, we're already done */
@@ -341,7 +341,7 @@ int MPIDI_CH3_PktHandler_EagerShortSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 	    int            dt_contig;
 	    MPI_Aint       dt_true_lb;
 	    intptr_t userbuf_sz;
-	    MPIDU_Datatype *dt_ptr;
+	    MPIR_Datatype *dt_ptr;
 	    intptr_t data_sz;
 
 	    /* Make sure that we handle the general (non-contiguous)
@@ -403,15 +403,15 @@ int MPIDI_CH3_PktHandler_EagerShortSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 		   exceptional cases */
 		/* FIXME: The MPICH tests do not exercise this branch */
 		/* printf( "Surprise!\n" ); fflush(stdout);*/
-		rreq->dev.segment_ptr = MPIDU_Segment_alloc( );
-                MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIDU_Segment_alloc");
+		rreq->dev.segment_ptr = MPIR_Segment_alloc( );
+                MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIR_Segment_alloc");
 
-		MPIDU_Segment_init(rreq->dev.user_buf, rreq->dev.user_count, 
-				  rreq->dev.datatype, rreq->dev.segment_ptr, 0);
+		MPIR_Segment_init(rreq->dev.user_buf, rreq->dev.user_count, 
+				  rreq->dev.datatype, rreq->dev.segment_ptr);
 
 		recv_data_sz = rreq->dev.recv_data_sz;
 		last    = recv_data_sz;
-		MPIDU_Segment_unpack( rreq->dev.segment_ptr, 0, 
+		MPIR_Segment_unpack( rreq->dev.segment_ptr, 0, 
 				     &last, eagershort_pkt->data );
 		if (last != recv_data_sz) {
 		    /* --BEGIN ERROR HANDLING-- */
@@ -450,7 +450,7 @@ int MPIDI_CH3_PktHandler_EagerShortSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 	    /* printf( "Allocating into tmp\n" ); fflush(stdout); */
 	    recv_data_sz = rreq->dev.recv_data_sz;
         MPIR_T_PVAR_LEVEL_INC(RECVQ, unexpected_recvq_buffer_size, recv_data_sz);
-	    rreq->dev.tmpbuf = MPL_malloc(recv_data_sz);
+	    rreq->dev.tmpbuf = MPL_malloc(recv_data_sz, MPL_MEM_BUFFER);
 	    if (!rreq->dev.tmpbuf) {
 		MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**nomem");
 	    }
@@ -604,14 +604,13 @@ int MPIDI_CH3_EagerContigIsend( MPIR_Request **sreq_p,
 #define FUNCNAME MPIDI_CH3_PktHandler_EagerSend
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIDI_CH3_PktHandler_EagerSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, 
+int MPIDI_CH3_PktHandler_EagerSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, void *data,
 				    intptr_t *buflen, MPIR_Request **rreqp )
 {
     MPIDI_CH3_Pkt_eager_send_t * eager_pkt = &pkt->eager_send;
     MPIR_Request * rreq;
     int found;
     int complete;
-    char *data_buf;
     intptr_t data_len;
     int mpi_errno = MPI_SUCCESS;
 
@@ -639,13 +638,12 @@ int MPIDI_CH3_PktHandler_EagerSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
     
     set_request_info(rreq, eager_pkt, MPIDI_REQUEST_EAGER_MSG);
     
-    data_len = ((*buflen - sizeof(MPIDI_CH3_Pkt_t) >= rreq->dev.recv_data_sz)
-                ? rreq->dev.recv_data_sz : *buflen - sizeof(MPIDI_CH3_Pkt_t));
-    data_buf = (char *)pkt + sizeof(MPIDI_CH3_Pkt_t);
+    data_len = ((*buflen >= rreq->dev.recv_data_sz)
+                ? rreq->dev.recv_data_sz : *buflen);
     
     if (rreq->dev.recv_data_sz == 0) {
         /* return the number of bytes processed in this function */
-        *buflen = sizeof(MPIDI_CH3_Pkt_t);
+        *buflen = 0;
         mpi_errno = MPID_Request_complete(rreq);
         if (mpi_errno != MPI_SUCCESS) {
             MPIR_ERR_POP(mpi_errno);
@@ -654,11 +652,11 @@ int MPIDI_CH3_PktHandler_EagerSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
     }
     else {
 	if (found) {
-	    mpi_errno = MPIDI_CH3U_Receive_data_found( rreq, data_buf,
+	    mpi_errno = MPIDI_CH3U_Receive_data_found( rreq, data,
                                                        &data_len, &complete );
 	}
 	else {
-	    mpi_errno = MPIDI_CH3U_Receive_data_unexpected( rreq, data_buf,
+	    mpi_errno = MPIDI_CH3U_Receive_data_unexpected( rreq, data,
                                                             &data_len, &complete );
 	}
 
@@ -668,7 +666,7 @@ int MPIDI_CH3_PktHandler_EagerSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 	}
 
         /* return the number of bytes processed in this function */
-        *buflen = sizeof(MPIDI_CH3_Pkt_t) + data_len;
+        *buflen = data_len;
 
         if (complete) 
         {
@@ -694,14 +692,13 @@ int MPIDI_CH3_PktHandler_EagerSend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 #define FUNCNAME MPIDI_CH3_PktHandler_ReadySend
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIDI_CH3_PktHandler_ReadySend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
+int MPIDI_CH3_PktHandler_ReadySend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, void *data,
 				    intptr_t *buflen, MPIR_Request **rreqp )
 {
     MPIDI_CH3_Pkt_ready_send_t * ready_pkt = &pkt->ready_send;
     MPIR_Request * rreq;
     int found;
     int complete;
-    char *data_buf;
     intptr_t data_len;
     int mpi_errno = MPI_SUCCESS;
     
@@ -729,14 +726,13 @@ int MPIDI_CH3_PktHandler_ReadySend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
     
     set_request_info(rreq, ready_pkt, MPIDI_REQUEST_EAGER_MSG);
     
-    data_len = ((*buflen - sizeof(MPIDI_CH3_Pkt_t) >= rreq->dev.recv_data_sz)
-                ? rreq->dev.recv_data_sz : *buflen - sizeof(MPIDI_CH3_Pkt_t));
-    data_buf = (char *)pkt + sizeof(MPIDI_CH3_Pkt_t);
+    data_len = ((*buflen >= rreq->dev.recv_data_sz)
+                ? rreq->dev.recv_data_sz : *buflen);
     
     if (found) {
 	if (rreq->dev.recv_data_sz == 0) {
             /* return the number of bytes processed in this function */
-            *buflen = sizeof(MPIDI_CH3_Pkt_t) + data_len;;
+            *buflen = data_len;;
             mpi_errno = MPID_Request_complete(rreq);
             if (mpi_errno != MPI_SUCCESS) {
                 MPIR_ERR_POP(mpi_errno);
@@ -744,7 +740,7 @@ int MPIDI_CH3_PktHandler_ReadySend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 	    *rreqp = NULL;
 	}
 	else {
-	    mpi_errno = MPIDI_CH3U_Receive_data_found(rreq, data_buf, &data_len,
+	    mpi_errno = MPIDI_CH3U_Receive_data_found(rreq, data, &data_len,
                                                       &complete);
 	    if (mpi_errno != MPI_SUCCESS) {
 		MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, 
@@ -754,7 +750,7 @@ int MPIDI_CH3_PktHandler_ReadySend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 	    }
 
             /* return the number of bytes processed in this function */
-            *buflen = sizeof(MPIDI_CH3_Pkt_t) + data_len;
+            *buflen = data_len;
 
             if (complete) 
             {
@@ -810,7 +806,7 @@ int MPIDI_CH3_PktHandler_ReadySend( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 	    *rreqp = NULL;
 	}
         /* we didn't process anything but the header in this case */
-        *buflen = sizeof(MPIDI_CH3_Pkt_t);
+        *buflen = 0;
     }
  fn_fail:
     return mpi_errno;

@@ -4,8 +4,8 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#ifndef _MPID_NEM_INLINE_H
-#define _MPID_NEM_INLINE_H
+#ifndef MPID_NEM_INLINE_H_INCLUDED
+#define MPID_NEM_INLINE_H_INCLUDED
 
 #include "my_papi_defs.h"
 #include "mpl.h"
@@ -27,10 +27,10 @@ static inline int MPID_nem_mpich_test_recv (MPID_nem_cell_ptr_t *cell, int *in_f
 static inline int MPID_nem_mpich_blocking_recv (MPID_nem_cell_ptr_t *cell, int *in_fbox, int completions);
 static inline int MPID_nem_mpich_test_recv_wait (MPID_nem_cell_ptr_t *cell, int *in_fbox, int timeout);
 static inline int MPID_nem_mpich_release_cell (MPID_nem_cell_ptr_t cell, MPIDI_VC_t *vc);
-static inline void MPID_nem_mpich_send_seg_header (MPIDU_Segment *segment, intptr_t *segment_first,
+static inline void MPID_nem_mpich_send_seg_header (MPIR_Segment *segment, intptr_t *segment_first,
                                                    intptr_t segment_size, void *header, intptr_t header_sz,
                                                    void *ext_header, intptr_t ext_header_sz, MPIDI_VC_t *vc, int *again);
-static inline void MPID_nem_mpich_send_seg (MPIDU_Segment *segment, intptr_t *segment_first, intptr_t segment_size,
+static inline void MPID_nem_mpich_send_seg (MPIR_Segment *segment, intptr_t *segment_first, intptr_t segment_size,
                                                     MPIDI_VC_t *vc, int *again);
 
 
@@ -90,6 +90,7 @@ cvars:
      !MPIDI_CH3I_shm_active_send &&             \
      !MPIDI_CH3I_Sendq_head(MPIDI_CH3I_shm_sendq) &&       \
      !MPIDU_Sched_are_pending() &&              \
+     MPIR_Coll_safe_to_block() &&  \
      !MPIDI_RMA_Win_active_list_head)
 
 #undef FUNCNAME
@@ -103,6 +104,9 @@ MPID_nem_mpich_send_header (void* buf, int size, MPIDI_VC_t *vc, int *again)
     MPID_nem_cell_ptr_t el;
     int my_rank;
     MPIDI_CH3I_VC *vc_ch = &vc->ch;
+
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_SEND_HEADER);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_SEND_HEADER);
 
     /*DO_PAPI (PAPI_reset (PAPI_EventSet)); */
 
@@ -201,6 +205,7 @@ MPID_nem_mpich_send_header (void* buf, int size, MPIDI_VC_t *vc, int *again)
     *again = 1;
     goto fn_exit;
  fn_exit:
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_SEND_HEADER);
     return mpi_errno;
  fn_fail:
     goto fn_exit;
@@ -484,10 +489,13 @@ MPID_nem_mpich_sendv_header (MPL_IOV **iov, int *n_iov,
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
 static inline void
-MPID_nem_mpich_send_seg_header (MPIDU_Segment *segment, intptr_t *segment_first, intptr_t segment_size,
+MPID_nem_mpich_send_seg_header (MPIR_Segment *segment, intptr_t *segment_first, intptr_t segment_size,
                                 void *header, intptr_t header_sz, void *ext_header, intptr_t ext_header_sz,
                                 MPIDI_VC_t *vc, int *again)
 {
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_SEND_SEG_HEADER);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_SEND_SEG_HEADER);
+
     MPID_nem_cell_ptr_t el;
     intptr_t datalen;
     int my_rank;
@@ -532,7 +540,7 @@ MPID_nem_mpich_send_seg_header (MPIDU_Segment *segment, intptr_t *segment_first,
             
             /* copy data */
             last = segment_size;
-            MPIDU_Segment_pack(segment, *segment_first, &last, (char *)pbox->cell.pkt.p.payload + sizeof(MPIDI_CH3_Pkt_t));
+            MPIR_Segment_pack(segment, *segment_first, &last, (char *)pbox->cell.pkt.p.payload + sizeof(MPIDI_CH3_Pkt_t));
             MPIR_Assert(last == segment_size);
 
             OPA_store_release_int(&pbox->flag.value, 1);
@@ -590,7 +598,7 @@ MPID_nem_mpich_send_seg_header (MPIDU_Segment *segment, intptr_t *segment_first,
     else
         last = *segment_first + MPID_NEM_MPICH_DATA_LEN - buf_offset;
 
-    MPIDU_Segment_pack(segment, *segment_first, &last, (char *)el->pkt.p.payload + buf_offset);
+    MPIR_Segment_pack(segment, *segment_first, &last, (char *)el->pkt.p.payload + buf_offset);
     datalen = buf_offset + last - *segment_first;
     *segment_first = last;
     
@@ -620,6 +628,7 @@ MPID_nem_mpich_send_seg_header (MPIDU_Segment *segment, intptr_t *segment_first,
     *again = 1;
     goto fn_exit;
  fn_exit:
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_SEND_SEG_HEADER);
     return;
 }
 
@@ -630,8 +639,11 @@ MPID_nem_mpich_send_seg_header (MPIDU_Segment *segment, intptr_t *segment_first,
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
 static inline void
-MPID_nem_mpich_send_seg (MPIDU_Segment *segment, intptr_t *segment_first, intptr_t segment_size, MPIDI_VC_t *vc, int *again)
+MPID_nem_mpich_send_seg (MPIR_Segment *segment, intptr_t *segment_first, intptr_t segment_size, MPIDI_VC_t *vc, int *again)
 {
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_SEND_SEG);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_SEND_SEG);
+
     MPID_nem_cell_ptr_t el;
     intptr_t datalen;
     int my_rank;
@@ -673,7 +685,7 @@ MPID_nem_mpich_send_seg (MPIDU_Segment *segment, intptr_t *segment_first, intptr
     else
         last = *segment_first + MPID_NEM_MPICH_DATA_LEN;
     
-    MPIDU_Segment_pack(segment, *segment_first, &last, (char *)el->pkt.p.payload);
+    MPIR_Segment_pack(segment, *segment_first, &last, (char *)el->pkt.p.payload);
     datalen = last - *segment_first;
     *segment_first = last;
     
@@ -702,6 +714,7 @@ MPID_nem_mpich_send_seg (MPIDU_Segment *segment, intptr_t *segment_first, intptr
     *again = 1;
     goto fn_exit;
  fn_exit:
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_SEND_SEG_HEADER);
     return;
 }
 
@@ -719,6 +732,8 @@ MPID_nem_mpich_send_seg (MPIDU_Segment *segment, intptr_t *segment_first, intptr
 static inline void MPID_nem_mpich_dequeue_fastbox(int local_rank)
 {
     MPID_nem_fboxq_elem_t *el;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_DEQUEUE_FASTBOX);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_DEQUEUE_FASTBOX);
 
     MPIR_Assert(local_rank < MPID_nem_mem_region.num_local);
 
@@ -748,6 +763,7 @@ static inline void MPID_nem_mpich_dequeue_fastbox(int local_rank)
 		MPID_nem_curr_fboxq_elem = el->next;
 	}
     }    
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_DEQUEUE_FASTBOX);
 }
 
 /*
@@ -763,6 +779,8 @@ static inline void MPID_nem_mpich_dequeue_fastbox(int local_rank)
 static inline void MPID_nem_mpich_enqueue_fastbox(int local_rank)
 {
     MPID_nem_fboxq_elem_t *el;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_ENQUEUE_FASTBOX);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_ENQUEUE_FASTBOX);
 
     MPIR_Assert(local_rank < MPID_nem_mem_region.num_local);
 
@@ -790,6 +808,7 @@ static inline void MPID_nem_mpich_enqueue_fastbox(int local_rank)
 	el->next = NULL;
 	MPID_nem_fboxq_tail = el;
     }
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_ENQUEUE_FASTBOX);
 }
 /*
   MPID_nem_recv_seqno_matches (MPID_nem_queue_ptr_t qhead)
@@ -805,9 +824,13 @@ static inline int
 MPID_nem_recv_seqno_matches (MPID_nem_queue_ptr_t qhead)
 {
     int source;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_RECV_SEQNO_MATCHES);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_RECV_SEQNO_MATCHES);
+
     MPID_nem_cell_ptr_t cell = MPID_nem_queue_head(qhead);
     source = cell->pkt.header.source;
     
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_RECV_SEQNO_MATCHES);
     return (cell->pkt.header.seqno == MPID_nem_recv_seqno[source]);
 }
 
@@ -826,6 +849,8 @@ static inline int
 MPID_nem_mpich_test_recv(MPID_nem_cell_ptr_t *cell, int *in_fbox, int in_blocking_progress)
 {
     int mpi_errno = MPI_SUCCESS;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_TEST_RECV);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_TEST_RECV);
     
     DO_PAPI (PAPI_reset (PAPI_EventSet));
 
@@ -876,6 +901,7 @@ MPID_nem_mpich_test_recv(MPID_nem_cell_ptr_t *cell, int *in_fbox, int in_blockin
     });
 
  fn_fail:
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_TEST_RECV);
     return mpi_errno;
 
  fbox_l:
@@ -900,7 +926,8 @@ static inline int
 MPID_nem_mpich_test_recv_wait (MPID_nem_cell_ptr_t *cell, int *in_fbox, int timeout)
 {
     int mpi_errno = MPI_SUCCESS;
-    
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_TEST_RECV_WAIT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_TEST_RECV_WAIT);
 #ifdef USE_FASTBOX
     if (poll_active_fboxes(cell)) goto fbox_l;
 #endif/* USE_FASTBOX     */
@@ -935,6 +962,7 @@ MPID_nem_mpich_test_recv_wait (MPID_nem_cell_ptr_t *cell, int *in_fbox, int time
         });
 
  fn_fail:
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_TEST_RECV_WAIT);
     return mpi_errno;
 
  fbox_l:
@@ -958,6 +986,8 @@ static inline int
 MPID_nem_mpich_blocking_recv(MPID_nem_cell_ptr_t *cell, int *in_fbox, int completions)
 {
     int mpi_errno = MPI_SUCCESS;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_BLOCKING_RECV);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_BLOCKING_RECV);
     DO_PAPI (PAPI_reset (PAPI_EventSet));
 
 #ifdef MPICH_IS_THREADED
@@ -1023,6 +1053,7 @@ MPID_nem_mpich_blocking_recv(MPID_nem_cell_ptr_t *cell, int *in_fbox, int comple
         });
 
  fn_fail:
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_BLOCKING_RECV);
     return mpi_errno;
 
  fbox_l:
@@ -1043,12 +1074,17 @@ static inline int
 MPID_nem_mpich_release_cell (MPID_nem_cell_ptr_t cell, MPIDI_VC_t *vc)
 {
     int mpi_errno = MPI_SUCCESS;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MPICH_RELEASE_CELL);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MPICH_RELEASE_CELL);
+
     MPIDI_CH3I_VC *vc_ch = &vc->ch;
     DO_PAPI (PAPI_reset (PAPI_EventSet));
     MPID_nem_queue_enqueue (vc_ch->free_queue, cell);
     DO_PAPI (PAPI_accum_var (PAPI_EventSet,PAPI_vvalues9));
+
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MPICH_RELEASE_CELL);
     return mpi_errno;
 }
 
-#endif /*_MPID_NEM_INLINE_H*/
+#endif /* MPID_NEM_INLINE_H_INCLUDED */
 

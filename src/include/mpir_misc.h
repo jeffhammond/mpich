@@ -40,23 +40,23 @@ typedef enum {
 typedef enum MPIR_Lang_t {
     MPIR_LANG__C
 #ifdef HAVE_FORTRAN_BINDING
-    , MPIR_LANG__FORTRAN
-    , MPIR_LANG__FORTRAN90
+        , MPIR_LANG__FORTRAN, MPIR_LANG__FORTRAN90
 #endif
 #ifdef HAVE_CXX_BINDING
-    , MPIR_LANG__CXX
+        , MPIR_LANG__CXX
 #endif
 } MPIR_Lang_t;
 
-extern const char MPII_Version_string[];
-extern const char MPII_Version_date[];
-extern const char MPII_Version_configure[];
-extern const char MPII_Version_device[];
-extern const char MPII_Version_CC[];
-extern const char MPII_Version_CXX[];
-extern const char MPII_Version_F77[];
-extern const char MPII_Version_FC[];
-extern const char MPII_Version_custom[];
+extern const char MPII_Version_string[] MPICH_API_PUBLIC;
+extern const char MPII_Version_date[] MPICH_API_PUBLIC;
+extern const char MPII_Version_ABI[] MPICH_API_PUBLIC;
+extern const char MPII_Version_configure[] MPICH_API_PUBLIC;
+extern const char MPII_Version_device[] MPICH_API_PUBLIC;
+extern const char MPII_Version_CC[] MPICH_API_PUBLIC;
+extern const char MPII_Version_CXX[] MPICH_API_PUBLIC;
+extern const char MPII_Version_F77[] MPICH_API_PUBLIC;
+extern const char MPII_Version_FC[] MPICH_API_PUBLIC;
+extern const char MPII_Version_custom[] MPICH_API_PUBLIC;
 
 int MPIR_Localcopy(const void *sendbuf, MPI_Aint sendcount, MPI_Datatype sendtype,
                    void *recvbuf, MPI_Aint recvcount, MPI_Datatype recvtype);
@@ -75,17 +75,22 @@ Notes:
   a higher priority execute before 'MPID_Finalize' is called; those with
   a lower priority after 'MPID_Finalize' is called.
 @*/
-void MPIR_Add_finalize( int (*routine)( void * ), void *extra, int priority );
+void MPIR_Add_finalize(int (*routine) (void *), void *extra, int priority);
 
 /* Routines for determining local and remote processes */
-int MPIR_Find_local_and_external(struct MPIR_Comm *comm, int *local_size_p, int *local_rank_p, int **local_ranks_p,
-                                 int *external_size_p, int *external_rank_p, int **external_ranks_p,
-                                 int **intranode_table, int **internode_table_p);
-int MPIR_Get_internode_rank(MPIR_Comm *comm_ptr, int r);
-int MPIR_Get_intranode_rank(MPIR_Comm *comm_ptr, int r);
+int MPIR_Find_local_and_external(struct MPIR_Comm *comm, int *local_size_p, int *local_rank_p,
+                                 int **local_ranks_p, int *external_size_p, int *external_rank_p,
+                                 int **external_ranks_p, int **intranode_table,
+                                 int **internode_table_p);
+int MPIR_Get_internode_rank(MPIR_Comm * comm_ptr, int r);
+int MPIR_Get_intranode_rank(MPIR_Comm * comm_ptr, int r);
 
 int MPIR_Close_port_impl(const char *port_name);
-int MPIR_Open_port_impl(MPIR_Info *info_ptr, char *port_name);
-int MPIR_Cancel_impl(MPIR_Request *request_ptr);
+int MPIR_Open_port_impl(MPIR_Info * info_ptr, char *port_name);
+int MPIR_Cancel(MPIR_Request * request_ptr);
+
+/* Default routines for asynchronous progress thread */
+int MPIR_Init_async_thread(void);
+int MPIR_Finalize_async_thread(void);
 
 #endif /* MPIR_MISC_H_INCLUDED */

@@ -8,8 +8,8 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_OFI_PROBE_H_INCLUDED
-#define NETMOD_OFI_PROBE_H_INCLUDED
+#ifndef OFI_PROBE_H_INCLUDED
+#define OFI_PROBE_H_INCLUDED
 
 #include "ofi_impl.h"
 
@@ -21,6 +21,7 @@ static inline int MPIDI_OFI_do_iprobe(int source,
                                       int tag,
                                       MPIR_Comm * comm,
                                       int context_offset,
+                                      MPIDI_av_entry_t * addr,
                                       int *flag,
                                       MPI_Status * status,
                                       MPIR_Request ** message, uint64_t peek_flags)
@@ -30,23 +31,24 @@ static inline int MPIDI_OFI_do_iprobe(int source,
     uint64_t match_bits, mask_bits;
     MPIR_Request r, *rreq;      /* don't need to init request, output only */
     struct fi_msg_tagged msg;
+    int ofi_err;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_NETMOD_OFI_NETMOD_DO_PROBE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_OFI_NETMOD_DO_PROBE);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_OFI_DO_IPROBE);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_OFI_DO_IPROBE);
 
     if (unlikely(MPI_ANY_SOURCE == source))
         remote_proc = FI_ADDR_UNSPEC;
     else
-        remote_proc = MPIDI_OFI_comm_to_phys(comm, source, MPIDI_OFI_API_TAG);
+        remote_proc = MPIDI_OFI_av_to_phys(addr);
 
-    if (message)
-        MPIDI_OFI_REQUEST_CREATE(rreq, MPIR_REQUEST_KIND__MPROBE);
-    else
+    if (message) {
+        rreq = MPIR_Request_create(MPIR_REQUEST_KIND__MPROBE);
+        MPIR_ERR_CHKANDSTMT((rreq) == NULL, mpi_errno, MPIX_ERR_NOREQ, goto fn_fail, "**nomemreq");
+    } else {
         rreq = &r;
+    }
 
-    match_bits =
-        MPIDI_OFI_init_recvtag(&mask_bits, comm->context_id + context_offset, source, tag,
-                               MPIDI_OFI_ENABLE_DATA);
+    match_bits = MPIDI_OFI_init_recvtag(&mask_bits, comm->context_id + context_offset, source, tag);
 
     MPIDI_OFI_REQUEST(rreq, event_id) = MPIDI_OFI_EVENT_PEEK;
     MPIDI_OFI_REQUEST(rreq, util_id) = MPIDI_OFI_PEEK_START;
@@ -60,64 +62,46 @@ static inline int MPIDI_OFI_do_iprobe(int source,
     msg.context = (void *) &(MPIDI_OFI_REQUEST(rreq, context));
     msg.data = 0;
 
-    MPIDI_OFI_CALL(fi_trecvmsg
-                   (MPIDI_OFI_EP_RX_TAG(0), &msg,
-                    peek_flags | FI_PEEK | FI_COMPLETION | MPIDI_OFI_ENABLE_DATA), trecvmsg);
+    MPIDI_OFI_CALL_RETURN(fi_trecvmsg(MPIDI_Global.ctx[0].rx, &msg,
+                                      peek_flags | FI_PEEK | FI_COMPLETION | FI_REMOTE_CQ_DATA),
+                          ofi_err);
+    if (ofi_err == -FI_ENOMSG) {
+        *flag = 0;
+        if (message)
+            MPIR_Request_free(rreq);
+        goto fn_exit;
+    }
+
+    MPIDI_OFI_CALL(ofi_err, trecvmsg);
     MPIDI_OFI_PROGRESS_WHILE(MPIDI_OFI_REQUEST(rreq, util_id) == MPIDI_OFI_PEEK_START);
 
     switch (MPIDI_OFI_REQUEST(rreq, util_id)) {
-    case MPIDI_OFI_PEEK_NOT_FOUND:
-        *flag = 0;
+        case MPIDI_OFI_PEEK_NOT_FOUND:
+            *flag = 0;
 
-        if (message)
-            MPIR_Handle_obj_free(&MPIR_Request_mem, rreq);
+            if (message)
+                MPIR_Request_free(rreq);
 
-        goto fn_exit;
-        break;
+            goto fn_exit;
+            break;
 
-    case MPIDI_OFI_PEEK_FOUND:
-        MPIR_Request_extract_status(rreq, status);
-        *flag = 1;
+        case MPIDI_OFI_PEEK_FOUND:
+            MPIR_Request_extract_status(rreq, status);
+            *flag = 1;
 
-        if (message)
-            *message = rreq;
+            if (message) {
+                MPIR_Request_add_ref(rreq);
+                *message = rreq;
+            }
 
-        break;
+            break;
 
-    default:
-        MPIR_Assert(0);
+        default:
+            MPIR_Assert(0);
     }
 
   fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_NETMOD_OFI_NETMOD_DO_PROBE);
-    return mpi_errno;
-  fn_fail:
-    goto fn_exit;
-}
-
-
-#undef FUNCNAME
-#define FUNCNAME MPIDI_NM_probe
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline int MPIDI_NM_probe(int source,
-                                 int tag, MPIR_Comm * comm, int context_offset, MPI_Status * status)
-{
-    int mpi_errno = MPI_SUCCESS, flag = 0;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_NETMOD_OFI_NETMOD_PROBE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_OFI_NETMOD_PROBE);
-
-    while (!flag) {
-        mpi_errno = MPIDI_Iprobe(source, tag, comm, context_offset, &flag, status);
-
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
-
-        MPIDI_OFI_PROGRESS();
-    }
-
-  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_NETMOD_OFI_NETMOD_PROBE);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_OFI_DO_IPROBE);
     return mpi_errno;
   fn_fail:
     goto fn_exit;
@@ -130,21 +114,35 @@ static inline int MPIDI_NM_probe(int source,
 static inline int MPIDI_NM_mpi_improbe(int source,
                                        int tag,
                                        MPIR_Comm * comm,
-                                       int context_offset,
+                                       int context_offset, MPIDI_av_entry_t * addr,
                                        int *flag, MPIR_Request ** message, MPI_Status * status)
 {
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_NETMOD_OFI_NETMOD_IMPROBE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_OFI_NETMOD_IMPROBE);
+    int mpi_errno = MPI_SUCCESS;
+
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_NM_MPI_IMPROBE);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_NM_MPI_IMPROBE);
+
+#ifdef MPIDI_ENABLE_LEGACY_OFI
+    if (!MPIDI_OFI_ENABLE_TAGGED) {
+        mpi_errno =
+            MPIDI_CH4U_mpi_improbe(source, tag, comm, context_offset, flag, message, status);
+        goto fn_exit;
+    }
+#endif
+
     /* Set flags for mprobe peek, when ready */
-    int mpi_errno = MPIDI_OFI_do_iprobe(source, tag, comm, context_offset,
-                                        flag, status, message, FI_CLAIM | FI_COMPLETION);
+    mpi_errno = MPIDI_OFI_do_iprobe(source, tag, comm, context_offset, addr,
+                                    flag, status, message, FI_CLAIM | FI_COMPLETION);
+    if (mpi_errno != MPI_SUCCESS)
+        goto fn_exit;
 
     if (*flag && *message) {
         (*message)->comm = comm;
         MPIR_Object_add_ref(comm);
     }
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_NETMOD_OFI_NETMOD_IMPROBE);
+  fn_exit:
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_NM_MPI_IMPROBE);
     return mpi_errno;
 }
 
@@ -155,14 +153,26 @@ static inline int MPIDI_NM_mpi_improbe(int source,
 static inline int MPIDI_NM_mpi_iprobe(int source,
                                       int tag,
                                       MPIR_Comm * comm,
-                                      int context_offset, int *flag, MPI_Status * status)
+                                      int context_offset, MPIDI_av_entry_t * addr, int *flag,
+                                      MPI_Status * status)
 {
     int mpi_errno;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_NETMOD_OFI_NETMOD_IPROBE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_OFI_NETMOD_IPROBE);
-    mpi_errno = MPIDI_OFI_do_iprobe(source, tag, comm, context_offset, flag, status, NULL, 0ULL);
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_NETMOD_OFI_NETMOD_IPROBE);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_NM_MPI_IPROBE);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_NM_MPI_IPROBE);
+
+#ifdef MPIDI_ENABLE_LEGACY_OFI
+    if (!MPIDI_OFI_ENABLE_TAGGED) {
+        mpi_errno = MPIDI_CH4U_mpi_iprobe(source, tag, comm, context_offset, flag, status);
+        goto fn_exit;
+    }
+#endif
+
+    mpi_errno =
+        MPIDI_OFI_do_iprobe(source, tag, comm, context_offset, addr, flag, status, NULL, 0ULL);
+
+  fn_exit:
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_NM_MPI_IPROBE);
     return mpi_errno;
 }
 
-#endif /* NETMOD_OFI_PROBE_H_INCLUDED */
+#endif /* OFI_PROBE_H_INCLUDED */

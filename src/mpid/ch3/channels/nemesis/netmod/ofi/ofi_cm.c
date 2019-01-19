@@ -21,7 +21,7 @@
 /* is enough to look up the VC.                                             */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(ofi_tag_to_vc)
+#define FCNAME MPL_QUOTE(ofi_tag_to_vc)
 static inline MPIDI_VC_t *ofi_wc_to_vc(cq_tagged_entry_t * wc)
 {
     int pgid = 0, port = 0;
@@ -93,11 +93,11 @@ static inline MPIDI_VC_t *ofi_wc_to_vc(cq_tagged_entry_t * wc)
 /* other VC's because they may not be part of a process group.              */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_conn_req_callback)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_conn_req_callback)
 static inline int MPID_nem_ofi_conn_req_callback(cq_tagged_entry_t * wc, MPIR_Request * rreq)
 {
     int ret, len, mpi_errno = MPI_SUCCESS;
-    char bc[OFI_KVSAPPSTRLEN];
+    char bc[MPIDI_OFI_KVSAPPSTRLEN];
 
     MPIDI_VC_t *vc;
     char *addr = NULL;
@@ -110,17 +110,17 @@ static inline int MPID_nem_ofi_conn_req_callback(cq_tagged_entry_t * wc, MPIR_Re
     MPIR_Assert(gl_data.conn_req == rreq);
     FI_RC_RETRY(fi_trecv(gl_data.endpoint,
                    gl_data.conn_req->dev.user_buf,
-                   OFI_KVSAPPSTRLEN,
+                   MPIDI_OFI_KVSAPPSTRLEN,
                    gl_data.mr,
                    FI_ADDR_UNSPEC,
-                   MPID_CONN_REQ,
+                   MPIDI_OFI_CONN_REQ,
                    GET_RCD_IGNORE_MASK(),
                    (void *) &(REQ_OFI(gl_data.conn_req)->ofi_context)), trecv);
 
-    addr = MPL_malloc(gl_data.bound_addrlen);
+    addr = MPL_malloc(gl_data.bound_addrlen, MPL_MEM_ADDRESS);
     MPIR_Assertp(addr);
 
-    vc = MPL_malloc(sizeof(MPIDI_VC_t));
+    vc = MPL_malloc(sizeof(MPIDI_VC_t), MPL_MEM_ADDRESS);
     MPIR_Assertp(vc);
 
     MPIDI_VC_Init(vc, NULL, 0);
@@ -157,7 +157,7 @@ static inline int MPID_nem_ofi_conn_req_callback(cq_tagged_entry_t * wc, MPIR_Re
 /* decrement the ref counter via request completion                         */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_handle_packet)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_handle_packet)
 static inline int MPID_nem_ofi_handle_packet(cq_tagged_entry_t * wc ATTRIBUTE((unused)),
                                              MPIR_Request * rreq)
 {
@@ -181,7 +181,7 @@ static inline int MPID_nem_ofi_handle_packet(cq_tagged_entry_t * wc ATTRIBUTE((u
 /* the parent request's counter, and cleans up the CTS request              */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_cts_send_callback)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_cts_send_callback)
 static inline int MPID_nem_ofi_cts_send_callback(cq_tagged_entry_t * wc, MPIR_Request * sreq)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -201,7 +201,7 @@ static inline int MPID_nem_ofi_cts_send_callback(cq_tagged_entry_t * wc, MPIR_Re
 /*   * Re-Post the RTS receive and handler to handle the next message       */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_preposted_callback)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_preposted_callback)
 static inline int MPID_nem_ofi_preposted_callback(cq_tagged_entry_t * wc, MPIR_Request * rreq)
 {
     int c, mpi_errno = MPI_SUCCESS;
@@ -216,7 +216,7 @@ static inline int MPID_nem_ofi_preposted_callback(cq_tagged_entry_t * wc, MPIR_R
     VC_READY_CHECK(vc);
 
     pkt_len = REQ_OFI(rreq)->msg_bytes;
-    pack_buffer = (char *) MPL_malloc(pkt_len);
+    pack_buffer = (char *) MPL_malloc(pkt_len, MPL_MEM_BUFFER);
     /* If the pack buffer is NULL, let OFI handle the truncation
      * in the progress loop
      */
@@ -236,7 +236,7 @@ static inline int MPID_nem_ofi_preposted_callback(cq_tagged_entry_t * wc, MPIR_R
                        REQ_OFI(new_rreq)->pack_buffer_size,
                        gl_data.mr,
                        VC_OFI(vc)->direct_addr,
-                       wc->tag | MPID_MSG_CTS | MPID_MSG_DATA, 0, &(REQ_OFI(new_rreq)->ofi_context)), trecv);
+                       wc->tag | MPIDI_OFI_MSG_CTS | MPIDI_OFI_MSG_DATA, 0, &(REQ_OFI(new_rreq)->ofi_context)), trecv);
 
     MPID_nem_ofi_create_req(&sreq, 1);
     sreq->dev.OnDataAvail = NULL;
@@ -248,7 +248,7 @@ static inline int MPID_nem_ofi_preposted_callback(cq_tagged_entry_t * wc, MPIR_R
                      0,
                      gl_data.mr,
                      VC_OFI(vc)->direct_addr,
-                     wc->tag | MPID_MSG_CTS, &(REQ_OFI(sreq)->ofi_context)), tsend);
+                     wc->tag | MPIDI_OFI_MSG_CTS, &(REQ_OFI(sreq)->ofi_context)), tsend);
     MPIR_Assert(gl_data.persistent_req == rreq);
 
     FI_RC_RETRY(fi_trecv(gl_data.endpoint,
@@ -256,7 +256,7 @@ static inline int MPID_nem_ofi_preposted_callback(cq_tagged_entry_t * wc, MPIR_R
                    sizeof REQ_OFI(rreq)->msg_bytes,
                    gl_data.mr,
                    FI_ADDR_UNSPEC,
-                   MPID_MSG_RTS,
+                   MPIDI_OFI_MSG_RTS,
                    GET_RCD_IGNORE_MASK(),
                    &(REQ_OFI(rreq)->ofi_context)), trecv);
     /* Return a proper error to MPI to indicate out of memory condition */
@@ -270,7 +270,7 @@ static inline int MPID_nem_ofi_preposted_callback(cq_tagged_entry_t * wc, MPIR_R
 /* Complete and clean up the request                                        */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_connect_to_root_callback)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_connect_to_root_callback)
 int MPID_nem_ofi_connect_to_root_callback(cq_tagged_entry_t * wc ATTRIBUTE((unused)),
                                           MPIR_Request * sreq)
 {
@@ -292,7 +292,7 @@ int MPID_nem_ofi_connect_to_root_callback(cq_tagged_entry_t * wc ATTRIBUTE((unus
 /* messages.                                                                */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_cm_init)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_cm_init)
 int MPID_nem_ofi_cm_init(MPIDI_PG_t * pg_p, int pg_rank ATTRIBUTE((unused)))
 {
     int mpi_errno = MPI_SUCCESS;
@@ -328,7 +328,7 @@ int MPID_nem_ofi_cm_init(MPIDI_PG_t * pg_p, int pg_rank ATTRIBUTE((unused)))
                    sizeof REQ_OFI(persistent_req)->msg_bytes,
                    gl_data.mr,
                    FI_ADDR_UNSPEC,
-                   MPID_MSG_RTS,
+                   MPIDI_OFI_MSG_RTS,
                    GET_RCD_IGNORE_MASK(),
                    (void *) &(REQ_OFI(persistent_req)->ofi_context)), trecv);
     gl_data.persistent_req = persistent_req;
@@ -337,17 +337,17 @@ int MPID_nem_ofi_cm_init(MPIDI_PG_t * pg_p, int pg_rank ATTRIBUTE((unused)))
     /* Post recv for connection requests */
     /* --------------------------------- */
     MPID_nem_ofi_create_req(&conn_req, 1);
-    conn_req->dev.user_buf = MPL_malloc(OFI_KVSAPPSTRLEN * sizeof(char));
+    conn_req->dev.user_buf = MPL_malloc(MPIDI_OFI_KVSAPPSTRLEN * sizeof(char), MPL_MEM_BUFFER);
     conn_req->dev.OnDataAvail = NULL;
     conn_req->dev.next = NULL;
     REQ_OFI(conn_req)->vc = NULL;       /* We don't know the source yet */
     REQ_OFI(conn_req)->event_callback = MPID_nem_ofi_conn_req_callback;
     FI_RC_RETRY(fi_trecv(gl_data.endpoint,
                    conn_req->dev.user_buf,
-                   OFI_KVSAPPSTRLEN,
+                   MPIDI_OFI_KVSAPPSTRLEN,
                    gl_data.mr,
                    FI_ADDR_UNSPEC,
-                   MPID_CONN_REQ,
+                   MPIDI_OFI_CONN_REQ,
                    GET_RCD_IGNORE_MASK(),
                    (void *) &(REQ_OFI(conn_req)->ofi_context)), trecv);
     gl_data.conn_req = conn_req;
@@ -366,7 +366,7 @@ int MPID_nem_ofi_cm_init(MPIDI_PG_t * pg_p, int pg_rank ATTRIBUTE((unused)))
 /* Clean up and cancle the requests initiated by the cm_init routine        */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_cm_finalize)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_cm_finalize)
 int MPID_nem_ofi_cm_finalize()
 {
     int mpi_errno = MPI_SUCCESS;
@@ -393,14 +393,14 @@ int MPID_nem_ofi_cm_finalize()
 /*   * Use fi_av_insert to register the address name with OFI               */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_vc_connect)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_vc_connect)
 int MPID_nem_ofi_vc_connect(MPIDI_VC_t * vc)
 {
     int len, ret, mpi_errno = MPI_SUCCESS;
-    char bc[OFI_KVSAPPSTRLEN], *addr = NULL;
+    char bc[MPIDI_OFI_KVSAPPSTRLEN], *addr = NULL;
 
     BEGIN_FUNC(FCNAME);
-    addr = MPL_malloc(gl_data.bound_addrlen);
+    addr = MPL_malloc(gl_data.bound_addrlen, MPL_MEM_ADDRESS);
     MPIR_Assert(addr);
     MPIR_Assert(1 != VC_OFI(vc)->ready);
 
@@ -408,7 +408,7 @@ int MPID_nem_ofi_vc_connect(MPIDI_VC_t * vc)
         goto fn_exit;
     }
 
-    MPIDI_CH3I_NM_OFI_RC(vc->pg->getConnInfo(vc->pg_rank, bc, OFI_KVSAPPSTRLEN, vc->pg));
+    MPIDI_CH3I_NM_OFI_RC(vc->pg->getConnInfo(vc->pg_rank, bc, MPIDI_OFI_KVSAPPSTRLEN, vc->pg));
     ret = MPL_str_get_binary_arg(bc, "OFI", addr, gl_data.bound_addrlen, &len);
     MPIR_ERR_CHKANDJUMP((ret != MPL_STR_SUCCESS && ret != MPL_STR_NOMEM) ||
                         (size_t) len != gl_data.bound_addrlen,
@@ -427,7 +427,7 @@ int MPID_nem_ofi_vc_connect(MPIDI_VC_t * vc)
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_vc_init)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_vc_init)
 int MPID_nem_ofi_vc_init(MPIDI_VC_t * vc)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -460,7 +460,7 @@ int MPID_nem_ofi_vc_init(MPIDI_VC_t * vc)
 /* TODO:  Verify this code has no leaks                                     */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_vc_destroy)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_vc_destroy)
 int MPID_nem_ofi_vc_destroy(MPIDI_VC_t * vc)
 {
     BEGIN_FUNC(FCNAME);
@@ -491,7 +491,7 @@ int MPID_nem_ofi_vc_destroy(MPIDI_VC_t * vc)
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_vc_terminate)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_vc_terminate)
 int MPID_nem_ofi_vc_terminate(MPIDI_VC_t * vc)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -518,18 +518,18 @@ int MPID_nem_ofi_vc_terminate(MPIDI_VC_t * vc)
 /*    during the SendContig family of routines.                             */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(nm_connect_to_root)
+#define FCNAME MPL_QUOTE(nm_connect_to_root)
 int MPID_nem_ofi_connect_to_root(const char *business_card, MPIDI_VC_t * new_vc)
 {
     int len, ret, mpi_errno = MPI_SUCCESS, str_errno = MPI_SUCCESS;
-    int my_bc_len = OFI_KVSAPPSTRLEN;
+    int my_bc_len = MPIDI_OFI_KVSAPPSTRLEN;
     char *addr = NULL, *bc = NULL, *my_bc = NULL;
     MPIR_Request *sreq;
     uint64_t conn_req_send_bits;
 
     BEGIN_FUNC(FCNAME);
-    addr = MPL_malloc(gl_data.bound_addrlen);
-    bc = MPL_malloc(OFI_KVSAPPSTRLEN);
+    addr = MPL_malloc(gl_data.bound_addrlen, MPL_MEM_ADDRESS);
+    bc = MPL_malloc(MPIDI_OFI_KVSAPPSTRLEN, MPL_MEM_ADDRESS);
     MPIR_Assertp(addr);
     MPIR_Assertp(bc);
     my_bc = bc;
@@ -548,7 +548,7 @@ int MPID_nem_ofi_connect_to_root(const char *business_card, MPIDI_VC_t * new_vc)
     str_errno = MPL_str_add_int_arg(&bc, &my_bc_len, "tag", new_vc->port_name_tag);
     MPIR_ERR_CHKANDJUMP(str_errno, mpi_errno, MPI_ERR_OTHER, "**argstr_port_name_tag");
     MPIDI_CH3I_NM_OFI_RC(MPID_nem_ofi_get_business_card(MPIR_Process.comm_world->rank, &bc, &my_bc_len));
-    my_bc_len = OFI_KVSAPPSTRLEN - my_bc_len;
+    my_bc_len = MPIDI_OFI_KVSAPPSTRLEN - my_bc_len;
 
     MPID_nem_ofi_create_req(&sreq, 1);
     sreq->kind = MPIR_REQUEST_KIND__SEND;
@@ -557,7 +557,7 @@ int MPID_nem_ofi_connect_to_root(const char *business_card, MPIDI_VC_t * new_vc)
     REQ_OFI(sreq)->event_callback = MPID_nem_ofi_connect_to_root_callback;
     REQ_OFI(sreq)->pack_buffer = my_bc;
     if (gl_data.api_set == API_SET_1) {
-        conn_req_send_bits = init_sendtag(0, MPIR_Process.comm_world->rank, 0, MPID_CONN_REQ);
+        conn_req_send_bits = init_sendtag(0, MPIR_Process.comm_world->rank, 0, MPIDI_OFI_CONN_REQ);
         FI_RC_RETRY(fi_tsend(gl_data.endpoint,
                        REQ_OFI(sreq)->pack_buffer,
                        my_bc_len,
@@ -565,7 +565,7 @@ int MPID_nem_ofi_connect_to_root(const char *business_card, MPIDI_VC_t * new_vc)
                        VC_OFI(new_vc)->direct_addr,
                        conn_req_send_bits, &(REQ_OFI(sreq)->ofi_context)), tsend);
     } else {
-        conn_req_send_bits = init_sendtag_2(0, 0, MPID_CONN_REQ);
+        conn_req_send_bits = init_sendtag_2(0, 0, MPIDI_OFI_CONN_REQ);
         FI_RC_RETRY(fi_tsenddata(gl_data.endpoint,
                            REQ_OFI(sreq)->pack_buffer,
                            my_bc_len,
@@ -590,7 +590,7 @@ int MPID_nem_ofi_connect_to_root(const char *business_card, MPIDI_VC_t * new_vc)
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_get_business_card)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_get_business_card)
 int MPID_nem_ofi_get_business_card(int my_rank ATTRIBUTE((unused)),
                                    char **bc_val_p, int *val_max_sz_p)
 {

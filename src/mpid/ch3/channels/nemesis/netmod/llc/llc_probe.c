@@ -157,9 +157,8 @@ int MPID_nem_llc_improbe(MPIDI_VC_t * vc, int source, int tag, MPIR_Comm * comm,
 
         *flag = 1;
 
-        req = MPIR_Request_create(MPIR_REQUEST_KIND__UNDEFINED);
+        req = MPIR_Request_create(MPIR_REQUEST_KIND__MPROBE);
         MPIR_Object_set_ref(req, 2);
-        req->kind = MPIR_REQUEST_KIND__MPROBE;
         req->comm = comm;
         MPIR_Comm_add_ref(comm);
         req->ch.vc = vc;
@@ -178,7 +177,7 @@ int MPID_nem_llc_improbe(MPIDI_VC_t * vc, int source, int tag, MPIR_Comm * comm,
         req->status.MPI_TAG = probe.tag & 0xffffffff;
         req->dev.recv_data_sz = probe.len;
         MPIR_STATUS_SET_COUNT(req->status, req->dev.recv_data_sz);
-        req->dev.tmpbuf = MPL_malloc(req->dev.recv_data_sz);
+        req->dev.tmpbuf = MPL_malloc(req->dev.recv_data_sz, MPL_MEM_BUFFER);
         MPIR_Assert(req->dev.tmpbuf);
 
         /* receive message in req->dev.tmpbuf */

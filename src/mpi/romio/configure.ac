@@ -28,6 +28,10 @@ AM_MAINTAINER_MODE([enable])
 dnl must come before LT_INIT, which AC_REQUIREs AC_PROG_CC
 PAC_PROG_CC
 AM_PROG_CC_C_O
+PAC_CHECK_VISIBILITY
+AC_SUBST(VISIBILITY_CFLAGS)
+
+AC_USE_SYSTEM_EXTENSIONS
 
 AM_PROG_AR
 
@@ -44,7 +48,7 @@ fi
 
 AC_CONFIG_HEADER(adio/include/romioconf.h)
 AH_TOP([/*
- *  (C) 2011 by Argonne National Laboratory.
+ *  (C) 2008 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
 #ifndef ROMIOCONF_H_INCLUDED
@@ -84,6 +88,17 @@ DEBUG=no
 MIPS=0
 BITS=0
 
+AC_ARG_VAR([FROM_MPICH],[set to "yes" if building ROMIO inside of MPICH])
+FROM_MPICH=${FROM_MPICH:-no}
+
+AC_ARG_VAR([FROM_LAM],[set to "yes" if building ROMIO inside of LAM])
+FROM_LAM=${FROM_LAM:-no}
+if test "$FROM_LAM" = 1 ; then FROM_LAM=yes ; fi
+
+AC_ARG_VAR([FROM_OMPI],[set to "yes" if building ROMIO inside of Open MPI])
+FROM_OMPI=${FROM_OMPI:-no}
+if test "$FROM_OMPI" = 1 ; then FROM_OMPI=yes ; fi
+
 # MPL
 AC_ARG_VAR([MPLLIBNAME],[can be used to override the name of the MPL library (default: "mpl")])
 MPLLIBNAME=${MPLLIBNAME:-"mpl"}
@@ -107,12 +122,16 @@ mpl_includedir=""
 AC_SUBST([mpl_includedir])
 mpl_libdir=""
 AC_SUBST([mpl_libdir])
+mpl_lib=""
+AC_SUBST([mpl_lib])
+if test "$FROM_MPICH" = "no" ; then
 if test "$with_mpl_prefix" = "embedded" ; then
     mpl_srcdir="mpl"
     mpl_dist_srcdir="mpl"
     mpl_subdir_args="--disable-versioning --enable-embedded"
     PAC_CONFIG_SUBDIR_ARGS([mpl],[$mpl_subdir_args],[],[AC_MSG_ERROR(MPL configure failed)])
     mpl_includedir='-I$(top_builddir)/mpl/include -I$(top_srcdir)/mpl/include'
+    mpl_lib="mpl/lib${MPLLIBNAME}.la"
 else
     # The user specified an already-installed MPL; just sanity check, don't
     # subconfigure it
@@ -120,18 +139,9 @@ else
           [:],[AC_MSG_ERROR([the MPL installation in "${with_mpl_prefix}" appears broken])])
     mpl_includedir="-I${with_mpl_prefix}/include"
     mpl_libdir="-L${with_mpl_prefix}/lib"
+    mpl_lib="-l${MPLLIBNAME}"
 fi
-
-AC_ARG_VAR([FROM_MPICH],[set to "yes" if building ROMIO inside of MPICH])
-FROM_MPICH=${FROM_MPICH:-no}
-
-AC_ARG_VAR([FROM_LAM],[set to "yes" if building ROMIO inside of LAM])
-FROM_LAM=${FROM_LAM:-no}
-if test "$FROM_LAM" = 1 ; then FROM_LAM=yes ; fi
-
-AC_ARG_VAR([FROM_OMPI],[set to "yes" if building ROMIO inside of Open MPI])
-FROM_OMPI=${FROM_OMPI:-no}
-if test "$FROM_OMPI" = 1 ; then FROM_OMPI=yes ; fi
+fi
 
 CFLAGS=${CFLAGS:-""}
 LL="lld"
@@ -177,7 +187,7 @@ dnl An m4 macro for use with m4_foreach_w and friends.  You should modify this
 dnl list if you want to add a known file system.  The list is just whitespace
 dnl separated, so you can use newlines and tabs as well.
 m4_define([known_filesystems_m4_w],
-          [nfs ufs pvfs2 testfs xfs panfs lustre gpfs])dnl
+          [nfs ufs pvfs2 testfs xfs panfs lustre gpfs ime])dnl
 dnl
 dnl An m4 macro for use with m4_foreach and friends.  Expands to a quoted list of
 dnl quoted elements.  A bit easier to use without unintended expansion than the
@@ -473,7 +483,7 @@ AC_TYPE_OFF_T
 # Header files
 # Find the CPP before the header check
 AC_PROG_CPP
-AC_CHECK_HEADERS([unistd.h fcntl.h malloc.h stddef.h sys/types.h limits.h time.h])
+AC_CHECK_HEADERS([unistd.h fcntl.h malloc.h stddef.h sys/types.h limits.h time.h dirent.h])
 AC_CHECK_HEADERS(mpix.h,,,[#include <mpi.h>])
 #
 
@@ -688,6 +698,11 @@ AM_CONDITIONAL([BUILD_MPIO_ERRHAN],[false])
 # if we don't have weak symbol support, we must build a separate convenience
 # library in order to provide the "PMPI_" symbols
 AM_CONDITIONAL([BUILD_PROFILING_LIB],[test "x$HAVE_WEAK_SYMBOLS" = "x0"])
+# disable visibility if building profiling library
+if test "x$HAVE_WEAK_SYMBOLS" = "x0" ; then
+    VISIBILITY_CFLAGS=""
+fi
+
 
 # weird: we have conflated "buid ROMIO's versions of the fortran bindings" and
 # "build ROMIO"s fortran I/O tests". Of course the common situaiton is that we
@@ -869,12 +884,31 @@ fi
 #
 # Verify presence of lustre/lustre_user.h
 #
+lustre_lockahead="no"
 if test -n "$file_system_lustre"; then
-    AC_CHECK_HEADERS(lustre/lustre_user.h,
-        AC_DEFINE(ROMIO_LUSTRE,1,[Define for ROMIO with LUSTRE]),
-        AC_MSG_ERROR([LUSTRE support requested but cannot find lustre/lustre_user.h header file])                                        
-    )
+    AC_CHECK_HEADERS([linux/lustre/lustre_user.h lustre/lustre_user.h],
+        break)
+    if test x"$ac_cv_header_linux_lustre_lustre_user_h" = "xyes" -o x"$ac_cv_header_lustre_lustre_user_h" = "xyes" ; then
+        AC_DEFINE(ROMIO_LUSTRE, 1, [Define for ROMIO with LUSTRE])
+    else
+        AC_MSG_ERROR([LUSTRE support requested but cannot find lustre/lustre_user.h header file])
+    fi
+    AC_COMPILE_IFELSE([
+        AC_LANG_SOURCE([
+#include <lustre/lustre_user.h>
+#include <sys/ioctl.h>
+        int main(int argc, char **argv) {
+            int fd=100;
+            struct ladvise_hdr *ladvise_hdr;
+            ioctl(fd, LL_IOC_LADVISE, &ladvise_hdr);
+            return 0; }
+        ])],
+        lustre_lockahead="yes"
+	AC_DEFINE(HAVE_LUSTRE_LOCKAHEAD, 1, [Define if LUSTRE_LOCKAHEAD is enabled.]) )
 fi
+
+# Add conditional compilation of Lustre lockahead sources
+AM_CONDITIONAL([LUSTRE_LOCKAHEAD],[test "$lustre_lockahead" = "yes"])
 
 if test -n "$file_system_xfs"; then
     AC_DEFINE(ROMIO_XFS,1,[Define for ROMIO with XFS])
@@ -913,6 +947,13 @@ int main(int argc, char **argv) {
         AC_MSG_RESULT(assuming 128 for memory alignment)
         CFLAGS="$CFLAGS -DXFS_MEMALIGN=128"
     fi
+fi
+
+if test -n "$file_system_ime"; then
+        AC_CHECK_HEADERS(ime_native.h,
+                AC_DEFINE(ROMIO_IME,1,[Define for ROMIO with IME]),
+                AC_MSG_ERROR([IME support requested but cannot find ime_native.h header file])
+        )
 fi
 
 #

@@ -23,23 +23,23 @@
   Collective-DS
   E*/
 typedef enum MPIR_Op_kind {
-    MPIR_OP_KIND__NULL=0,
-    MPIR_OP_KIND__MAX=1,
-    MPIR_OP_KIND__MIN=2,
-    MPIR_OP_KIND__SUM=3,
-    MPIR_OP_KIND__PROD=4,
-    MPIR_OP_KIND__LAND=5,
-    MPIR_OP_KIND__BAND=6,
-    MPIR_OP_KIND__LOR=7,
-    MPIR_OP_KIND__BOR=8,
-    MPIR_OP_KIND__LXOR=9,
-    MPIR_OP_KIND__BXOR=10,
-    MPIR_OP_KIND__MAXLOC=11,
-    MPIR_OP_KIND__MINLOC=12,
-    MPIR_OP_KIND__REPLACE=13,
-    MPIR_OP_KIND__NO_OP=14,
-    MPIR_OP_KIND__USER_NONCOMMUTE=32,
-    MPIR_OP_KIND__USER=33
+    MPIR_OP_KIND__NULL = 0,
+    MPIR_OP_KIND__MAX = 1,
+    MPIR_OP_KIND__MIN = 2,
+    MPIR_OP_KIND__SUM = 3,
+    MPIR_OP_KIND__PROD = 4,
+    MPIR_OP_KIND__LAND = 5,
+    MPIR_OP_KIND__BAND = 6,
+    MPIR_OP_KIND__LOR = 7,
+    MPIR_OP_KIND__BOR = 8,
+    MPIR_OP_KIND__LXOR = 9,
+    MPIR_OP_KIND__BXOR = 10,
+    MPIR_OP_KIND__MAXLOC = 11,
+    MPIR_OP_KIND__MINLOC = 12,
+    MPIR_OP_KIND__REPLACE = 13,
+    MPIR_OP_KIND__NO_OP = 14,
+    MPIR_OP_KIND__USER_NONCOMMUTE = 32,
+    MPIR_OP_KIND__USER = 33
 } MPIR_Op_kind;
 
 /*S
@@ -78,13 +78,11 @@ typedef enum MPIR_Op_kind {
   Collective-DS
   S*/
 typedef union MPIR_User_function {
-    void (*c_function) ( const void *, void *,
-			 const int *, const MPI_Datatype * );
-    void (*f77_function) ( const void *, void *,
-			  const MPI_Fint *, const MPI_Fint * );
+    void (*c_function) (const void *, void *, const int *, const MPI_Datatype *);
+    void (*f77_function) (const void *, void *, const MPI_Fint *, const MPI_Fint *);
 } MPIR_User_function;
 /* FIXME: Should there be "restrict" in the definitions above, e.g.,
-   (*c_function)( const void restrict * , void restrict *, ... )? */
+   (*c_function)(const void restrict * , void restrict *, ...)? */
 
 /*S
   MPIR_Op - MPI_Op structure
@@ -102,68 +100,98 @@ typedef union MPIR_User_function {
   Collective-DS
   S*/
 typedef struct MPIR_Op {
-     MPIR_OBJECT_HEADER; /* adds handle and ref_count fields */
-     MPIR_Op_kind       kind;
-     MPIR_Lang_t        language;
-     MPIR_User_function function;
-  } MPIR_Op;
+    MPIR_OBJECT_HEADER;         /* adds handle and ref_count fields */
+    MPIR_Op_kind kind;
+    MPIR_Lang_t language;
+    MPIR_User_function function;
+#ifdef MPID_DEV_OP_DECL
+     MPID_DEV_OP_DECL
+#endif
+} MPIR_Op;
 #define MPIR_OP_N_BUILTIN 15
 extern MPIR_Op MPIR_Op_builtin[MPIR_OP_N_BUILTIN];
 extern MPIR_Op MPIR_Op_direct[];
 extern MPIR_Object_alloc_t MPIR_Op_mem;
 
-#define MPIR_Op_add_ref(_op) \
-    do { MPIR_Object_add_ref(_op); } while (0)
-#define MPIR_Op_release_ref( _op, _inuse ) \
-    do { MPIR_Object_release_ref( _op, _inuse ); } while (0)
+#define MPIR_Op_ptr_add_ref(op_p_) \
+    do { MPIR_Object_add_ref(op_p_); } while (0)
+#define MPIR_Op_ptr_release_ref(op_p_, inuse_) \
+    do { MPIR_Object_release_ref(op_p_, inuse_); } while (0)
 
 /* release and free-if-not-in-use helper */
-#define MPIR_Op_release(op_p_)                           \
+#define MPIR_Op_ptr_release(op_p_)                       \
     do {                                                 \
         int in_use_;                                     \
-        MPIR_Op_release_ref((op_p_), &in_use_);          \
+        MPIR_Op_ptr_release_ref((op_p_), &in_use_);      \
         if (!in_use_) {                                  \
             MPIR_Handle_obj_free(&MPIR_Op_mem, (op_p_)); \
         }                                                \
     } while (0)
 
-void MPIR_MAXF  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_MINF  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_SUM  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_PROD  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_LAND  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_BAND  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_LOR  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_BOR  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_LXOR  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_BXOR  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_MAXLOC  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_MINLOC  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_REPLACE  ( void *, void *, int *, MPI_Datatype * ) ;
-void MPIR_NO_OP  ( void *, void *, int *, MPI_Datatype * ) ;
+void MPIR_MAXF(void *, void *, int *, MPI_Datatype *);
+void MPIR_MINF(void *, void *, int *, MPI_Datatype *);
+void MPIR_SUM(void *, void *, int *, MPI_Datatype *);
+void MPIR_PROD(void *, void *, int *, MPI_Datatype *);
+void MPIR_LAND(void *, void *, int *, MPI_Datatype *);
+void MPIR_BAND(void *, void *, int *, MPI_Datatype *);
+void MPIR_LOR(void *, void *, int *, MPI_Datatype *);
+void MPIR_BOR(void *, void *, int *, MPI_Datatype *);
+void MPIR_LXOR(void *, void *, int *, MPI_Datatype *);
+void MPIR_BXOR(void *, void *, int *, MPI_Datatype *);
+void MPIR_MAXLOC(void *, void *, int *, MPI_Datatype *);
+void MPIR_MINLOC(void *, void *, int *, MPI_Datatype *);
+void MPIR_REPLACE(void *, void *, int *, MPI_Datatype *);
+void MPIR_NO_OP(void *, void *, int *, MPI_Datatype *);
 
-int MPIR_MAXF_check_dtype  ( MPI_Datatype ) ;
-int MPIR_MINF_check_dtype ( MPI_Datatype ) ;
-int MPIR_SUM_check_dtype  ( MPI_Datatype ) ;
-int MPIR_PROD_check_dtype  ( MPI_Datatype ) ;
-int MPIR_LAND_check_dtype  ( MPI_Datatype ) ;
-int MPIR_BAND_check_dtype  ( MPI_Datatype ) ;
-int MPIR_LOR_check_dtype  ( MPI_Datatype ) ;
-int MPIR_BOR_check_dtype  ( MPI_Datatype ) ;
-int MPIR_LXOR_check_dtype ( MPI_Datatype ) ;
-int MPIR_BXOR_check_dtype  ( MPI_Datatype ) ;
-int MPIR_MAXLOC_check_dtype  ( MPI_Datatype ) ;
-int MPIR_MINLOC_check_dtype  ( MPI_Datatype ) ;
-int MPIR_REPLACE_check_dtype  ( MPI_Datatype ) ;
-int MPIR_NO_OP_check_dtype  ( MPI_Datatype ) ;
+int MPIR_MAXF_check_dtype(MPI_Datatype);
+int MPIR_MINF_check_dtype(MPI_Datatype);
+int MPIR_SUM_check_dtype(MPI_Datatype);
+int MPIR_PROD_check_dtype(MPI_Datatype);
+int MPIR_LAND_check_dtype(MPI_Datatype);
+int MPIR_BAND_check_dtype(MPI_Datatype);
+int MPIR_LOR_check_dtype(MPI_Datatype);
+int MPIR_BOR_check_dtype(MPI_Datatype);
+int MPIR_LXOR_check_dtype(MPI_Datatype);
+int MPIR_BXOR_check_dtype(MPI_Datatype);
+int MPIR_MAXLOC_check_dtype(MPI_Datatype);
+int MPIR_MINLOC_check_dtype(MPI_Datatype);
+int MPIR_REPLACE_check_dtype(MPI_Datatype);
+int MPIR_NO_OP_check_dtype(MPI_Datatype);
+
+#define MPIR_Op_add_ref_if_not_builtin(op)               \
+    do {                                                 \
+        if (HANDLE_GET_KIND(op) != HANDLE_KIND_BUILTIN) {\
+            MPIR_Op *op_ptr = NULL;                      \
+            MPIR_Op_get_ptr(op, op_ptr);                 \
+            MPIR_Assert(op_ptr != NULL);                 \
+            MPIR_Op_ptr_add_ref(op_ptr);                 \
+        }                                                \
+    } while (0)                                          \
+
+
+#define MPIR_Op_release_if_not_builtin(op)               \
+    do {                                                 \
+        if (HANDLE_GET_KIND(op) != HANDLE_KIND_BUILTIN) {\
+            MPIR_Op *op_ptr = NULL;                      \
+            MPIR_Op_get_ptr(op, op_ptr);                 \
+            MPIR_Assert(op_ptr != NULL);                 \
+            MPIR_Op_ptr_release(op_ptr);                 \
+        }                                                \
+    } while (0)                                          \
 
 #define MPIR_PREDEF_OP_COUNT 14
 extern MPI_User_function *MPIR_Op_table[];
 
-typedef int (MPIR_Op_check_dtype_fn) ( MPI_Datatype );
+typedef int (MPIR_Op_check_dtype_fn) (MPI_Datatype);
 extern MPIR_Op_check_dtype_fn *MPIR_Op_check_dtype_table[];
 
-#define MPIR_OP_HDL_TO_FN(op) MPIR_Op_table[((op)&0xf) - 1]
-#define MPIR_OP_HDL_TO_DTYPE_FN(op) MPIR_Op_check_dtype_table[((op)&0xf) - 1]
+#define MPIR_OP_HDL_TO_FN(op) MPIR_Op_table[((op)&0xf)]
+#define MPIR_OP_HDL_TO_DTYPE_FN(op) MPIR_Op_check_dtype_table[((op)&0xf)]
 
+int MPIR_Op_commutative(MPIR_Op * op_ptr, int *commute);
+
+int MPIR_Op_is_commutative(MPI_Op);
+
+int MPIR_Op_create_impl(MPI_User_function * user_fn, int commute, MPI_Op * op);
+void MPIR_Op_free_impl(MPI_Op * op);
 #endif /* MPIR_OP_H_INCLUDED */

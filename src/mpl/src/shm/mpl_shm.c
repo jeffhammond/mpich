@@ -18,9 +18,7 @@
  */
 int MPL_shm_hnd_serialize(char *str, MPL_shm_hnd_t hnd, int str_len)
 {
-    int rc = -1;
-    rc = MPLI_shm_ghnd_get_by_val(hnd, str, str_len);
-    return rc;
+    return MPLI_shm_ghnd_get_by_val(hnd, str, str_len);
 }
 
 /* Deserialize a handle.
@@ -33,9 +31,9 @@ int MPL_shm_hnd_serialize(char *str, MPL_shm_hnd_t hnd, int str_len)
  */
 int MPL_shm_hnd_deserialize(MPL_shm_hnd_t hnd, const char *str_hnd, size_t str_hnd_len)
 {
-    int rc = -1;
+    int rc = MPL_SHM_SUCCESS;
     MPLI_shm_hnd_reset_val(hnd);
-    rc = MPLI_shm_ghnd_alloc(hnd);
+    rc = MPLI_shm_ghnd_alloc(hnd, MPL_MEM_SHM);
     rc = MPLI_shm_ghnd_set_by_val(hnd, "%s", str_hnd);
     rc = MPL_shm_seg_open(hnd, 0);
     return rc;
@@ -53,9 +51,8 @@ int MPL_shm_hnd_deserialize(MPL_shm_hnd_t hnd, const char *str_hnd, size_t str_h
 
 int MPL_shm_hnd_get_serialized_by_ref(MPL_shm_hnd_t hnd, char **str_ptr)
 {
-    int mpi_errno = 0;
-    *str_ptr = (char *)MPLI_shm_ghnd_get_by_ref(hnd);
-    return mpi_errno;
+    *str_ptr = (char *) MPLI_shm_ghnd_get_by_ref(hnd);
+    return MPL_SHM_SUCCESS;
 }
 
 /* Deserialize a handle by reference.
@@ -69,25 +66,27 @@ int MPL_shm_hnd_get_serialized_by_ref(MPL_shm_hnd_t hnd, char **str_ptr)
  */
 int MPL_shm_hnd_deserialize_by_ref(MPL_shm_hnd_t hnd, char **ser_hnd_ptr)
 {
-    int mpi_errno = 0;
-
     MPLI_shm_hnd_reset_val(hnd);
     MPLI_shm_ghnd_set_by_ref(hnd, *ser_hnd_ptr);
 
-    mpi_errno = MPL_shm_seg_open(hnd, 0);
-
-    return mpi_errno;
+    return MPL_shm_seg_open(hnd, 0);
 }
 
 /* Initialize a shared memory handle
  * hnd_ptr : A pointer to the shared memory handle
  */
 
-int MPL_shm_hnd_init(MPL_shm_hnd_t *hnd_ptr)
+int MPL_shm_hnd_init(MPL_shm_hnd_t * hnd_ptr)
 {
     int rc = -1;
-    rc = MPLI_shm_hnd_alloc(hnd_ptr);
+
+    rc = MPLI_shm_hnd_alloc(hnd_ptr, MPL_MEM_SHM);
+
+    if (MPL_SHM_SUCCESS != rc)
+        return rc;
+
     MPLI_shm_hnd_reset_val(*hnd_ptr);
+
     return rc;
 }
 
@@ -95,10 +94,8 @@ int MPL_shm_hnd_init(MPL_shm_hnd_t *hnd_ptr)
  * hnd_ptr : A pointer to the shm handle to be finalized.
  *           Any handle that is init has to be finalized.
  */
-int MPL_shm_hnd_finalize(MPL_shm_hnd_t *hnd_ptr)
+int MPL_shm_hnd_finalize(MPL_shm_hnd_t * hnd_ptr)
 {
-    int mpi_errno = 0;
-
     /* A finalize can/should be called on an invalid handle
      * Don't assert if we fail here ...
      */
@@ -107,6 +104,5 @@ int MPL_shm_hnd_finalize(MPL_shm_hnd_t *hnd_ptr)
 
     *hnd_ptr = MPL_SHM_HND_INVALID;
 
-    return mpi_errno;
+    return 0;
 }
-

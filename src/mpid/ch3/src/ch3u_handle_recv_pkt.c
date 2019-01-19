@@ -52,7 +52,7 @@
 #define FUNCNAME MPIDI_CH3U_Handle_ordered_recv_pkt
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIDI_CH3U_Handle_ordered_recv_pkt(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt, 
+int MPIDI_CH3U_Handle_ordered_recv_pkt(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt, void *data,
 				       intptr_t *buflen, MPIR_Request ** rreqp)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -78,7 +78,7 @@ int MPIDI_CH3U_Handle_ordered_recv_pkt(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt,
     }
     /* Packet type is an enum and hence >= 0 */
     MPIR_Assert(pkt->type <= MPIDI_CH3_PKT_END_CH3);
-    mpi_errno = pktArray[pkt->type](vc, pkt, buflen, rreqp);
+    mpi_errno = pktArray[pkt->type](vc, pkt, data, buflen, rreqp);
 
     MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3U_HANDLE_ORDERED_RECV_PKT);
     return mpi_errno;
@@ -102,12 +102,12 @@ int MPIDI_CH3U_Handle_ordered_recv_pkt(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt,
 #define FUNCNAME MPIDI_CH3U_Receive_data_found
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, char *buf, intptr_t *buflen, int *complete)
+int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, void *buf, intptr_t *buflen, int *complete)
 {
     int dt_contig;
     MPI_Aint dt_true_lb;
     intptr_t userbuf_sz;
-    MPIDU_Datatype * dt_ptr = NULL;
+    MPIR_Datatype * dt_ptr = NULL;
     intptr_t data_sz;
     int mpi_errno = MPI_SUCCESS;
     MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_RECEIVE_DATA_FOUND);
@@ -173,11 +173,11 @@ int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, char *buf, intptr_t *bufle
 	/* user buffer is not contiguous or is too small to hold
 	   the entire message */
         
-	rreq->dev.segment_ptr = MPIDU_Segment_alloc( );
-        MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIDU_Segment_alloc");
+	rreq->dev.segment_ptr = MPIR_Segment_alloc( );
+        MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIR_Segment_alloc");
 
- 	MPIDU_Segment_init(rreq->dev.user_buf, rreq->dev.user_count, 
-			  rreq->dev.datatype, rreq->dev.segment_ptr, 0);
+ 	MPIR_Segment_init(rreq->dev.user_buf, rreq->dev.user_count, 
+			  rreq->dev.datatype, rreq->dev.segment_ptr);
 	rreq->dev.segment_first = 0;
 	rreq->dev.segment_size  = data_sz;
 
@@ -189,7 +189,7 @@ int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, char *buf, intptr_t *bufle
             intptr_t last;
             MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"Copying noncontiguous data to user buffer");
             last = data_sz;
-            MPIDU_Segment_unpack(rreq->dev.segment_ptr, rreq->dev.segment_first, 
+            MPIR_Segment_unpack(rreq->dev.segment_ptr, rreq->dev.segment_first, 
 				&last, buf);
             /* --BEGIN ERROR HANDLING-- */
             if (last != data_sz)
@@ -235,7 +235,7 @@ fn_fail:
 #define FUNCNAME MPIDI_CH3U_Receive_data_unexpected
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIDI_CH3U_Receive_data_unexpected(MPIR_Request * rreq, char *buf, intptr_t *buflen, int *complete)
+int MPIDI_CH3U_Receive_data_unexpected(MPIR_Request * rreq, void *buf, intptr_t *buflen, int *complete)
 {
     int mpi_errno = MPI_SUCCESS;
     MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_RECEIVE_DATA_UNEXPECTED);
@@ -248,7 +248,7 @@ int MPIDI_CH3U_Receive_data_unexpected(MPIR_Request * rreq, char *buf, intptr_t 
        with flow control */
     MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"unexpected request allocated");
     
-    rreq->dev.tmpbuf = MPL_malloc(rreq->dev.recv_data_sz);
+    rreq->dev.tmpbuf = MPL_malloc(rreq->dev.recv_data_sz, MPL_MEM_BUFFER);
     if (!rreq->dev.tmpbuf) {
 	MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**nomem","**nomem %d",
 			     rreq->dev.recv_data_sz);
@@ -299,7 +299,7 @@ int MPIDI_CH3U_Post_data_receive_found(MPIR_Request * rreq)
     int dt_contig;
     MPI_Aint dt_true_lb;
     intptr_t userbuf_sz;
-    MPIDU_Datatype * dt_ptr = NULL;
+    MPIR_Datatype * dt_ptr = NULL;
     intptr_t data_sz;
     MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_POST_DATA_RECEIVE_FOUND);
 
@@ -346,10 +346,10 @@ int MPIDI_CH3U_Post_data_receive_found(MPIR_Request * rreq)
 	/* user buffer is not contiguous or is too small to hold
 	   the entire message */
 	MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"IOV loaded for non-contiguous read");
-	rreq->dev.segment_ptr = MPIDU_Segment_alloc( );
-        MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIDU_Segment_alloc");
-	MPIDU_Segment_init(rreq->dev.user_buf, rreq->dev.user_count, 
-			  rreq->dev.datatype, rreq->dev.segment_ptr, 0);
+	rreq->dev.segment_ptr = MPIR_Segment_alloc( );
+        MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIR_Segment_alloc");
+	MPIR_Segment_init(rreq->dev.user_buf, rreq->dev.user_count, 
+			  rreq->dev.datatype, rreq->dev.segment_ptr);
 	rreq->dev.segment_first = 0;
 	rreq->dev.segment_size = data_sz;
 	mpi_errno = MPIDI_CH3U_Request_load_recv_iov(rreq);
@@ -383,7 +383,7 @@ int MPIDI_CH3U_Post_data_receive_unexpected(MPIR_Request * rreq)
        with flow control */
     MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"unexpected request allocated");
     
-    rreq->dev.tmpbuf = MPL_malloc(rreq->dev.recv_data_sz);
+    rreq->dev.tmpbuf = MPL_malloc(rreq->dev.recv_data_sz, MPL_MEM_BUFFER);
     if (!rreq->dev.tmpbuf) {
 	MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**nomem","**nomem %d",
 			     rreq->dev.recv_data_sz);
@@ -483,10 +483,10 @@ int MPIDI_CH3I_Try_acquire_win_lock(MPIR_Win *win_ptr, int requested_lock)
 #undef FUNCNAME
 #define FUNCNAME MPIDI_CH3_PktHandler_FlowCntlUpdate
 #undef FCNAME
-int MPIDI_CH3_PktHandler_FlowCntlUpdate( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
+int MPIDI_CH3_PktHandler_FlowCntlUpdate( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, void *data ATTRIBUTE((unused)),
 					 intptr_t *buflen, MPIR_Request **rreqp)
 {
-    *buflen = sizeof(MPIDI_CH3_Pkt_t);
+    *buflen = 0;
     return MPI_SUCCESS;
 }
 
@@ -497,6 +497,7 @@ int MPIDI_CH3_PktHandler_FlowCntlUpdate( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
 #define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3_PktHandler_EndCH3( MPIDI_VC_t *vc ATTRIBUTE((unused)), 
 				 MPIDI_CH3_Pkt_t *pkt ATTRIBUTE((unused)),
+				 void *data ATTRIBUTE((unused)),
 				 intptr_t *buflen ATTRIBUTE((unused)),
 				 MPIR_Request **rreqp ATTRIBUTE((unused)) )
 {

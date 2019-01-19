@@ -11,7 +11,7 @@
 #ifndef MPL_THREAD_POSIX_H_INCLUDED
 #define MPL_THREAD_POSIX_H_INCLUDED
 
-#include "mpl.h"      /* for MPL_sched_yield */
+#include "mpl.h"        /* for MPL_sched_yield */
 
 #include <errno.h>
 #include <pthread.h>
@@ -40,7 +40,7 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
 
 #define MPL_thread_same(id1_, id2_, same_)                              \
     do {                                                                \
-        *(same_) = pthread_equal(*(id1_), *(id2_)) ? TRUE : FALSE;	\
+        *(same_) = pthread_equal(*(id1_), *(id2_)) ? TRUE : FALSE;      \
     } while (0)
 
 #define MPL_thread_yield MPL_sched_yield
@@ -93,7 +93,7 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
 
 #define MPL_thread_mutex_destroy(mutex_ptr_, err_ptr_)                  \
     do {                                                                \
-        int err__;							\
+        int err__;                                                      \
                                                                         \
         err__ = pthread_mutex_destroy(mutex_ptr_);                      \
         if (unlikely(err__))                                            \
@@ -103,7 +103,7 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
     } while (0)
 
 
-#define MPL_thread_mutex_lock(mutex_ptr_, err_ptr_)                     \
+#define MPL_thread_mutex_lock(mutex_ptr_, err_ptr_, prio_)              \
     do {                                                                \
         int err__;                                                      \
         err__ = pthread_mutex_lock(mutex_ptr_);                         \
@@ -114,6 +114,23 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
         *(int *)(err_ptr_) = err__;                                     \
     } while (0)
 
+#define MPL_thread_mutex_trylock(mutex_ptr_, err_ptr_, cs_acq_ptr)      \
+    do {                                                                \
+        int err__;                                                      \
+        *(int*)cs_acq_ptr = 1;                                          \
+        err__ = pthread_mutex_trylock(mutex_ptr_);                      \
+        if (unlikely(err__ != 0 && err__ != EBUSY)) {                   \
+            *(int*)cs_acq_ptr = 0;                                      \
+            MPL_internal_sys_error_printf("pthread_mutex_trylock", err__,  \
+                                          "    %s:%d\n", __FILE__, __LINE__); \
+        }                                                               \
+        else {                                                          \
+            if (unlikely(err__ != 0))                                   \
+                *(int*)cs_acq_ptr = 0;                                  \
+             err__ = 0;                                                 \
+        }                                                               \
+        *(int *)(err_ptr_) = err__;                                     \
+    } while (0)
 
 #define MPL_thread_mutex_unlock(mutex_ptr_, err_ptr_)                   \
     do {                                                                \
@@ -134,7 +151,7 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
 
 #define MPL_thread_cond_create(cond_ptr_, err_ptr_)                     \
     do {                                                                \
-        int err__;							\
+        int err__;                                                      \
                                                                         \
         err__ = pthread_cond_init((cond_ptr_), NULL);                   \
         if (unlikely(err__))                                            \
@@ -145,19 +162,19 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
 
 #define MPL_thread_cond_destroy(cond_ptr_, err_ptr_)                    \
     do {                                                                \
-        int err__;							\
+        int err__;                                                      \
                                                                         \
         err__ = pthread_cond_destroy(cond_ptr_);                        \
         if (unlikely(err__))                                            \
             MPL_internal_sys_error_printf("pthread_cond_destroy", err__, \
-                                          "    %s:%d\n", __FILE__, __LINE__); \
+            "    %s:%d\n", __FILE__, __LINE__);                         \
         *(int *)(err_ptr_) = err__;                                     \
     } while (0)
 
-#define MPL_thread_cond_wait(cond_ptr_, mutex_ptr_, err_ptr_)		\
+#define MPL_thread_cond_wait(cond_ptr_, mutex_ptr_, err_ptr_)           \
     do {                                                                \
         int err__;                                                      \
-    									\
+                                                                        \
         /* The latest pthread specification says that cond_wait         \
          * routines aren't allowed to return EINTR, but some of the     \
          * older implementations still do. */                           \
@@ -167,15 +184,15 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
         if (unlikely(err__))                                            \
             MPL_internal_sys_error_printf("pthread_cond_wait", err__,   \
                                           "    %s:%d\n", __FILE__, __LINE__); \
-									\
+                                                                        \
         *(int *)(err_ptr_) = err__;                                     \
     } while (0)
 
-#define MPL_thread_cond_broadcast(cond_ptr_, err_ptr_)                 \
+#define MPL_thread_cond_broadcast(cond_ptr_, err_ptr_)                  \
     do {                                                                \
-        int err__;							\
+        int err__;                                                      \
                                                                         \
-        err__ = pthread_cond_broadcast(cond_ptr_);			\
+        err__ = pthread_cond_broadcast(cond_ptr_);                      \
         if (unlikely(err__))                                            \
             MPL_internal_sys_error_printf("pthread_cond_broadcast", err__, \
                                           "    %s:%d\n", __FILE__, __LINE__); \
@@ -183,9 +200,9 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
         *(int *)(err_ptr_) = err__;                                     \
     } while (0)
 
-#define MPL_thread_cond_signal(cond_ptr_, err_ptr_)                    \
+#define MPL_thread_cond_signal(cond_ptr_, err_ptr_)                     \
     do {                                                                \
-        int err__;							\
+        int err__;                                                      \
                                                                         \
         err__ = pthread_cond_signal(cond_ptr_);                         \
         if (unlikely(err__))                                            \
@@ -200,35 +217,35 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
  * Thread Local Storage
  */
 
-#define MPL_thread_tls_create(exit_func_ptr_, tls_ptr_, err_ptr_)	\
+#define MPL_thread_tls_create(exit_func_ptr_, tls_ptr_, err_ptr_)       \
     do {                                                                \
         int err__;                                                      \
-    									\
+                                                                        \
         err__ = pthread_key_create((tls_ptr_), (exit_func_ptr_));       \
         if (unlikely(err__))                                            \
             MPL_internal_sys_error_printf("pthread_key_create", err__,  \
                                           "    %s:%d\n", __FILE__, __LINE__); \
-									\
+                                                                        \
         *(int *)(err_ptr_) = err__;                                     \
     } while (0)
 
-#define MPL_thread_tls_destroy(tls_ptr_, err_ptr_)     \
-    do {                                                \
-        int err__;                                      \
-                                                        \
-        err__ = pthread_key_delete(*(tls_ptr_));        \
+#define MPL_thread_tls_destroy(tls_ptr_, err_ptr_)                      \
+    do {                                                                \
+        int err__;                                                      \
+                                                                        \
+        err__ = pthread_key_delete(*(tls_ptr_));                        \
         if (unlikely(err__))                                            \
             MPL_internal_sys_error_printf("pthread_key_delete", err__,  \
                                           "    %s:%d\n", __FILE__, __LINE__); \
-                                                        \
-        *(int *)(err_ptr_) = err__;                     \
+                                                                        \
+        *(int *)(err_ptr_) = err__;                                     \
     } while (0)
 
-#define MPL_thread_tls_set(tls_ptr_, value_, err_ptr_)                 \
+#define MPL_thread_tls_set(tls_ptr_, value_, err_ptr_)                  \
     do {                                                                \
-        int err__;							\
+        int err__;                                                      \
                                                                         \
-        err__ = pthread_setspecific(*(tls_ptr_), (value_));		\
+        err__ = pthread_setspecific(*(tls_ptr_), (value_));             \
         if (unlikely(err__))                                            \
             MPL_internal_sys_error_printf("pthread_setspecific", err__, \
                                           "    %s:%d\n", __FILE__, __LINE__); \
@@ -236,11 +253,11 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * id,
         *(int *)(err_ptr_) = err__;                                     \
     } while (0)
 
-#define MPL_thread_tls_get(tls_ptr_, value_ptr_, err_ptr_)	\
+#define MPL_thread_tls_get(tls_ptr_, value_ptr_, err_ptr_)      \
     do {                                                        \
         *(value_ptr_) = pthread_getspecific(*(tls_ptr_));       \
-								\
-        *(int *)(err_ptr_) = MPL_THREAD_SUCCESS;               \
+                                                                \
+        *(int *)(err_ptr_) = MPL_THREAD_SUCCESS;                \
     } while (0)
 
 #endif /* MPL_THREAD_POSIX_H_INCLUDED */
