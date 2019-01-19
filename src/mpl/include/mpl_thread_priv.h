@@ -4,7 +4,7 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#if !defined(MPL_THREAD_PRIV_H_INCLUDED)
+#ifndef MPL_THREAD_PRIV_H_INCLUDED
 #define MPL_THREAD_PRIV_H_INCLUDED
 
 #if MPL_THREAD_PACKAGE_NAME != MPL_THREAD_PACKAGE_NONE && !defined(MPL_TLS_SPECIFIER)
@@ -24,14 +24,14 @@ void MPLI_cleanup_tls(void *a);
    whether MPL is initialized with thread safety, one or the other is used.
  */
 
-#define MPL_THREADPRIV_KEY_CREATE(key, var, err_ptr_)                   \
+#define MPL_THREADPRIV_KEY_CREATE(key, var, err_ptr_, class_)           \
     do {                                                                \
         void *thread_ptr;                                               \
                                                                         \
         MPL_thread_tls_create(MPLI_cleanup_tls, &(key) , err_ptr_);     \
         if (unlikely(*((int *) err_ptr_)))                              \
             break;                                                      \
-        thread_ptr = MPL_calloc(1, sizeof(var));                        \
+        thread_ptr = MPL_calloc(1, sizeof(var), class_);                \
         if (unlikely(!thread_ptr)) {                                    \
             *((int *) err_ptr_) = MPL_THREAD_ERROR;                     \
             break;                                                      \
@@ -47,7 +47,7 @@ void MPLI_cleanup_tls(void *a);
             if (unlikely(*((int *) err_ptr_)))                          \
                 break;                                                  \
             if (!thread_ptr) {                                          \
-                thread_ptr = MPL_calloc(1, sizeof(var));                \
+                thread_ptr = MPL_calloc(1, sizeof(var), MPL_MEM_OTHER); \
                 if (unlikely(!thread_ptr)) {                            \
                     *((int *) err_ptr_) = MPL_THREAD_ERROR;             \
                     break;                                              \
@@ -95,4 +95,4 @@ void MPLI_cleanup_tls(void *a);
 
 #endif
 
-#endif /* !defined(MPL_THREAD_PRIV_H_INCLUDED) */
+#endif /* MPL_THREAD_PRIV_H_INCLUDED */

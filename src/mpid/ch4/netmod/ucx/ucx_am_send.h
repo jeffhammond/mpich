@@ -8,128 +8,146 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_UCX_AM_SEND_H_INCLUDED
-#define NETMOD_UCX_AM_SEND_H_INCLUDED
+#ifndef UCX_AM_SEND_H_INCLUDED
+#define UCX_AM_SEND_H_INCLUDED
 
 #include "ucx_impl.h"
 
-static inline int MPIDI_NM_mpi_send(const void *buf,
-                                    int count,
-                                    MPI_Datatype datatype,
-                                    int rank,
-                                    int tag,
-                                    MPIR_Comm * comm, int context_offset, MPIR_Request ** request)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_send
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_send(const void *buf,
+                                               MPI_Aint count,
+                                               MPI_Datatype datatype,
+                                               int rank,
+                                               int tag,
+                                               MPIR_Comm * comm, int context_offset,
+                                               MPIDI_av_entry_t * addr, MPIR_Request ** request)
 {
-    return MPIDI_CH4U_mpi_send(buf, count, datatype, rank, tag, comm, context_offset, request);
+    return MPIDIG_mpi_send(buf, count, datatype, rank, tag, comm, context_offset, addr, request);
 }
 
-static inline int MPIDI_NM_rsend(const void *buf,
-                                 int count,
-                                 MPI_Datatype datatype,
-                                 int rank,
-                                 int tag,
-                                 MPIR_Comm * comm, int context_offset, MPIR_Request ** request)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_ssend
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_ssend(const void *buf,
+                                                MPI_Aint count,
+                                                MPI_Datatype datatype,
+                                                int rank,
+                                                int tag,
+                                                MPIR_Comm * comm, int context_offset,
+                                                MPIDI_av_entry_t * addr, MPIR_Request ** request)
 {
-    return MPIDI_CH4U_rsend(buf, count, datatype, rank, tag, comm, context_offset, request);
+    return MPIDIG_mpi_ssend(buf, count, datatype, rank, tag, comm, context_offset, addr, request);
 }
 
-
-
-static inline int MPIDI_NM_irsend(const void *buf,
-                                  int count,
-                                  MPI_Datatype datatype,
-                                  int rank,
-                                  int tag,
-                                  MPIR_Comm * comm, int context_offset, MPIR_Request ** request)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_send_init
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_send_init(const void *buf,
+                                                    int count,
+                                                    MPI_Datatype datatype,
+                                                    int rank,
+                                                    int tag,
+                                                    MPIR_Comm * comm, int context_offset,
+                                                    MPIDI_av_entry_t * addr,
+                                                    MPIR_Request ** request)
 {
-    return MPIDI_CH4U_irsend(buf, count, datatype, rank, tag, comm, context_offset, request);
+    return MPIDIG_mpi_send_init(buf, count, datatype, rank, tag, comm, context_offset, addr,
+                                request);
 }
 
-static inline int MPIDI_NM_mpi_ssend(const void *buf,
-                                     int count,
-                                     MPI_Datatype datatype,
-                                     int rank,
-                                     int tag,
-                                     MPIR_Comm * comm, int context_offset, MPIR_Request ** request)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_ssend_init
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_ssend_init(const void *buf,
+                                                     int count,
+                                                     MPI_Datatype datatype,
+                                                     int rank,
+                                                     int tag,
+                                                     MPIR_Comm * comm, int context_offset,
+                                                     MPIDI_av_entry_t * addr,
+                                                     MPIR_Request ** request)
 {
-    return MPIDI_CH4U_mpi_ssend(buf, count, datatype, rank, tag, comm, context_offset, request);
+    return MPIDIG_mpi_ssend_init(buf, count, datatype, rank, tag, comm, context_offset, addr,
+                                 request);
 }
 
-static inline int MPIDI_NM_mpi_startall(int count, MPIR_Request * requests[])
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_bsend_init
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_bsend_init(const void *buf,
+                                                     int count,
+                                                     MPI_Datatype datatype,
+                                                     int rank,
+                                                     int tag,
+                                                     MPIR_Comm * comm, int context_offset,
+                                                     MPIDI_av_entry_t * addr,
+                                                     MPIR_Request ** request)
 {
-    return MPIDI_CH4U_mpi_startall(count, requests);
+    return MPIDIG_mpi_bsend_init(buf, count, datatype, rank, tag, comm, context_offset, addr,
+                                 request);
 }
 
-static inline int MPIDI_NM_mpi_send_init(const void *buf,
-                                         int count,
-                                         MPI_Datatype datatype,
-                                         int rank,
-                                         int tag,
-                                         MPIR_Comm * comm, int context_offset,
-                                         MPIR_Request ** request)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_rsend_init
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_rsend_init(const void *buf,
+                                                     int count,
+                                                     MPI_Datatype datatype,
+                                                     int rank,
+                                                     int tag,
+                                                     MPIR_Comm * comm, int context_offset,
+                                                     MPIDI_av_entry_t * addr,
+                                                     MPIR_Request ** request)
 {
-    return MPIDI_CH4U_mpi_send_init(buf, count, datatype, rank, tag, comm, context_offset, request);
+    return MPIDIG_mpi_rsend_init(buf, count, datatype, rank, tag, comm, context_offset, addr,
+                                 request);
 }
 
-static inline int MPIDI_NM_mpi_ssend_init(const void *buf,
-                                          int count,
-                                          MPI_Datatype datatype,
-                                          int rank,
-                                          int tag,
-                                          MPIR_Comm * comm, int context_offset,
-                                          MPIR_Request ** request)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_isend
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_isend(const void *buf,
+                                                MPI_Aint count,
+                                                MPI_Datatype datatype,
+                                                int rank,
+                                                int tag,
+                                                MPIR_Comm * comm, int context_offset,
+                                                MPIDI_av_entry_t * addr, MPIR_Request ** request)
 {
-    return MPIDI_CH4U_mpi_ssend_init(buf, count, datatype, rank, tag, comm, context_offset,
-                                     request);
+    return MPIDIG_mpi_isend(buf, count, datatype, rank, tag, comm, context_offset, addr, request);
 }
 
-static inline int MPIDI_NM_mpi_bsend_init(const void *buf,
-                                          int count,
-                                          MPI_Datatype datatype,
-                                          int rank,
-                                          int tag,
-                                          MPIR_Comm * comm, int context_offset,
-                                          MPIR_Request ** request)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_issend
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_issend(const void *buf,
+                                                 MPI_Aint count,
+                                                 MPI_Datatype datatype,
+                                                 int rank,
+                                                 int tag,
+                                                 MPIR_Comm * comm, int context_offset,
+                                                 MPIDI_av_entry_t * addr, MPIR_Request ** request)
 {
-    return MPIDI_CH4U_mpi_bsend_init(buf, count, datatype, rank, tag, comm, context_offset,
-                                     request);
+    return MPIDIG_mpi_issend(buf, count, datatype, rank, tag, comm, context_offset, addr, request);
 }
 
-static inline int MPIDI_NM_mpi_rsend_init(const void *buf,
-                                          int count,
-                                          MPI_Datatype datatype,
-                                          int rank,
-                                          int tag,
-                                          MPIR_Comm * comm, int context_offset,
-                                          MPIR_Request ** request)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_cancel_send
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_cancel_send(MPIR_Request * sreq)
 {
-    return MPIDI_CH4U_mpi_rsend_init(buf, count, datatype, rank, tag, comm, context_offset,
-                                     request);
+    return MPIDIG_mpi_cancel_send(sreq);
 }
 
-static inline int MPIDI_NM_mpi_isend(const void *buf,
-                                     int count,
-                                     MPI_Datatype datatype,
-                                     int rank,
-                                     int tag,
-                                     MPIR_Comm * comm, int context_offset, MPIR_Request ** request)
-{
-    return MPIDI_CH4U_mpi_isend(buf, count, datatype, rank, tag, comm, context_offset, request);
-}
-
-static inline int MPIDI_NM_mpi_issend(const void *buf,
-                                      int count,
-                                      MPI_Datatype datatype,
-                                      int rank,
-                                      int tag,
-                                      MPIR_Comm * comm, int context_offset, MPIR_Request ** request)
-{
-    return MPIDI_CH4U_mpi_issend(buf, count, datatype, rank, tag, comm, context_offset, request);
-}
-
-static inline int MPIDI_NM_mpi_cancel_send(MPIR_Request * sreq)
-{
-    return MPIDI_CH4U_mpi_cancel_send(sreq);
-}
-
-#endif /* NETMOD_UCX_SEND_H_INCLUDED */
+#endif /* UCX_AM_SEND_H_INCLUDED */

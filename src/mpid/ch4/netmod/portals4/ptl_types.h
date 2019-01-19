@@ -5,8 +5,8 @@
  *    *
  *    */
 
-#ifndef NETMOD_PTL_TYPES_H_INCLUDED
-#define NETMOD_PTL_TYPES_H_INCLUDED
+#ifndef PTL_TYPES_H_INCLUDED
+#define PTL_TYPES_H_INCLUDED
 
 #include "mpidimpl.h"
 #include "portals4.h"
@@ -21,7 +21,6 @@
 #define MPIDI_PTL_OVERFLOW_BUFFER_SZ   (1024*1024)
 #define MPIDI_PTL_MAX_AM_EAGER_SZ      (64*1024)
 #define MPIDI_PTL_AM_TAG               (1 << 28)
-#define MPIDI_PTL_MAX_AM_HANDLERS      (64)
 
 typedef struct {
     ptl_process_t process;
@@ -30,14 +29,12 @@ typedef struct {
 
 typedef struct {
     MPIDI_PTL_addr_t *addr_table;
-    MPID_Node_id_t *node_map;
-    MPID_Node_id_t max_node_id;
+    int *node_map;
+    int max_node_id;
     char *kvsname;
     char pname[MPI_MAX_PROCESSOR_NAME];
     void *overflow_bufs[MPIDI_PTL_NUM_OVERFLOW_BUFFERS];
     ptl_handle_me_t overflow_me_handles[MPIDI_PTL_NUM_OVERFLOW_BUFFERS];
-    MPIDI_NM_am_target_handler_fn am_handlers[MPIDI_PTL_MAX_AM_HANDLERS];
-    MPIDI_NM_am_origin_handler_fn send_cmpl_handlers[MPIDI_PTL_MAX_AM_HANDLERS];
     ptl_handle_ni_t ni;
     ptl_ni_limits_t ni_limits;
     ptl_handle_eq_t eqs[2];
@@ -73,4 +70,4 @@ static inline ptl_hdr_data_t MPIDI_PTL_init_am_hdr(int handler_id, size_t msg_sz
     return hdr;
 }
 
-#endif /* NETMOD_PTL_TYPES_H_INCLUDED */
+#endif /* PTL_TYPES_H_INCLUDED */

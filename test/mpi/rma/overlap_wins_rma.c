@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
+#include "mpitest.h"
 
 /* This test checks the remote completion of flush with RMA write-like operations
  * (PUT, ACC, GET_ACC, FOP, CAS) concurrently issued from different origin processes
@@ -172,8 +173,7 @@ static int run_test()
      *  - Origins: issue RMA on different window and different memory location */
     if (rank == target) {
         win = wins[0];
-    }
-    else {
+    } else {
         win = wins[rank];
         target_disp = rank;
     }
@@ -260,7 +260,7 @@ int main(int argc, char *argv[])
 {
     int errors = 0, all_errors = 0;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
@@ -290,15 +290,9 @@ int main(int argc, char *argv[])
     errors = run_test();
 
     MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Reduce(&errors, &all_errors, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    if (rank == 0 && all_errors == 0) {
-        fprintf(stdout, " No Errors\n");
-        fflush(stdout);
-    }
 
     destroy_windows();
-    MPI_Finalize();
+    MTest_Finalize(errors);
 
-    return 0;
+    return MTestReturnValue(all_errors);
 }

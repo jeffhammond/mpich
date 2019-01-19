@@ -44,16 +44,10 @@ dnl                            This name server will be used if the
 dnl                            default name server is selected.
 dnl    MPID_NO_PM            - If yes, the device does not require any
 dnl                            PM implementation.  
-dnl    MPID_NO_PMI           - If yes, the device does not require any 
-dnl                            PMI implementation.
 dnl    MPID_MAX_PROCESSOR_NAME - The maximum number of character in a processor
 dnl                            name.  If not set, 128 will be used.
 dnl    MPID_MAX_ERROR_STRING - The maximum number of character in an error
 dnl                            string.  If not set, 1024 will be used.
-dnl    MPID_LIBTOOL_STATIC_FLAG - The static compilation flag to use
-dnl                               for the example executables within
-dnl                               mpich.  If not set, -static will be
-dnl                               used.
 dnl    PM_REQUIRES_PMI       - if set, provides the name of the PMI 
 dnl                            interface implementation.  If not set,
 dnl                            the "simple" PMI implementation is used.
@@ -384,7 +378,7 @@ AC_ARG_ENABLE(g,
         all      - All of the above choices
 ],,enable_g=none)
 
-AC_ARG_ENABLE([mpit_pvars],
+AC_ARG_ENABLE([mpit-pvars],
 [  --enable-mpit-pvars=list - Selectively enable MPI_T performance variables in
                       modules. list is a comma-separated module names,
                       including (Default is "none"):
@@ -513,7 +507,13 @@ AC_ARG_ENABLE(thread-cs,
 			[Choose the method used for critical sections
                          and other atomic updates when multiple
                          threads are present.  Values may be global
-                         (default), per-object, lock-free]),,enable_thread_cs=global)
+                         (default), per-object, per-vni, lock-free]),,enable_thread_cs=global)
+
+AC_ARG_ENABLE(mdta,
+    AC_HELP_STRING([--enable-mdta],
+            [Optimize global granularity using message-driven thread activation.
+                         Only available for ch4 device with --enable-thread-cs=global]),
+    AC_DEFINE(MPICH_THREAD_USE_MDTA,1,[Define to enable message-driven thread activation]))
 
 AC_ARG_ENABLE(refcount,
 	AC_HELP_STRING([--enable-refcount=type],
@@ -522,7 +522,7 @@ AC_ARG_ENABLE(refcount,
                          Values may be lock-free or none.  The
                          default depends on the thread-cs choice; for
                          global it is none (because none is required),
-                         for per-object and lock-free, lock-free]),,
+                         for per-object, per-vni, and lock-free, lock-free]),,
                          enable_refcount=default)
 
 AC_ARG_ENABLE(mutex-timing,
@@ -559,17 +559,20 @@ AC_ARG_ENABLE(multi-aliases,
 		[Multiple aliasing to support multiple fortran compilers (default)]),,
 		enable_multi_aliases=yes)
 
-AC_ARG_ENABLE([wrapper-rpath],
-              [AC_HELP_STRING([--enable-wrapper-rpath],
-                              [Determine whether the rpath is set when programs
-                               are linked by mpicc compiler wrappers.  This only
-                               applies when shared libraries are built.  The
-                               default is yes; use --disable-wrapper-rpath to
-                               turn this feature off.  In that case, shared
-                               libraries will be found according to the rules
-                               for your system (e.g., in LD_LIBRARY_PATH)])],
-              [],[enable_wrapper_rpath=yes])
-AC_SUBST([enable_wrapper_rpath])
+AC_ARG_WITH([wrapper-dl-type],
+            [AC_HELP_STRING([--enable-wrapper-dl-type],
+                            [Dynamic loading model for alternate MPI
+                             libraries, used when programs are linked
+                             by mpicc compiler wrappers.  This only
+                             applies when shared libraries are built.
+                             The default is "runpath"; use
+                             --with-wrapper-dl-type=rpath to force
+                             rpath; use --with-wrapper-dl-type=none to
+                             find shared libraries according to the
+                             rules for your system (e.g., in
+                             LD_LIBRARY_PATH)])],
+              [],[with_wrapper_dl_type=runpath])
+AC_SUBST([with_wrapper_dl_type])
 
 AC_ARG_ENABLE([long-double],
               [AC_HELP_STRING([--disable-long-double],
@@ -586,10 +589,6 @@ AC_ARG_WITH(cross,
 		[Specify the values of variables that configure cannot
                  determine in a cross-compilation environment]),,
 		 with_cross=$MPID_DEFAULT_CROSS_FILE)
-if test -z "$with_cross" ; then with_cross=no ; fi
-if test "$with_cross" != "no"; then
-  AC_MSG_NOTICE([Using cross file: $with_cross])
-fi
 
 AC_ARG_WITH(namepublisher,
 [  --with-namepublisher=name   Choose the system that will support 
@@ -601,6 +600,14 @@ AC_ARG_WITH(namepublisher,
 AC_ARG_WITH(name-publisher,
     [],
     with_namepublisher=$with_name_publisher,)
+
+AC_ARG_ENABLE(dbg-nolocal, AC_HELP_STRING([--enable-dbg-nolocal], [enables debugging mode where shared-memory communication is disabled]),
+    AC_DEFINE(ENABLED_NO_LOCAL, 1, [Define to disable shared-memory communication for debugging]))
+
+AC_ARG_ENABLE(dbg-localoddeven, AC_HELP_STRING([--enable-dbg-localoddeven], [enables debugging mode where shared-memory communication is enabled only between even processes or odd processes on a node]),
+    AC_DEFINE(ENABLED_ODD_EVEN_CLIQUES, 1, [Define to enable debugging mode where shared-memory communication is done only between even procs or odd procs]))
+
+AC_CANONICAL_TARGET
 
 # Find a C compiler.
 # We also need to do this before the F77 and FC test to ensure that we
@@ -620,6 +627,10 @@ if test "$pac_cross_compiling" = "yes" -a "$ac_cv_prog_cc_cross" = "no" ; then
 fi
 PAC_POP_FLAG([CFLAGS])
 
+# also needed by hwloc in embedded mode, must also come early for expansion
+# ordering reasons
+AC_USE_SYSTEM_EXTENSIONS
+
 dnl now that autoconf and core compilers are setup, init automake and libtool
 dnl
 dnl We would like to pass -Werror, but we are cheating in the "examples/"
@@ -635,10 +646,11 @@ LT_INIT()
 # Non-verbose make by default
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
-# Disable rpath in the compiler wrappers if shared libraries are disabled, since
-# rpath makes no sense in the context of static libraries.
+# Disable rpath/runpath-related linkflags in the compiler wrappers if
+# shared libraries are disabled, since rpath/runpath makes no sense in
+# the context of static libraries.
 if test "X$enable_shared" = "Xno" ; then
-    enable_wrapper_rpath=no
+    with_wrapper_dl_type=no
 fi
 
 INTERLIB_DEPS=yes
@@ -765,6 +777,17 @@ AC_SUBST(master_top_builddir)
 AC_SUBST(master_top_srcdir)
 export master_top_builddir
 export master_top_srcdir
+
+if test -z "$with_cross"; then
+  if test -f "$master_top_srcdir/src/cross/$host_alias"; then
+    with_cross="$master_top_srcdir/src/cross/$host_alias"
+  else
+    with_cross=no
+  fi
+fi
+if test "$with_cross" != "no"; then
+  AC_MSG_NOTICE([Using cross file: $with_cross])
+fi
 
 # ----------------------------------------------------------------------------
 dnl Export important "precious" variables so that any directories configured via
@@ -1179,8 +1202,7 @@ if test "$with_mpl_prefix" = "embedded" ; then
     PAC_APPEND_FLAG([-I${master_top_builddir}/src/mpl/include], [CPPFLAGS])
     PAC_APPEND_FLAG([-I${use_top_srcdir}/src/mpl/include], [CPPFLAGS])
 
-    mplsrcdir="${master_top_builddir}/src/mpl"
-    mpllibdir="-L${master_top_builddir}/src/mpl"
+    mplsrcdir="src/mpl"
     mpllib="src/mpl/lib${MPLLIBNAME}.la"
 else
     # The user specified an already-installed MPL; just sanity check, don't
@@ -1229,8 +1251,8 @@ AC_SUBST([opalib])
 
 if test "$with_openpa_prefix" = "embedded" ; then
     if test -e "${use_top_srcdir}/src/openpa" ; then
-        opasrcdir="${master_top_builddir}/src/openpa"
-        opalib="${master_top_builddir}/src/openpa/src/lib${OPALIBNAME}.la"
+        opasrcdir="src/openpa"
+        opalib="src/openpa/src/lib${OPALIBNAME}.la"
         PAC_APPEND_FLAG([-I${use_top_srcdir}/src/openpa/src],[CPPFLAGS])
         PAC_APPEND_FLAG([-I${master_top_builddir}/src/openpa/src],[CPPFLAGS])
 
@@ -1243,7 +1265,7 @@ if test "$with_openpa_prefix" = "embedded" ; then
                                      for more info.])],
                     [],[with_atomic_primitives=not_specified])
         # no need for libtool versioning when embedding OPA
-        opa_subdir_args="--disable-versioning"
+        opa_subdir_args="--disable-versioning --enable-embedded"
         if test "$with_atomic_primitives" = "not_specified" ; then
             PAC_APPEND_FLAG([--with-atomic-primitives=auto_allow_emulation], [opa_subdir_args])
         fi
@@ -1271,6 +1293,272 @@ else
         opalibdir="-L${with_openpa_prefix}/lib"
     fi
     PAC_APPEND_FLAG([-L${with_openpa_prefix}/lib],[WRAPPER_LDFLAGS])
+fi
+
+# Izem
+
+AC_ARG_ENABLE([izem],
+[  --enable-izem@<:@=ARGS@:>@   Enable features from the Izem library.
+                          "ARGS" is a list of comma separated features.
+                          Accepted arguments are:
+			  sync     - use the Izem interface for sychronization objects
+                                     (locks and condition variables) instead of the MPL interface
+                          queue    - use the Izem interface for atomic queue objects
+                          atomic   - use the Izem interface for CPU atomics
+                          yes/all  - all of the above features are enabled
+                          no/none  - none of the above features are enabled],,
+[enable_izem=no])
+
+# strip off multiple options, separated by commas
+save_IFS="$IFS"
+IFS=","
+for option in $enable_izem ; do
+    case "$option" in
+        sync)
+            izem_sync=yes
+        ;;
+        queue)
+            izem_queue=yes
+        ;;
+        atomic)
+            izem_atomic=yes
+        ;;
+        yes|all)
+            izem_sync=yes
+            izem_queue=yes
+            izem_atomic=yes
+        ;;
+        no|none)
+        ;;
+        *)
+            AC_MSG_ERROR([Unknown value $option for enable-izem])
+        ;;
+    esac
+done
+IFS="$save_IFS"
+
+if test "$izem_sync" = "yes" ; then
+    AC_DEFINE(ENABLE_IZEM_SYNC,1,[Define to enable using Izem locks and condition variables])
+fi
+
+if test "$izem_queue" = "yes" ; then
+    AC_DEFINE(ENABLE_IZEM_QUEUE,1,[Define to enable using Izem queues])
+fi
+
+if test "$izem_atomic" = "yes" ; then
+    AC_DEFINE(ENABLE_IZEM_ATOMIC,1,[Define to enable using Izem CPU atomics])
+fi
+
+AC_ARG_VAR([ZMLIBNAME],[can be used to override the name of the Izem library (default: "zm")])
+ZMLIBNAME=${ZMLIBNAME:-"zm"}
+export ZMLIBNAME
+AC_SUBST(ZMLIBNAME)
+AC_ARG_WITH([zm-prefix],
+[  --with-zm-prefix@<:@=ARG@:>@
+                          specify the Izem library to use. No argument implies "yes".
+                          Accepted values for ARG are:
+                          yes|embedded - use the embedded Izem
+                          system       - search system paths for an Izem installation
+                          no           - disable Izem
+                          <PATH>       - use the Izem at PATH],,
+[with_zm_prefix=no])
+
+zmsrcdir=""
+AC_SUBST([zmsrcdir])
+zmlibdir=""
+AC_SUBST([zmlibdir])
+zmlib=""
+AC_SUBST([zmlib])
+
+if test "$enable_izem" != "no" && test "$enable_izem" != "none"; then
+    if test "$with_zm_prefix" = "yes" || test "$with_zm_prefix" = "embedded"; then
+        if test -e "${use_top_srcdir}/src/izem" ; then
+            zm_subdir_args="--enable-embedded"
+            PAC_CONFIG_SUBDIR_ARGS([src/izem],[$zm_subdir_args],[],[AC_MSG_ERROR(Izem configure failed)])
+            zmsrcdir="${master_top_builddir}/src/izem"
+            zmlib="${master_top_builddir}/src/izem/src/lib${ZMLIBNAME}.la"
+            PAC_APPEND_FLAG([-I${use_top_srcdir}/src/izem/src/include],[CPPFLAGS])
+            PAC_APPEND_FLAG([-I${master_top_builddir}/src/izem/src/include],[CPPFLAGS])
+        else
+            AC_MSG_WARN([Attempted to use the embedded Izem source tree in "src/izem", but it is missing.  Configuration or compilation may fail later.])
+        fi
+    elif test "$with_zm_prefix" = "system"; then
+        # check if an Izem installation exists on this system
+        PAC_PUSH_FLAG([LIBS])
+        PAC_PREPEND_FLAG([-l${ZMLIBNAME}],[LIBS])
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([#include "lock/zm_ticket.h"
+                                        ],
+                                        [zm_ticket_t lock;
+                                         zm_ticket_init(&lock);
+                                         zm_ticket_acquire(&lock);
+                                         zm_ticket_release(&lock);])],
+                       [AC_MSG_ERROR([No usable Izem installation was found on this system])],
+                       [PAC_PREPEND_FLAG([-l${ZMLIBNAME}],[WRAPPER_LIBS])])
+        PAC_POP_FLAG([LIBS])
+    elif test "$with_zm_prefix" = "no"; then
+        AC_MSG_ERROR([Izem features were requested with --enable-izem but Izem was disabled.])
+    else
+        # The user specified an already-installed Izem; just sanity check, don't
+        # subconfigure it
+
+        AS_IF([test -s "${with_zm_prefix}/include/lock/zm_lock.h" -a -s "${with_zm_prefix}/include/cond/zm_cond.h"],
+              [:],[AC_MSG_ERROR([Izem headers at "${with_zm_prefix}/include" are missing])])
+        PAC_APPEND_FLAG([-I${with_zm_prefix}/include],[CPPFLAGS])
+
+        PAC_PUSH_FLAG([LIBS])
+        PAC_PUSH_FLAG([LDFLAGS])
+        PAC_PREPEND_FLAG([-l${ZMLIBNAME}],[LIBS])
+        PAC_APPEND_FLAG([-L${with_zm_prefix}/lib],[LDFLAGS])
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([#include "lock/zm_ticket.h"
+                                        ],
+                                        [zm_ticket_t lock;
+                                         zm_ticket_init(&lock);
+                                         zm_ticket_acquire(&lock);
+                                         zm_ticket_release(&lock);])],
+                       [],[AC_MSG_ERROR([The Izem installation at "${with_zm_prefix}" seems broken])])
+        PAC_POP_FLAG([LIBS])
+        PAC_POP_FLAG([LDFLAGS])
+        PAC_APPEND_FLAG([-L${with_zm_prefix}/lib],[WRAPPER_LDFLAGS])
+        PAC_PREPEND_FLAG([-l${ZMLIBNAME}],[WRAPPER_LIBS])
+        zmlibdir="-L${with_zm_prefix}/lib"
+    fi
+fi
+
+
+# Set NEEDSPLIB to yes if link commands need both -l$MPILIBNAME
+# and -lp$MPILIBNAME.
+NEEDSPLIB=yes
+if test $enable_weak_symbols = yes ; then
+    # Turn off weak symbols if they aren't available
+    PAC_PROG_C_WEAK_SYMBOLS(,enable_weak_symbols=no)
+fi
+if test $enable_weak_symbols = "yes" ; then
+    AC_DEFINE(USE_WEAK_SYMBOLS,1,[Define if weak symbols should be used])
+    NEEDSPLIB=no
+    # Check for the ability to support multiple weak symbols
+    if test "$pac_cv_prog_c_weak_symbols" = "pragma weak" ; then
+       PAC_PROG_C_MULTIPLE_WEAK_SYMBOLS(AC_DEFINE(HAVE_MULTIPLE_PRAGMA_WEAK,1,[Define if multiple weak symbols may be defined]))
+    fi
+fi
+export NEEDSPLIB
+
+AM_CONDITIONAL([BUILD_PROFILING_LIB],[test "$NEEDSPLIB" = "yes"])
+PAC_CHECK_VISIBILITY
+AC_SUBST(VISIBILITY_CFLAGS)
+# disable visibility if building profiling library
+if test "$NEEDSPLIB" = "yes" ; then
+    VISIBILITY_CFLAGS=""
+fi
+
+
+# ----------------------------------------------------------------------------
+# HWLOC
+# ----------------------------------------------------------------------------
+# Allow the user to override the hwloc location (from embedded to user
+# path)
+# HWLOC
+AC_ARG_WITH([hwloc-prefix],
+            [AS_HELP_STRING([[--with-hwloc-prefix[=DIR]]],
+                            [use the HWLOC library installed in DIR,
+                             rather than the one included in src/hwloc.  Pass
+                             "embedded" to force usage of the HWLOC source
+                             distributed with MPICH.])],
+            [],dnl action-if-given
+            [with_hwloc_prefix=embedded]) dnl action-if-not-given
+hwlocsrcdir=""
+AC_SUBST([hwlocsrcdir])
+hwloclibdir=""
+AC_SUBST([hwloclibdir])
+hwloclib=""
+AC_SUBST([hwloclib])
+
+if test "$with_hwloc_prefix" = "embedded" ; then
+   # Disable visibility when setting up hwloc
+   PAC_PUSH_FLAG([enable_visibility])
+   enable_visibility=no;
+   HWLOC_SETUP_CORE([src/hwloc],[have_hwloc=yes],[have_hwloc=no],[1])
+   # Only build hwloc in embedded mode
+   if test "$have_hwloc" = "yes" ; then
+      use_embedded_hwloc=yes
+      hwlocsrcdir="src/hwloc"
+      hwloclib="$HWLOC_EMBEDDED_LDADD"
+      PAC_PREPEND_FLAG([$HWLOC_EMBEDDED_LIBS], [WRAPPER_LIBS])
+      # if possible, do not expose hwloc symbols in libmpi.so
+      PAC_PREPEND_FLAG([$VISIBILITY_CFLAGS], [HWLOC_CFLAGS])
+   fi
+   PAC_POP_FLAG([enable_visibility])
+else
+   AC_CHECK_HEADERS([hwloc.h])
+   # hwloc_topology_set_pid was added in hwloc-1.0.0, which is our
+   # minimum required version
+   AC_CHECK_LIB([hwloc],[hwloc_topology_set_pid])
+   AC_MSG_CHECKING([if non-embedded hwloc works])
+   if test "$ac_cv_header_hwloc_h" = "yes" -a "$ac_cv_lib_hwloc_hwloc_topology_set_pid" = "yes" ; then
+      have_hwloc=yes
+   else
+      have_hwloc=no
+   fi
+   AC_MSG_RESULT([$have_hwloc])
+
+   # FIXME: Disable hwloc on Cygwin for now. The hwloc package,
+   # atleast as of 1.0.2, does not install correctly on Cygwin
+   AS_CASE([$host], [*-*-cygwin], [have_hwloc=no])
+
+   if test "$have_hwloc" = "yes" ; then
+      hwloclib="-lhwloc"
+      if test -d ${with_hwloc_prefix}/lib64 ; then
+         PAC_APPEND_FLAG([-L${with_hwloc_prefix}/lib64],[WRAPPER_LDFLAGS])
+         hwloclibdir="-L${with_hwloc_prefix}/lib64"
+      else
+	 hwloclibdir="-L${with_hwloc_prefix}/lib"
+      fi
+   fi
+fi
+
+if test "$have_hwloc" = "yes" ; then
+   AC_DEFINE(HAVE_HWLOC,1,[Define if hwloc is available])
+fi
+
+HWLOC_DO_AM_CONDITIONALS
+AM_CONDITIONAL([have_hwloc], [test "${have_hwloc}" = "yes"])
+AM_CONDITIONAL([use_embedded_hwloc], [test "${use_embedded_hwloc}" = "yes"])
+
+# ----------------------------------------------------------------------------
+# NETLOC
+# ----------------------------------------------------------------------------
+AC_ARG_WITH([netloc-prefix],
+            [AS_HELP_STRING([[--with-netloc-prefix[=DIR]]],
+                            [use the NETLOC library installed in DIR]) or system to use the system library], [],
+                            [with_netloc_prefix=no])
+
+netloclibdir=""
+AC_SUBST([netloclibdir])
+
+if test "$have_hwloc" = "yes" ; then
+    if test "${with_netloc_prefix}" != "no" ; then
+        if test "${with_netloc_prefix}" != "system"; then
+            # The user specified an already-installed Netloc; just sanity check,
+            # don't subconfigure it
+            AS_IF([test -s "${with_netloc_prefix}/include/netloc.h"],
+              [:],[AC_MSG_ERROR([the Netloc installation in "${with_netloc_prefix}" appears broken])])
+            PAC_APPEND_FLAG([-I${with_netloc_prefix}/include],[CPPFLAGS])
+            PAC_APPEND_FLAG([-I${with_netloc_prefix}/include],[CFLAGS])
+            PAC_PREPEND_FLAG([-lnetloc],[WRAPPER_LIBS])
+            if test -d ${with_netloc_prefix}/lib64 ; then
+                PAC_APPEND_FLAG([-L${with_netloc_prefix}/lib64],[WRAPPER_LDFLAGS])
+                netloclibdir="-L${with_netloc_prefix}/lib64"
+            else
+                PAC_APPEND_FLAG([-L${with_netloc_prefix}/lib],[WRAPPER_LDFLAGS])
+                netloclibdir="-L${with_netloc_prefix}/lib"
+            fi
+       else
+           AC_LINK_IFELSE([AC_LANG_PROGRAM([#include "netloc.h"
+                                   ],
+                                   [])],
+                          [AC_MSG_ERROR([the Netloc installation seems to be added from system path])], [])
+       fi
+       AC_DEFINE(HAVE_NETLOC,1,[Define if netloc is available in either user specified path or in system path])
+    fi
 fi
 
 # ----------------------------------------------------------------------------
@@ -1378,6 +1666,10 @@ if test "$enable_threads" = "multiple" ; then
     thread_granularity=MPICH_THREAD_GRANULARITY__POBJ
     if test "$enable_refcount" = "default" ; then enable_refcount=lock-free ; fi
     ;;
+    per-vni|per_vni)
+    thread_granularity=MPICH_THREAD_GRANULARITY__VNI
+    if test "$enable_refcount" = "default" ; then enable_refcount=lock-free ; fi
+    ;;
     lock-free|lock_free|lockfree)
     thread_granularity=MPICH_THREAD_GRANULARITY__LOCKFREE
     if test "$enable_refcount" = "default" ; then enable_refcount=lock-free ; fi
@@ -1402,6 +1694,16 @@ if test "$enable_threads" = "multiple" ; then
     esac
 fi
 AC_DEFINE_UNQUOTED([MPICH_THREAD_GRANULARITY],$thread_granularity,[Method used to implement atomic updates and access])
+
+if test "$thread_granularity" = "MPICH_THREAD_GRANULARITY__VNI" -a "$device_name" != "ch4" ; then
+    AC_MSG_ERROR([per-vni critical section granularity is only supported for the ch4 device])
+fi
+
+if test "$enable_mdta" = "yes" ; then
+    if test "$enable_threads" != "multiple" -o "$device_name" != "ch4" -o "$enable_thread_cs" != "global" ; then
+        AC_MSG_ERROR([--enable-mdta is not supported for this setting])
+    fi
+fi
 
 if test "$enable_predefined_refcount" = "no" ; then
     AC_DEFINE([MPICH_THREAD_SUPPRESS_PREDEFINED_REFCOUNTS],[1],[define to disable reference counting predefined objects like MPI_COMM_WORLD])
@@ -1576,6 +1878,21 @@ else
     # Make device_name available to subdirs
 fi
 
+PAC_SET_HEADER_LIB_PATH(pmix)
+if test -n "${with_pmix}" -a "${with_pmix}" != "no" ; then
+    # disable built-in PMI and process managers
+    with_pmi="no"
+    with_pm="no"
+    if test "${device_name}" != "ch4" ; then
+        AC_MSG_ERROR([$device_name does not support PMIx])
+    fi
+    PAC_PUSH_FLAG([LIBS])
+    PAC_CHECK_HEADER_LIB_FATAL(pmix, pmix.h, pmix, PMIx_Init)
+    PAC_APPEND_FLAG([-lpmix],[WRAPPER_LIBS])
+    PAC_POP_FLAG([LIBS])
+    AC_DEFINE(USE_PMIX_API, 1, [Define if PMIx API must be used])
+fi
+
 # with-pm
 if test "$with_pm" = "none" ; then
     # add "none" as synonym for "no" to agree with older erroneous docs
@@ -1672,14 +1989,7 @@ AC_SUBST(pm_name)
 # Once we've selected the process manager (or managers), we can
 # check that we have a compatible PMI implemenatation.
 # with-pmi
-if test "$MPID_NO_PMI" = yes ; then
-    if test "$with_pmi" != "default" -a "$with_pmi" != no ; then
-        AC_MSG_ERROR([The PMI chosen ($with_pmi) is is not valid for the selected device ($with_device)])
-    fi
-    # This is used to change with_pmi=default to with_pmi=no in the case
-    # where the device does not want a PMI
-    with_pmi=no
-elif test "$with_pmi" != "no" ; then
+if test "$with_pmi" != "no" ; then
     if test "$with_pmi" = "default" -o "$with_pmi" = "yes" ; then
         if test -n "$PM_REQUIRES_PMI" ; then
 	    with_pmi=$PM_REQUIRES_PMI
@@ -1705,8 +2015,6 @@ elif test "$with_pmi" != "no" ; then
         # only add to subsystems if a full configure is present
         subsystems="$subsystems src/pmi/$pmi_name"
     fi
-else
-    AC_MSG_ERROR([A PMI implementation must be selected or the default used.])
 fi
 
 # Step 3: complete pm setup.
@@ -1746,38 +2054,27 @@ if test -n "$MPI_DEFAULT_COPTS" ; then
     fi
 fi
 
-# Set NEEDSPLIB to yes if link commands need both -l$MPILIBNAME
-# and -lp$MPILIBNAME.
-NEEDSPLIB=yes
-if test $enable_weak_symbols = yes ; then
-    # Turn off weak symbols if they aren't available
-    PAC_PROG_C_WEAK_SYMBOLS(,enable_weak_symbols=no)
-fi
-if test $enable_weak_symbols = "yes" ; then
-    AC_DEFINE(USE_WEAK_SYMBOLS,1,[Define if weak symbols should be used])
-    NEEDSPLIB=no
-    # Check for the ability to support multiple weak symbols
-    if test "$pac_cv_prog_c_weak_symbols" = "pragma weak" ; then
-       PAC_PROG_C_MULTIPLE_WEAK_SYMBOLS(AC_DEFINE(HAVE_MULTIPLE_PRAGMA_WEAK,1,[Define if multiple weak symbols may be defined]))
-    fi
-fi
-export NEEDSPLIB
-
-AM_CONDITIONAL([BUILD_PROFILING_LIB],[test "$NEEDSPLIB" = "yes"])
-
 # ---------------------------------------------------------------------------
-# determine rpath and other shared library flags for CC
+# determine shared library flags for CC
 # src/env may not exist yet in a vpath build
 $MKDIR_P src/env
 cc_shlib_conf=src/env/cc_shlib.conf
 PAC_COMPILER_SHLIB_FLAGS([CC],[$cc_shlib_conf])
 AC_SUBST_FILE([cc_shlib_conf])
 
-# output rpath flags in a usable format for mpich.pc (pkg-config)
-if test "X$enable_wrapper_rpath" = "Xyes"; then
-    eval WRAPPER_RPATH_LDFLAGS=\"$hardcode_libdir_flag_spec\"
+$cc_shlib_conf
+
+# Attempt to construct dynamic loading info, based on the user
+# preference of rpath, runpath or none and on the detected libdir
+# flags.
+if test "X${with_wrapper_dl_type}" = "Xrunpath" ; then
+   eval WRAPPER_C_DYNAMIC_LOADING_FLAGS=\"${hardcode_libdir_flag_spec} ${enable_dtags_flag}\"
+elif test "X${with_wrapper_dl_type}" = "Xrpath" ; then
+   eval WRAPPER_C_DYNAMIC_LOADING_FLAGS=\"${hardcode_libdir_flag_spec} ${disable_dtags_flag}\"
+else
+   WRAPPER_C_DYNAMIC_LOADING_FLAGS=""
 fi
-AC_SUBST(WRAPPER_RPATH_LDFLAGS)
+AC_SUBST(WRAPPER_C_DYNAMIC_LOADING_FLAGS)
 
 # ---------------------------------------------------------------------------
 # Support for MPI_T performance variables
@@ -2072,7 +2369,7 @@ fi
 # Now test for Fortran compiler characteristics
 # ----------------------------------------------------------------------------
 if test "$enable_f77" = "yes" ; then
-    # determine rpath and other shared library flags for F77
+    # determine shared library flags for F77
     f77_shlib_conf=src/env/f77_shlib.conf
     PAC_COMPILER_SHLIB_FLAGS([F77],[$f77_shlib_conf])
     AC_SUBST_FILE([f77_shlib_conf])
@@ -2171,7 +2468,7 @@ if test "$enable_fc" = "yes" ; then
 fi
 AM_CONDITIONAL([BUILD_F08_BINDING], [test "$f08_works" = "yes"])
 
-if test -n "$f08_works" ; then
+if test "$f08_works" = "yes" ; then
     status_f08_works=1
     bindings="$bindings f08"
 else
@@ -2201,7 +2498,7 @@ MPI_C_INTERFACE_TYPES_NAME=mpi_c_interface_types
 MPI_C_INTERFACE_CDESC_NAME=mpi_c_interface_cdesc
 
 if test "$enable_fc" = "yes" ; then
-    # determine rpath and other shared library flags for FC
+    # determine shared library flags for FC
     fc_shlib_conf=src/env/fc_shlib.conf
     PAC_COMPILER_SHLIB_FLAGS([FC],[$fc_shlib_conf])
     AC_SUBST_FILE([fc_shlib_conf])
@@ -2486,7 +2783,7 @@ int main() {
     AC_SUBST(MPIR_CXX_DOUBLE_COMPLEX)
     AC_SUBST(MPIR_CXX_LONG_DOUBLE_COMPLEX)
 
-    # determine rpath and other shared library flags for CXX
+    # determine shared library flags for CXX
     cxx_shlib_conf=src/env/cxx_shlib.conf
     PAC_COMPILER_SHLIB_FLAGS([CXX],[$cxx_shlib_conf])
     AC_SUBST_FILE([cxx_shlib_conf])
@@ -2765,6 +3062,8 @@ AC_C_INLINE
 
 PAC_C_GNU_ATTRIBUTE
 PAC_C_BUILTIN_EXPECT
+PAC_C_STATIC_ASSERT
+
 # We need to check for the endianess in order to implement the
 # "external32" representations.  This defines "WORDS_BIGENDIAN when
 # the system is bigendian.
@@ -2839,6 +3138,16 @@ if test "$MPID_NO_LONG_LONG" != "yes" ; then
     pac_cv_have_long_long=yes,pac_cv_have_long_long=no)])
     if test "$pac_cv_have_long_long" = "yes" ; then
         AC_DEFINE(HAVE_LONG_LONG_INT,1,[Define if long long is supported])
+    fi
+fi
+# Add HAVE_FLOAT16 detection
+if test "$MPID_NO_FLOAT16" != "yes" ; then
+    AC_CACHE_CHECK([whether _Float16 is supported],
+    pac_cv_have_float16,[
+    AC_TRY_COMPILE(,[_Float16 a;],
+    pac_cv_have_float16=yes,pac_cv_have_float16=no)])
+    if test "$pac_cv_have_float16" = "yes" ; then
+        AC_DEFINE(HAVE_FLOAT16,1,[Define if _Float16 is supported])
     fi
 fi
 # ----------------------------------------------------------------------------
@@ -2961,6 +3270,11 @@ else
    AC_MSG_RESULT([int or better])
 fi
 
+# Require strict alignment memory access for alignment-sensitive platform (e.g., SPARC)
+if test "$host_cpu" = "sparc" ; then
+    AC_DEFINE(NEEDS_STRICT_ALIGNMENT,1,[Define if strict alignment memory access is required])
+fi
+
 # There are further alignment checks after we test for int64_t etc. below.
 
 # Get the size of the C types for encoding in the basic datatypes and for
@@ -3073,6 +3387,7 @@ AS_IF([test "X$pac_cv_have_long_double" = "Xyes"],[
 #endif
   ])
 ])
+AC_CHECK_SIZEOF([_Float16])
 
 # we need really could just use the result of AC_CHECK_SIZEOF, but having a
 # HAVE_typename macro is useful for consistency
@@ -3085,7 +3400,8 @@ AS_IF([test "X$pac_cv_have_long_double" = "Xyes"],[
 # Generate a hex version of the size of each type
 for type in short int long long_long float double long_double wchar_t \
     float_int double_int long_int short_int two_int long_double_int     \
-    _Bool float__Complex double__Complex long_double__Complex ; do
+    _Bool float__Complex double__Complex long_double__Complex \
+    _Float16; do
     eval len=\$ac_cv_sizeof_$type
     if test -z "$len" ; then 
        len=0
@@ -3392,6 +3708,7 @@ MPI_C_BOOL=MPI_DATATYPE_NULL
 MPI_C_FLOAT_COMPLEX=MPI_DATATYPE_NULL
 MPI_C_DOUBLE_COMPLEX=MPI_DATATYPE_NULL
 MPI_C_LONG_DOUBLE_COMPLEX=MPI_DATATYPE_NULL
+MPIX_C_FLOAT16=MPI_DATATYPE_NULL
 if test ${len__Bool} != 0 ; then
     MPI_C_BOOL=0x4c00${len__Bool}3f
 fi
@@ -3403,6 +3720,9 @@ if test ${len_double__Complex} != 0 ; then
 fi
 if test ${len_long_double__Complex} != 0 ; then
     MPI_C_LONG_DOUBLE_COMPLEX=0x4c00${len_long_double__Complex}42
+fi
+if test ${len__Float16} != 0 ; then
+    MPIX_C_FLOAT16=0x4c000246
 fi
 
 AC_SUBST(MPI_INT8_T)
@@ -3417,6 +3737,7 @@ AC_SUBST(MPI_C_BOOL)
 AC_SUBST(MPI_C_FLOAT_COMPLEX)
 AC_SUBST(MPI_C_DOUBLE_COMPLEX)
 AC_SUBST(MPI_C_LONG_DOUBLE_COMPLEX)
+AC_SUBST(MPIX_C_FLOAT16)
 export MPI_INT8_T
 export MPI_INT16_T
 export MPI_INT32_T
@@ -3429,6 +3750,7 @@ export MPI_C_BOOL
 export MPI_C_FLOAT_COMPLEX
 export MPI_C_DOUBLE_COMPLEX
 export MPI_C_LONG_DOUBLE_COMPLEX
+export MPIX_C_FLOAT16
 
 
 # ----------------------------------------------------------------------------
@@ -4728,6 +5050,11 @@ if test "$ac_cv_sizeof_int" = "$aint_size" ; then
     AC_DEFINE(SIZEOF_INT_IS_AINT,1,[define if sizeof(int) = sizeof(MPI_Aint)])
 fi
 
+# If sizeof(mpi_aint) = sizeof(int), set this value
+if test "$ac_cv_sizeof_void_p" = "$aint_size" ; then
+    AC_DEFINE(SIZEOF_PTR_IS_AINT,1,[define if sizeof(void *) = sizeof(MPI_Aint)])
+fi
+
 # ----------------------------------------------------------------------------
 # MPI_AINT datatype
 # ----------------------------------------------------------------------------
@@ -5198,14 +5525,6 @@ else
 fi
 AC_SUBST(MPI_MAX_ERROR_STRING)
 
-# Get the value of libtool_static_flag
-if test ! -z "$MPID_LIBTOOL_STATIC_FLAG" ; then
-   mpich_libtool_static_flag="$MPID_LIBTOOL_STATIC_FLAG"
-else
-   mpich_libtool_static_flag="-static"
-fi
-AC_SUBST([mpich_libtool_static_flag])
-
 # Add a definition that is used to help support Windows DLLs (used in mpi.h.in)
 MPIU_DLL_SPEC_DEF="#define MPIU_DLL_SPEC"
 AC_SUBST(MPIU_DLL_SPEC_DEF)
@@ -5317,8 +5636,8 @@ fi
 # linking issue on Darwin
 LT_OUTPUT
 
-# see ticket #1590 for some more background on these Darwin linking issues
 if test "X$enable_shared" = "Xyes" ; then
+    # see ticket #1590 for some more background on these Darwin linking issues
     AS_CASE([$host],
         [*-*-darwin*],
         [

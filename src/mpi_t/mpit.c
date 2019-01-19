@@ -29,22 +29,22 @@ name2index_hash_t *pvar_hashs[MPIR_T_PVAR_CLASS_NUMBER];
  * IN: enum_name, name of the enum
  * OUT: handle, handle of the enum
  */
-void MPIR_T_enum_create(const char *enum_name, MPI_T_enum *handle)
+void MPIR_T_enum_create(const char *enum_name, MPI_T_enum * handle)
 {
     MPIR_T_enum_t *e;
-    static const UT_icd enum_item_icd = {sizeof(enum_item_t), NULL, NULL, NULL};
+    static const UT_icd enum_item_icd = { sizeof(enum_item_t), NULL, NULL, NULL };
 
     MPIR_Assert(enum_name);
     MPIR_Assert(handle);
 
-    utarray_extend_back(enum_table);
-    e = (MPIR_T_enum_t *)utarray_back(enum_table);
+    utarray_extend_back(enum_table, MPL_MEM_MPIT);
+    e = (MPIR_T_enum_t *) utarray_back(enum_table);
     e->name = MPL_strdup(enum_name);
     MPIR_Assert(e->name);
 #ifdef HAVE_ERROR_CHECKING
     e->kind = MPIR_T_ENUM_HANDLE;
 #endif
-    utarray_new(e->items, &enum_item_icd);
+    utarray_new(e->items, &enum_item_icd, MPL_MEM_MPIT);
     (*handle) = e;
 }
 
@@ -60,8 +60,8 @@ void MPIR_T_enum_add_item(MPI_T_enum handle, const char *item_name, int item_val
     MPIR_Assert(handle);
     MPIR_Assert(item_name);
 
-    utarray_extend_back(handle->items);
-    item = (enum_item_t *)utarray_back(handle->items);
+    utarray_extend_back(handle->items, MPL_MEM_MPIT);
+    item = (enum_item_t *) utarray_back(handle->items);
     item->name = MPL_strdup(item_name);
     MPIR_Assert(item->name);
     item->value = item_value;
@@ -79,23 +79,23 @@ static cat_table_entry_t *MPIR_T_cat_create(const char *cat_name)
     name2index_hash_t *hash_entry;
 
     /* New a category */
-    utarray_extend_back(cat_table);
-    cat =(cat_table_entry_t *)utarray_back(cat_table);
+    utarray_extend_back(cat_table, MPL_MEM_MPIT);
+    cat = (cat_table_entry_t *) utarray_back(cat_table);
     cat->name = MPL_strdup(cat_name);
     cat->desc = NULL;
-    utarray_new(cat->cvar_indices, &ut_int_icd);
-    utarray_new(cat->pvar_indices, &ut_int_icd);
-    utarray_new(cat->subcat_indices, &ut_int_icd);
+    utarray_new(cat->cvar_indices, &ut_int_icd, MPL_MEM_MPIT);
+    utarray_new(cat->pvar_indices, &ut_int_icd, MPL_MEM_MPIT);
+    utarray_new(cat->subcat_indices, &ut_int_icd, MPL_MEM_MPIT);
 
     /* Record <cat_name, cat_idx> in cat_hash */
     cat_idx = utarray_len(cat_table) - 1;
-    hash_entry = MPL_malloc(sizeof(name2index_hash_t));
+    hash_entry = MPL_malloc(sizeof(name2index_hash_t), MPL_MEM_MPIT);
     MPIR_Assert(hash_entry);
     /* Need not to Strdup cat_name, since cat_table and cat_hash co-exist */
     hash_entry->name = cat_name;
     hash_entry->idx = cat_idx;
-    MPL_HASH_ADD_KEYPTR(hh, cat_hash, hash_entry->name,
-                    strlen(hash_entry->name), hash_entry);
+    HASH_ADD_KEYPTR(hh, cat_hash, hash_entry->name,
+                    strlen(hash_entry->name), hash_entry, MPL_MEM_MPIT);
 
     return cat;
 }
@@ -115,22 +115,22 @@ int MPIR_T_cat_add_pvar(const char *cat_name, int pvar_index)
     if (cat_name == NULL || *cat_name == '\0')
         goto fn_exit;
 
-    MPL_HASH_FIND_STR(cat_hash, cat_name, hash_entry);
+    HASH_FIND_STR(cat_hash, cat_name, hash_entry);
 
     if (hash_entry != NULL) {
         /* Found it, i.e., category already exists */
         int cat_idx = hash_entry->idx;
-        cat = (cat_table_entry_t *)utarray_eltptr(cat_table, cat_idx);
+        cat = (cat_table_entry_t *) utarray_eltptr(cat_table, cat_idx);
         /* FIXME: Is it worth checking duplicated vars? Probably not */
-        utarray_push_back(cat->pvar_indices, &pvar_index);
+        utarray_push_back(cat->pvar_indices, &pvar_index, MPL_MEM_MPIT);
     } else {
         /* Not found, so create a new category */
         cat = MPIR_T_cat_create(cat_name);
-        utarray_push_back(cat->pvar_indices, &pvar_index);
+        utarray_push_back(cat->pvar_indices, &pvar_index, MPL_MEM_MPIT);
         /* Notify categories have been changed */
         cat_stamp++;
     }
-fn_exit:
+  fn_exit:
     return mpi_errno;
 }
 
@@ -149,23 +149,23 @@ int MPIR_T_cat_add_cvar(const char *cat_name, int cvar_index)
     if (cat_name == NULL || *cat_name == '\0')
         goto fn_exit;
 
-    MPL_HASH_FIND_STR(cat_hash, cat_name, hash_entry);
+    HASH_FIND_STR(cat_hash, cat_name, hash_entry);
 
     if (hash_entry != NULL) {
         /* Found it, i.e., category already exists */
         int cat_idx = hash_entry->idx;
-        cat = (cat_table_entry_t *)utarray_eltptr(cat_table, cat_idx);
+        cat = (cat_table_entry_t *) utarray_eltptr(cat_table, cat_idx);
         /* FIXME: Is it worth checking duplicated vars? Probably not */
-        utarray_push_back(cat->cvar_indices, &cvar_index);
+        utarray_push_back(cat->cvar_indices, &cvar_index, MPL_MEM_MPIT);
     } else {
         /* Not found, so create a new category */
         cat = MPIR_T_cat_create(cat_name);
-        utarray_push_back(cat->cvar_indices, &cvar_index);
+        utarray_push_back(cat->cvar_indices, &cvar_index, MPL_MEM_MPIT);
         /* Notify categories have been changed */
         cat_stamp++;
     }
 
-fn_exit:
+  fn_exit:
     return mpi_errno;
 }
 
@@ -181,14 +181,12 @@ int MPIR_T_cat_add_subcat(const char *parent_name, const char *child_name)
     cat_table_entry_t *parent;
 
     /* NULL or empty string are allowed */
-    if (parent_name == NULL || *parent_name == '\0' ||
-        child_name == NULL || *child_name == '\0')
-    {
+    if (parent_name == NULL || *parent_name == '\0' || child_name == NULL || *child_name == '\0') {
         goto fn_exit;
     }
 
     /* Find or create parent */
-    MPL_HASH_FIND_STR(cat_hash, parent_name, hash_entry);
+    HASH_FIND_STR(cat_hash, parent_name, hash_entry);
     if (hash_entry != NULL) {
         /* Found parent in cat_table */
         parent_index = hash_entry->idx;
@@ -199,7 +197,7 @@ int MPIR_T_cat_add_subcat(const char *parent_name, const char *child_name)
     }
 
     /* Find or create child */
-    MPL_HASH_FIND_STR(cat_hash, child_name, hash_entry);
+    HASH_FIND_STR(cat_hash, child_name, hash_entry);
     if (hash_entry != NULL) {
         /* Found child in cat_table */
         child_index = hash_entry->idx;
@@ -210,13 +208,13 @@ int MPIR_T_cat_add_subcat(const char *parent_name, const char *child_name)
     }
 
     /* Connect parent and child */
-    parent = (cat_table_entry_t *)utarray_eltptr(cat_table, parent_index);
-    utarray_push_back(parent->subcat_indices, &child_index);
+    parent = (cat_table_entry_t *) utarray_eltptr(cat_table, parent_index);
+    utarray_push_back(parent->subcat_indices, &child_index, MPL_MEM_MPIT);
 
     /* Notify categories have been changed */
     cat_stamp++;
 
-fn_exit:
+  fn_exit:
     return mpi_errno;
 
 }
@@ -235,12 +233,12 @@ int MPIR_T_cat_add_desc(const char *cat_name, const char *cat_desc)
     MPIR_Assert(cat_name);
     MPIR_Assert(cat_desc);
 
-    MPL_HASH_FIND_STR(cat_hash, cat_name, hash_entry);
+    HASH_FIND_STR(cat_hash, cat_name, hash_entry);
 
     if (hash_entry != NULL) {
         /* Found it, i.e., category already exists */
         cat_idx = hash_entry->idx;
-        cat = (cat_table_entry_t *)utarray_eltptr(cat_table, cat_idx);
+        cat = (cat_table_entry_t *) utarray_eltptr(cat_table, cat_idx);
         MPIR_Assert(cat->desc == NULL);
         cat->desc = MPL_strdup(cat_desc);
         MPIR_Assert(cat->desc);
@@ -272,46 +270,45 @@ int MPIR_T_cat_add_desc(const char *cat_name, const char *cat_desc)
  * IN: cat, Catogery name of the cvar
  * IN: desc, Description of the cvar
  */
-void MPIR_T_CVAR_REGISTER_impl(
-    MPI_Datatype dtype, const char* name, const void *addr, int count,
-    MPIR_T_enum_t *etype, MPIR_T_verbosity_t verb, MPIR_T_bind_t binding,
-    MPIR_T_scope_t scope, MPIR_T_cvar_get_addr_cb get_addr,
-    MPIR_T_cvar_get_count_cb get_count, MPIR_T_cvar_value_t defaultval,
-    const char *cat, const char * desc)
+void MPIR_T_CVAR_REGISTER_impl(MPI_Datatype dtype, const char *name, const void *addr, int count,
+                               MPIR_T_enum_t * etype, MPIR_T_verbosity_t verb,
+                               MPIR_T_bind_t binding, MPIR_T_scope_t scope,
+                               MPIR_T_cvar_get_addr_cb get_addr, MPIR_T_cvar_get_count_cb get_count,
+                               MPIR_T_cvar_value_t defaultval, const char *cat, const char *desc)
 {
     name2index_hash_t *hash_entry;
     cvar_table_entry_t *cvar;
     int cvar_idx;
 
     /* Check whether this is a replicated cvar, whose name is unique. */
-    MPL_HASH_FIND_STR(cvar_hash, name, hash_entry);
+    HASH_FIND_STR(cvar_hash, name, hash_entry);
 
     if (hash_entry != NULL) {
         /* Found it, the cvar already exists */
         cvar_idx = hash_entry->idx;
-        cvar = (cvar_table_entry_t *)utarray_eltptr(cvar_table, cvar_idx);
+        cvar = (cvar_table_entry_t *) utarray_eltptr(cvar_table, cvar_idx);
         /* Should never override an existing & active var */
         MPIR_Assert(cvar->active != TRUE);
         cvar->active = TRUE;
         /* FIXME: Do we need to check consistency between the old and new? */
     } else {
         /* Not found, so push the cvar to back of cvar_table */
-        utarray_extend_back(cvar_table);
-        cvar = (cvar_table_entry_t *)utarray_back(cvar_table);
+        utarray_extend_back(cvar_table, MPL_MEM_MPIT);
+        cvar = (cvar_table_entry_t *) utarray_back(cvar_table);
         cvar->active = TRUE;
         cvar->datatype = dtype;
         cvar->name = MPL_strdup(name);
         MPIR_Assert(cvar->name);
         if (dtype != MPI_CHAR) {
-            cvar->addr = (void *)addr;
+            cvar->addr = (void *) addr;
         } else {
-            cvar->addr = MPL_malloc(count);
+            cvar->addr = MPL_malloc(count, MPL_MEM_MPIT);
             MPIR_Assert(cvar->addr);
             if (defaultval.str == NULL) {
-                ((char *)(cvar->addr))[0] = '\0';
+                ((char *) (cvar->addr))[0] = '\0';
             } else {
                 /* Use greater (>), since count includes the terminating '\0', but strlen does not */
-                MPIR_Assert(count > strlen(defaultval.str));
+                MPIR_Assert((unsigned) count > strlen(defaultval.str));
                 strcpy(cvar->addr, defaultval.str);
             }
         }
@@ -327,13 +324,13 @@ void MPIR_T_CVAR_REGISTER_impl(
 
         /* Record <name, index> in hash table */
         cvar_idx = utarray_len(cvar_table) - 1;
-        hash_entry = MPL_malloc(sizeof(name2index_hash_t));
+        hash_entry = MPL_malloc(sizeof(name2index_hash_t), MPL_MEM_MPIT);
         MPIR_Assert(hash_entry);
         /* Need not to Strdup name, since cvar_table and cvar_hash co-exist */
-        hash_entry->name =name;
+        hash_entry->name = name;
         hash_entry->idx = cvar_idx;
-        MPL_HASH_ADD_KEYPTR(hh, cvar_hash, hash_entry->name,
-                        strlen(hash_entry->name), hash_entry);
+        HASH_ADD_KEYPTR(hh, cvar_hash, hash_entry->name,
+                        strlen(hash_entry->name), hash_entry, MPL_MEM_MPIT);
 
         /* Add the cvar to a category */
         MPIR_T_cat_add_cvar(cat, cvar_idx);
@@ -358,11 +355,12 @@ void MPIR_T_CVAR_REGISTER_impl(
  * IN: cat, Catogery name of the pvar
  * IN: desc, Description of the pvar
  */
-void MPIR_T_PVAR_REGISTER_impl(
-    int varclass, MPI_Datatype dtype, const char* name, void *addr, int count,
-    MPIR_T_enum_t *etype, int verb, int binding, int flags,
-    MPIR_T_pvar_get_value_cb get_value, MPIR_T_pvar_get_count_cb get_count,
-    const char * cat, const char * desc)
+void MPIR_T_PVAR_REGISTER_impl(MPIR_T_pvar_class_t varclass, MPI_Datatype dtype, const char *name,
+                               void *addr, int count, MPIR_T_enum_t * etype,
+                               MPIR_T_verbosity_t verb, MPIR_T_bind_t binding, int flags,
+                               MPIR_T_pvar_get_value_cb get_value,
+                               MPIR_T_pvar_get_count_cb get_count, const char *cat,
+                               const char *desc)
 {
     name2index_hash_t *hash_entry;
     pvar_table_entry_t *pvar;
@@ -370,20 +368,20 @@ void MPIR_T_PVAR_REGISTER_impl(
     int seq = varclass - MPIR_T_PVAR_CLASS_FIRST;
 
     /* Check whether this is a replicated pvar, whose name is unique per class */
-    MPL_HASH_FIND_STR(pvar_hashs[seq], name, hash_entry);
+    HASH_FIND_STR(pvar_hashs[seq], name, hash_entry);
 
     if (hash_entry != NULL) {
         /* Found it, the pvar already exists */
         pvar_idx = hash_entry->idx;
-        pvar = (pvar_table_entry_t *)utarray_eltptr(pvar_table, pvar_idx);
+        pvar = (pvar_table_entry_t *) utarray_eltptr(pvar_table, pvar_idx);
         /* Should never override an existing & active var */
         MPIR_Assert(pvar->active != TRUE);
         pvar->active = TRUE;
         /* FIXME: Do we need to check consistency between the old and new? */
     } else {
         /* Not found, so push the pvar to back of pvar_table */
-        utarray_extend_back(pvar_table);
-        pvar = (pvar_table_entry_t *)utarray_back(pvar_table);
+        utarray_extend_back(pvar_table, MPL_MEM_MPIT);
+        pvar = (pvar_table_entry_t *) utarray_back(pvar_table);
         pvar->active = TRUE;
         pvar->varclass = varclass;
         pvar->datatype = dtype;
@@ -402,16 +400,16 @@ void MPIR_T_PVAR_REGISTER_impl(
 
         /* Record <name, index> in hash table */
         pvar_idx = utarray_len(pvar_table) - 1;
-        hash_entry = MPL_malloc(sizeof(name2index_hash_t));
+        hash_entry = MPL_malloc(sizeof(name2index_hash_t), MPL_MEM_MPIT);
         MPIR_Assert(hash_entry);
         /* Need not to Strdup name, since pvar_table and pvar_hashs co-exist */
         hash_entry->name = name;
         hash_entry->idx = pvar_idx;
-        MPL_HASH_ADD_KEYPTR(hh, pvar_hashs[seq], hash_entry->name,
-                        strlen(hash_entry->name), hash_entry);
+        HASH_ADD_KEYPTR(hh, pvar_hashs[seq], hash_entry->name,
+                        strlen(hash_entry->name), hash_entry, MPL_MEM_MPIT);
 
         /* Add the pvar to a category */
-        MPIR_T_cat_add_pvar(cat, utarray_len(pvar_table)-1);
+        MPIR_T_cat_add_pvar(cat, utarray_len(pvar_table) - 1);
     }
 }
 
@@ -448,13 +446,12 @@ void MPIR_T_strncpy(char *dst, const char *src, int *len)
         /* If dst is NULL or *len is 0, just return src length + 1 */
         if (!dst || !*len) {
             *len = (src == NULL) ? 1 : strlen(src) + 1;
-        }
-        else {
+        } else {
             /* MPL_strncpy will always terminate the string */
             MPIR_Assert(*len > 0);
             if (src != NULL) {
                 MPL_strncpy(dst, src, *len);
-                *len = (int)strlen(dst) + 1;
+                *len = (int) strlen(dst) + 1;
             } else {
                 /* As if an empty string is copied */
                 *dst = '\0';
@@ -463,4 +460,3 @@ void MPIR_T_strncpy(char *dst, const char *src, int *len)
         }
     }
 }
-

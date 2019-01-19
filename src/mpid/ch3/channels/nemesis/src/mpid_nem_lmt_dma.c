@@ -97,7 +97,7 @@ static int open_knem_dev(void)
 
     knem_has_dma = (info.features & KNEM_FEATURE_DMA);
 
-    knem_status = mmap(NULL, KNEM_STATUS_NR, PROT_READ|PROT_WRITE, MAP_SHARED, knem_fd, KNEM_STATUS_ARRAY_FILE_OFFSET);
+    knem_status = MPL_mmap(NULL, KNEM_STATUS_NR, PROT_READ|PROT_WRITE, MAP_SHARED, knem_fd, KNEM_STATUS_ARRAY_FILE_OFFSET, MPL_MEM_SHM);
     MPIR_ERR_CHKANDJUMP1(knem_status == MAP_FAILED, mpi_errno, MPI_ERR_OTHER, "**mmap",
                          "**mmap %d", errno);
     for (i = 0; i < KNEM_STATUS_NR; ++i) {
@@ -234,7 +234,7 @@ static int send_sreq_data(MPIDI_VC_t *vc, MPIR_Request *sreq, knem_cookie_t *s_c
     int dt_contig;
     MPI_Aint dt_true_lb;
     intptr_t data_sz;
-    MPIDU_Datatype* dt_ptr;
+    MPIR_Datatype* dt_ptr;
 
     /* MT: this code assumes only one thread can be at this point at a time */
     if (knem_fd < 0) {
@@ -261,12 +261,12 @@ static int send_sreq_data(MPIDI_VC_t *vc, MPIR_Request *sreq, knem_cookie_t *s_c
             /* segment_ptr may be non-null when this is a continuation of a
                many-part message that we couldn't fit in one single flight of
                iovs. */
-            sreq->dev.segment_ptr = MPIDU_Segment_alloc();
+            sreq->dev.segment_ptr = MPIR_Segment_alloc();
             MPIR_ERR_CHKANDJUMP1((sreq->dev.segment_ptr == NULL), mpi_errno,
                                  MPI_ERR_OTHER, "**nomem",
-                                 "**nomem %s", "MPIDU_Segment_alloc");
-            MPIDU_Segment_init(sreq->dev.user_buf, sreq->dev.user_count,
-                              sreq->dev.datatype, sreq->dev.segment_ptr, 0);
+                                 "**nomem %s", "MPIR_Segment_alloc");
+            MPIR_Segment_init(sreq->dev.user_buf, sreq->dev.user_count,
+                              sreq->dev.datatype, sreq->dev.segment_ptr);
             sreq->dev.segment_first = 0;
             sreq->dev.segment_size = data_sz;
 
@@ -329,7 +329,7 @@ int MPID_nem_lmt_dma_initiate_lmt(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, MPIR_Req
     
     MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_LMT_DMA_INITIATE_LMT);
 
-    MPIR_CHKPMEM_MALLOC(sreq->ch.s_cookie, knem_cookie_t *, sizeof(knem_cookie_t), mpi_errno, "s_cookie");
+    MPIR_CHKPMEM_MALLOC(sreq->ch.s_cookie, knem_cookie_t *, sizeof(knem_cookie_t), mpi_errno, "s_cookie", MPL_MEM_BUFFER);
 
     mpi_errno = send_sreq_data(vc, sreq, sreq->ch.s_cookie);
     if (mpi_errno) MPIR_ERR_POP(mpi_errno);
@@ -358,7 +358,7 @@ int MPID_nem_lmt_dma_start_recv(MPIDI_VC_t *vc, MPIR_Request *rreq, MPL_IOV s_co
     int dt_contig;
     MPI_Aint dt_true_lb;
     intptr_t data_sz;
-    MPIDU_Datatype* dt_ptr;
+    MPIR_Datatype* dt_ptr;
     volatile knem_status_t *status;
     knem_status_t current_status;
     struct lmt_dma_node *node = NULL;
@@ -390,12 +390,12 @@ int MPID_nem_lmt_dma_start_recv(MPIDI_VC_t *vc, MPIR_Request *rreq, MPL_IOV s_co
                many-part message that we couldn't fit in one single flight of
                iovs. */
             MPIR_Assert(rreq->dev.segment_ptr == NULL);
-            rreq->dev.segment_ptr = MPIDU_Segment_alloc();
+            rreq->dev.segment_ptr = MPIR_Segment_alloc();
             MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno,
                                  MPI_ERR_OTHER, "**nomem",
-                                 "**nomem %s", "MPIDU_Segment_alloc");
-            MPIDU_Segment_init(rreq->dev.user_buf, rreq->dev.user_count,
-                              rreq->dev.datatype, rreq->dev.segment_ptr, 0);
+                                 "**nomem %s", "MPIR_Segment_alloc");
+            MPIR_Segment_init(rreq->dev.user_buf, rreq->dev.user_count,
+                              rreq->dev.datatype, rreq->dev.segment_ptr);
             rreq->dev.segment_first = 0;
             rreq->dev.segment_size = data_sz;
 
@@ -443,7 +443,7 @@ int MPID_nem_lmt_dma_start_recv(MPIDI_VC_t *vc, MPIR_Request *rreq, MPL_IOV s_co
 
     /* XXX DJG FIXME this looks like it always pushes! */
     /* push request if not complete for progress checks later */
-    node = MPL_malloc(sizeof(struct lmt_dma_node));
+    node = MPL_malloc(sizeof(struct lmt_dma_node), MPL_MEM_OTHER);
     node->vc = vc;
     node->req = rreq;
     node->status_p = status;

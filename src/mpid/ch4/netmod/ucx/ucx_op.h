@@ -6,19 +6,27 @@
  *  Portions of this code were written by Mellanox Technologies Ltd.
  *  Copyright (C) Mellanox Technologies Ltd. 2016. ALL RIGHTS RESERVED
  */
-#ifndef NETMOD_UCX_OP_H_INCLUDED
-#define NETMOD_UCX_OP_H_INCLUDED
+#ifndef UCX_OP_H_INCLUDED
+#define UCX_OP_H_INCLUDED
 
 #include "ucx_impl.h"
 
-static inline int MPIDI_NM_mpi_op_free_hook(MPIR_Op * op_p)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_op_free_hook
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_op_free_hook(MPIR_Op * op_p)
 {
     return 0;
 }
 
-static inline int MPIDI_NM_mpi_op_create_hook(MPIR_Op * op_p)
+#undef FUNCNAME
+#define FUNCNAME MPIDI_NM_mpi_op_commit_hook
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
+MPL_STATIC_INLINE_PREFIX int MPIDI_NM_mpi_op_commit_hook(MPIR_Op * op_p)
 {
     return 0;
 }
 
-#endif /* NETMOD_UCX_OP_H_INCLUDED */
+#endif /* UCX_OP_H_INCLUDED */

@@ -4,8 +4,8 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#ifndef TCP_IMPL_H
-#define TCP_IMPL_H
+#ifndef TCP_IMPL_H_INCLUDED
+#define TCP_IMPL_H_INCLUDED
 
 #include "mpid_nem_impl.h"
 #include <sys/types.h>
@@ -113,7 +113,9 @@ int MPID_nem_tcp_vc_terminated(MPIDI_VC_t *vc);
 int MPID_nem_tcp_get_ordering(int *ordering);
 
 
-int MPID_nem_tcp_pkt_unpause_handler(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, intptr_t *buflen, MPIR_Request **rreqp);
+int MPID_nem_tcp_pkt_unpause_handler(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt,
+                                     void *data ATTRIBUTE((unused)),
+                                     intptr_t *buflen, MPIR_Request **rreqp);
 
 
 /* Macros */
@@ -204,4 +206,4 @@ typedef struct MPIDI_nem_tcp_pkt_unpause
 
 
 
-#endif /* TCP_IMPL_H */
+#endif /* TCP_IMPL_H_INCLUDED */

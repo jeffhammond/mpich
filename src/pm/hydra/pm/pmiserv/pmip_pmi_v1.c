@@ -9,6 +9,7 @@
 #include "bsci.h"
 #include "demux.h"
 #include "topo.h"
+#include "uthash.h"
 
 #define debug(...)                              \
     {                                           \
@@ -28,11 +29,15 @@ static struct {
     int keyval_len;
 } cache_put;
 
-static struct {
-    char **key;
-    char **val;
-    int keyval_len;
-} cache_get;
+struct cache_elem {
+    char *key;
+    char *val;
+    UT_hash_handle hh;
+};
+
+static struct cache_elem *cache_get = NULL, *hash_get = NULL;
+
+static int num_elems = 0;
 
 static HYD_status send_cmd_upstream(const char *start, int fd, int num_args, char *args[])
 {
@@ -144,16 +149,16 @@ static HYD_status cache_put_flush(int fd)
 static HYD_status fn_init(int fd, char *args[])
 {
     int pmi_version, pmi_subversion, i;
-    const char *tmp = NULL;
+    char *tmp = NULL;
     static int global_init = 1;
     HYD_status status = HYD_SUCCESS;
 
     HYDU_FUNC_ENTER();
 
     strtok(args[0], "=");
-    pmi_version = atoi(strtok(NULL, "="));
+    pmi_version = strtol(strtok(NULL, "="), NULL, 10);
     strtok(args[1], "=");
-    pmi_subversion = atoi(strtok(NULL, "="));
+    pmi_subversion = strtol(strtok(NULL, "="), NULL, 10);
 
     if (pmi_version == 1 && pmi_subversion <= 1)
         tmp = MPL_strdup("cmd=response_to_init pmi_version=1 pmi_subversion=1 rc=0\n");
@@ -173,7 +178,6 @@ static HYD_status fn_init(int fd, char *args[])
         for (i = 0; i < CACHE_PUT_KEYVAL_MAXLEN + 1; i++)
             cache_put.keyval[i] = NULL;
         cache_put.keyval_len = 0;
-        cache_get.keyval_len = 0;
         global_init = 0;
     }
 
@@ -378,9 +382,10 @@ static HYD_status fn_get_usize(int fd, char *args[])
 static HYD_status fn_get(int fd, char *args[])
 {
     struct HYD_string_stash stash;
-    char *cmd, *key, *val;
+    char *cmd, *key;
     struct HYD_pmcd_token *tokens;
-    int token_count, i;
+    int token_count;
+    struct cache_elem *found = NULL;
     HYD_status status = HYD_SUCCESS;
 
     HYDU_FUNC_ENTER();
@@ -403,21 +408,13 @@ static HYD_status fn_get(int fd, char *args[])
         status = send_cmd_downstream(fd, cmd);
         HYDU_ERR_POP(status, "error sending PMI response\n");
         MPL_free(cmd);
-    }
-    else {
-        val = NULL;
-        for (i = 0; i < cache_get.keyval_len; i++) {
-            if (!strcmp(cache_get.key[i], key)) {
-                val = cache_get.val[i];
-                break;
-            }
-        }
-
-        if (val) {
+    } else {
+        HASH_FIND_STR(hash_get, key, found);
+        if (found) {
             HYD_STRING_STASH_INIT(stash);
             HYD_STRING_STASH(stash, MPL_strdup("cmd=get_result rc="), status);
             HYD_STRING_STASH(stash, MPL_strdup("0 msg=success value="), status);
-            HYD_STRING_STASH(stash, MPL_strdup(val), status);
+            HYD_STRING_STASH(stash, MPL_strdup(found->val), status);
             HYD_STRING_STASH(stash, MPL_strdup("\n"), status);
 
             HYD_STRING_SPIT(stash, cmd, status);
@@ -425,8 +422,7 @@ static HYD_status fn_get(int fd, char *args[])
             status = send_cmd_downstream(fd, cmd);
             HYDU_ERR_POP(status, "error sending PMI response\n");
             MPL_free(cmd);
-        }
-        else {
+        } else {
             /* if we can't find the key locally, ask upstream */
             status = send_cmd_upstream("cmd=get ", fd, token_count, args);
             HYDU_ERR_POP(status, "error sending command upstream\n");
@@ -462,6 +458,7 @@ static HYD_status fn_put(int fd, char *args[])
     val = HYD_pmcd_pmi_find_token_keyval(tokens, token_count, "value");
     if (val == NULL)
         val = MPL_strdup("");
+    HYDU_ERR_CHKANDJUMP(status, NULL == val, HYD_INTERNAL_ERROR, "strdup failed\n");
 
     /* add to the cache */
     HYD_STRING_STASH_INIT(stash);
@@ -502,16 +499,22 @@ static HYD_status fn_keyval_cache(int fd, char *args[])
 
     /* allocate a larger space for the cached keyvals, copy over the
      * older keyvals and add the new ones in */
-    HYDU_REALLOC_OR_JUMP(cache_get.key, char **,
-                         (cache_get.keyval_len + token_count) * sizeof(char *), status);
-    HYDU_REALLOC_OR_JUMP(cache_get.val, char **,
-                         (cache_get.keyval_len + token_count) * sizeof(char *), status);
-
-    for (i = 0; i < token_count; i++) {
-        cache_get.key[cache_get.keyval_len + i] = MPL_strdup(tokens[i].key);
-        cache_get.val[cache_get.keyval_len + i] = MPL_strdup(tokens[i].val);
+    HASH_CLEAR(hh, hash_get);
+    HYDU_REALLOC_OR_JUMP(cache_get, struct cache_elem *,
+                         (sizeof(struct cache_elem) * (num_elems + token_count)), status);
+    for (i = 0; i < num_elems; i++) {
+        struct cache_elem *elem = cache_get + i;
+        HASH_ADD_STR(hash_get, key, elem, MPL_MEM_PM);
     }
-    cache_get.keyval_len += token_count;
+    for (; i < num_elems + token_count; i++) {
+        struct cache_elem *elem = cache_get + i;
+        elem->key = MPL_strdup(tokens[i - num_elems].key);
+        HYDU_ERR_CHKANDJUMP(status, NULL == elem->key, HYD_INTERNAL_ERROR, "%s", "");
+        elem->val = MPL_strdup(tokens[i - num_elems].val);
+        HYDU_ERR_CHKANDJUMP(status, NULL == elem->val, HYD_INTERNAL_ERROR, "%s", "");
+        HASH_ADD_STR(hash_get, key, elem, MPL_MEM_PM);
+    }
+    num_elems += token_count;
 
   fn_exit:
     HYD_pmcd_pmi_free_tokens(tokens, token_count);
@@ -549,7 +552,7 @@ static HYD_status fn_barrier_in(int fd, char *args[])
 
 static HYD_status fn_barrier_out(int fd, char *args[])
 {
-    const char *cmd;
+    char *cmd;
     int i;
     HYD_status status = HYD_SUCCESS;
 
@@ -574,7 +577,7 @@ static HYD_status fn_barrier_out(int fd, char *args[])
 
 static HYD_status fn_finalize(int fd, char *args[])
 {
-    const char *cmd;
+    char *cmd;
     int i;
     static int finalize_count = 0;
     HYD_status status = HYD_SUCCESS;
@@ -595,12 +598,11 @@ static HYD_status fn_finalize(int fd, char *args[])
 
     if (finalize_count == HYD_pmcd_pmip.local.proxy_process_count) {
         /* All processes have finalized */
-        for (i = 0; i < cache_get.keyval_len; i++) {
-            MPL_free(cache_get.key[i]);
-            MPL_free(cache_get.val[i]);
+        for (i = 0; i < num_elems; i++) {
+            MPL_free((cache_get + i)->key);
+            MPL_free((cache_get + i)->val);
         }
-        MPL_free(cache_get.key);
-        MPL_free(cache_get.val);
+        MPL_free(cache_get);
     }
 
   fn_exit:

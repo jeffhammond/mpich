@@ -26,7 +26,6 @@ noinst_PROGRAMS =  \
     isendself      \
     issendselfcancel \
     isendirecv     \
-    sendself       \
     eagerdt        \
     isendselfprobe \
     bsendfrag      \
@@ -41,12 +40,10 @@ noinst_PROGRAMS =  \
     pscancel       \
     scancel_unmatch\
     sendflood      \
-    sendrecv1      \
     sendrecv2      \
     sendrecv3      \
-    waitany-null   \
-    pingping       \
-    probe-unexp    \
+    waitany_null   \
+    probe_unexp    \
     probenull      \
     inactivereq    \
     waittestnull   \
@@ -56,4 +53,17 @@ noinst_PROGRAMS =  \
     big_count_status	\
     many_isend     \
     manylmt        \
-    dtype_send
+    huge_underflow \
+    huge_anysrc    \
+    huge_dupcomm   \
+    huge_ssend     \
+    multi_psend_derived  \
+    dtype_send		 \
+    recv_any		\
+    irecv_any   \
+    large_tag
+
+irecv_any_CPPFLAGS = -DTEST_NB $(AM_CPPFLAGS)
+irecv_any_SOURCES  = recv_any.c
+
+include Makefile.dtp

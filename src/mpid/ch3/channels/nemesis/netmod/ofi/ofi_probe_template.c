@@ -15,7 +15,7 @@
 /* peek_callback called when a successful peek is completed                 */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(peek_callback)
+#define FCNAME MPL_QUOTE(peek_callback)
 static int
 ADD_SUFFIX(peek_callback)(cq_tagged_entry_t * wc, MPIR_Request * rreq)
 {
@@ -35,7 +35,7 @@ ADD_SUFFIX(peek_callback)(cq_tagged_entry_t * wc, MPIR_Request * rreq)
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_iprobe_impl)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_iprobe_impl)
 int ADD_SUFFIX(MPID_nem_ofi_iprobe_impl)(struct MPIDI_VC *vc,
                              int source,
                              int tag,
@@ -126,14 +126,15 @@ int ADD_SUFFIX(MPID_nem_ofi_iprobe_impl)(struct MPIDI_VC *vc,
     if (status != MPI_STATUS_IGNORE)
         *status = rreq->status;
 
-    MPIR_Request_add_ref(rreq);
+    if (rreq_ptr)
+        MPIR_Request_add_ref(rreq);
     *flag = 1;
     END_FUNC_RC(FCNAME);
 }
 
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_iprobe)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_iprobe)
 int ADD_SUFFIX(MPID_nem_ofi_iprobe)(struct MPIDI_VC *vc,
                         int source,
                         int tag,
@@ -149,7 +150,7 @@ int ADD_SUFFIX(MPID_nem_ofi_iprobe)(struct MPIDI_VC *vc,
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_improbe)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_improbe)
 int ADD_SUFFIX(MPID_nem_ofi_improbe)(struct MPIDI_VC *vc,
                          int source,
                          int tag,
@@ -172,7 +173,7 @@ int ADD_SUFFIX(MPID_nem_ofi_improbe)(struct MPIDI_VC *vc,
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_anysource_iprobe)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_anysource_iprobe)
 int ADD_SUFFIX(MPID_nem_ofi_anysource_iprobe)(int tag,
                                   MPIR_Comm * comm,
                                   int context_offset, int *flag, MPI_Status * status)
@@ -187,7 +188,7 @@ int ADD_SUFFIX(MPID_nem_ofi_anysource_iprobe)(int tag,
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_anysource_improbe)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_anysource_improbe)
 int ADD_SUFFIX(MPID_nem_ofi_anysource_improbe)(int tag,
                                    MPIR_Comm * comm,
                                    int context_offset,

@@ -124,9 +124,8 @@ int main(int argc, char **argv)
 
   fn_exit:
     MTest_Finalize(errs);
-    MPI_Finalize();
 
-    return 0;
+    return MTestReturnValue(errs);
 }
 
 void comm_tests(MPI_Comm comm)
@@ -213,9 +212,8 @@ double run_test(long long msg_size, MPI_Comm comm, test_t test_type, double *max
 
             /* If the maximum message size is too large, don't run */
             if (tmp > MAX_BUF)
-                return 0;
-        }
-        else if (test_type == BELL_CURVE) {
+                return MTestReturnValue(errs);
+        } else if (test_type == BELL_CURVE) {
             for (j = 0; j < i; j++) {
                 if (i - 1 + j >= comm_size)
                     continue;
@@ -225,7 +223,7 @@ double run_test(long long msg_size, MPI_Comm comm, test_t test_type, double *max
 
                 /* If the maximum message size is too large, don't run */
                 if (tmp > MAX_BUF)
-                    return 0;
+                    return MTestReturnValue(errs);
             }
         }
 
@@ -236,7 +234,7 @@ double run_test(long long msg_size, MPI_Comm comm, test_t test_type, double *max
     /* Test that:
      * 1: sbuf is large enough
      * 2: rbuf is large enough
-     * 3: There were no failures (e.g., tmp nowhere > rbuf size
+     * 3: There were no failures (e.g., tmp nowhere > rbuf size)
      */
     MPI_Barrier(comm);
     start = MPI_Wtime();

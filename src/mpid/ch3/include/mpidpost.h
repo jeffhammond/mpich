@@ -4,7 +4,7 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#if !defined(MPIDPOST_H_INCLUDED)
+#ifndef MPIDPOST_H_INCLUDED
 #define MPIDPOST_H_INCLUDED
 
 #include "mpid_coll.h"
@@ -140,8 +140,6 @@ int MPIDI_CH3_Comm_connect(char * port_name, int root, MPIR_Comm * comm_ptr,
    (mpiimpl.h). */
 #include "mpidi_ch3_post.h"
 
-#include "mpidu_datatype.h"
-
 /*
  * Request utility macros (public - can be used in MPID macros)
  */
@@ -164,6 +162,7 @@ int MPIDI_CH3_Comm_connect(char * port_name, int root, MPIR_Comm * comm_ptr,
  * Device level request management macros
  */
 
+#define MPID_Prequest_free_hook(req_) do {} while(0)
 
 /*
  * Device level progress engine macros
@@ -171,24 +170,46 @@ int MPIDI_CH3_Comm_connect(char * port_name, int root, MPIR_Comm * comm_ptr,
 #define MPID_Progress_start(progress_state_) MPIDI_CH3_Progress_start(progress_state_)
 #define MPID_Progress_wait(progress_state_)  MPIDI_CH3_Progress_wait(progress_state_)
 #define MPID_Progress_end(progress_state_)   MPIDI_CH3_Progress_end(progress_state_)
-#define MPID_Progress_test()                 MPIDI_CH3_Progress_test()
+/* This is static inline instead of macro because otherwise MPID_Progress_test will
+ * be a chain of macros and therefore can not be used as a callback function */
+static inline int MPID_Progress_test(void)
+{
+    return MPIDI_CH3_Progress_test();
+}
 #define MPID_Progress_poke()		     MPIDI_CH3_Progress_poke()
 
 /* Dynamic process support */
-int MPID_GPID_GetAllInComm( MPIR_Comm *comm_ptr, int local_size,
-			    MPIR_Gpid local_gpids[], int *singlePG );
-int MPID_GPID_Get( MPIR_Comm *comm_ptr, int rank, MPIR_Gpid *gpid );
-int MPID_GPID_ToLpidArray( int size, MPIR_Gpid gpid[], int lpid[] );
+int MPIDI_GPID_GetAllInComm( MPIR_Comm *comm_ptr, int local_size,
+                             MPIDI_Gpid local_gpids[], int *singlePG );
+int MPIDI_GPID_Get( MPIR_Comm *comm_ptr, int rank, MPIDI_Gpid *gpid );
+int MPIDI_GPID_ToLpidArray( int size, MPIDI_Gpid gpid[], int lpid[] );
+int MPIDI_PG_ForwardPGInfo( MPIR_Comm *peer_ptr, MPIR_Comm *comm_ptr,
+                            int nPGids, const MPIDI_Gpid gpids[],
+                            int root );
+int MPID_Intercomm_exchange_map( MPIR_Comm *local_comm_ptr, int local_leader,
+                                 MPIR_Comm *peer_comm_ptr, int remote_leader,
+                                 int *remote_size, int **remote_lpids,
+                                 int *is_low_group);
 int MPID_Create_intercomm_from_lpids( MPIR_Comm *newcomm_ptr,
-			    int size, const int lpids[] );
-int MPID_PG_ForwardPGInfo( MPIR_Comm *peer_ptr, MPIR_Comm *comm_ptr,
-			   int nPGids, const MPIR_Gpid gpids[],
-			   int root );
-/* PG_ForwardPGInfo is used as the implementation of the intercomm-create
-   hook that is needed with dynamic processes because of limitations
-   in the current definition of PMI */
-#define MPID_ICCREATE_REMOTECOMM_HOOK(_p,_c,_np,_gp,_r) \
-     MPID_PG_ForwardPGInfo(_p,_c,_np,_gp,_r)
+                                      int size, const int lpids[] );
+
+#define MPID_INTERCOMM_NO_DYNPROC(comm) (0)
+
+/* ULFM support */
+MPL_STATIC_INLINE_PREFIX int MPID_Comm_AS_enabled(MPIR_Comm * comm_ptr)
+{
+    return comm_ptr->dev.anysource_enabled;
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Request_is_anysource(MPIR_Request * request_ptr)
+{
+    int ret = 0;
+
+    if (request_ptr->kind == MPIR_REQUEST_KIND__RECV)
+        ret = request_ptr->dev.match.parts.rank == MPI_ANY_SOURCE;
+
+    return ret;
+}
 
 /* communicator hooks */
 int MPIDI_CH3I_Comm_create_hook(struct MPIR_Comm *);
@@ -204,4 +225,66 @@ int MPIDI_CH3I_Progress_deactivate_hook(int id);
 #define MPID_Progress_activate_hook(id_) MPIDI_CH3I_Progress_activate_hook(id_)
 #define MPID_Progress_deactivate_hook(id_) MPIDI_CH3I_Progress_deactivate_hook(id_)
 
-#endif /* !defined(MPIDPOST_H_INCLUDED) */
+/*
+  Device override hooks for asynchronous progress threads
+*/
+MPL_STATIC_INLINE_PREFIX int MPID_Init_async_thread(void)
+{
+    return MPIR_Init_async_thread();
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Finalize_async_thread(void)
+{
+    return MPIR_Finalize_async_thread();
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Test(MPIR_Request * request_ptr, int *flag, MPI_Status * status)
+{
+    return MPIR_Test_impl(request_ptr, flag, status);
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Testall(int count, MPIR_Request * request_ptrs[],
+                                          int *flag, MPI_Status array_of_statuses[],
+                                          int requests_property)
+{
+    return MPIR_Testall_impl(count, request_ptrs, flag, array_of_statuses, requests_property);
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Testany(int count, MPIR_Request * request_ptrs[],
+                                          int *indx, int *flag, MPI_Status * status)
+{
+    return MPIR_Testany_impl(count, request_ptrs, indx, flag, status);
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Testsome(int incount, MPIR_Request * request_ptrs[],
+                                           int *outcount, int array_of_indices[],
+                                           MPI_Status array_of_statuses[])
+{
+    return MPIR_Testsome_impl(incount, request_ptrs, outcount, array_of_indices, array_of_statuses);
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Waitall(int count, MPIR_Request * request_ptrs[],
+                                          MPI_Status array_of_statuses[], int request_properties)
+{
+    return MPIR_Waitall_impl(count, request_ptrs, array_of_statuses, request_properties);
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Wait(MPIR_Request * request_ptr, MPI_Status * status)
+{
+    return MPIR_Wait_impl(request_ptr, status);
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Waitany(int count, MPIR_Request * request_ptrs[],
+                                          int *indx, MPI_Status * status)
+{
+    return MPIR_Waitany_impl(count, request_ptrs, indx, status);
+}
+
+MPL_STATIC_INLINE_PREFIX int MPID_Waitsome(int incount, MPIR_Request * request_ptrs[],
+                                           int *outcount, int array_of_indices[],
+                                           MPI_Status array_of_statuses[])
+{
+    return MPIR_Waitsome_impl(incount, request_ptrs, outcount, array_of_indices, array_of_statuses);
+}
+
+#endif /* MPIDPOST_H_INCLUDED */

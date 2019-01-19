@@ -10,6 +10,7 @@
 **ch4|cancelresp:failure occurred while attempting to send cancel response packet
 **ch4|cancelrndv:failure occurred while performing local cancellation of a rendezvous message
 **ch4|ch4_init:channel initialization failed
+**ch4|too_many_ranks:User requested number of ranks unsupported
 **ch4|ctspkt:failure occurred while attempting to send CTS packet
 **ch4|eagermsg:failure occurred while attempting to send an eager message
 **ch4|loadrecviov:failure occurred while loading the receive I/O vector
@@ -34,8 +35,12 @@
 **ch4|pmi_finalize %d:PMI_Finalize failed, error %d
 **ch4|invalid_shm:Invalid shm specified
 **ch4|invalid_shm %s:Invalid shm specified (%s)
+**ch4|invalid_shm_posix_eager:Invalid shm posix eager module specified
+**ch4|invalid_shm_posix_eager %s:Invalid shm posix eager module specified (%s)
 **ch4|invalid_locality:Invalid locality usage
 **ch4|invalid_locality %s:Invalid locality usage (%s)
+**ch4|invalid_mt_model:Invalid multi-threading model
+**ch4|invalid_mt_model %s:Invalid multi-threading model (%s)
 #
 # RMA errors
 #

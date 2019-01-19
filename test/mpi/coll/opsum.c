@@ -120,7 +120,6 @@ int main(int argc, char *argv[])
             fprintf(stderr, "unsigned char SUM(>) test failed\n");
         }
     }
-
 #ifndef USE_STRICT_MPI
     /* For some reason, complex is not allowed for sum and prod */
     if (MPI_DOUBLE_COMPLEX != MPI_DATATYPE_NULL) {
@@ -267,6 +266,5 @@ int main(int argc, char *argv[])
 #endif
 
     MTest_Finalize(errs);
-    MPI_Finalize();
-    return 0;
+    return MTestReturnValue(errs);
 }

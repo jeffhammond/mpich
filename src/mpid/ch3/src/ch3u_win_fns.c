@@ -58,14 +58,14 @@ int MPIDI_CH3U_Win_gather_info(void *base, MPI_Aint size, int disp_unit,
      * completion counters of all processes */
     MPIR_CHKPMEM_MALLOC((*win_ptr)->basic_info_table, MPIDI_Win_basic_info_t *,
                         comm_size * sizeof(MPIDI_Win_basic_info_t),
-                        mpi_errno, "(*win_ptr)->basic_info_table");
+                        mpi_errno, "(*win_ptr)->basic_info_table",
+                        MPL_MEM_RMA);
 
     /* get the addresses of the windows, window objects, and completion
      * counters of all processes.  allocate temp. buffer for communication */
     MPIR_CHKLMEM_MALLOC(tmp_buf, MPI_Aint *, 4 * comm_size * sizeof(MPI_Aint),
-                        mpi_errno, "tmp_buf");
+                        mpi_errno, "tmp_buf", MPL_MEM_BUFFER);
 
-    /* FIXME: This needs to be fixed for heterogeneous systems */
     /* FIXME: If we wanted to validate the transfer as within range at the
      * origin, we'd also need the window size. */
     tmp_buf[4 * rank] = MPIR_Ptr_to_aint(base);
@@ -73,8 +73,8 @@ int MPIDI_CH3U_Win_gather_info(void *base, MPI_Aint size, int disp_unit,
     tmp_buf[4 * rank + 2] = (MPI_Aint) disp_unit;
     tmp_buf[4 * rank + 3] = (MPI_Aint) (*win_ptr)->handle;
 
-    mpi_errno = MPIR_Allgather_impl(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
-                                    tmp_buf, 4, MPI_AINT, (*win_ptr)->comm_ptr, &errflag);
+    mpi_errno = MPIR_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL,
+                               tmp_buf, 4, MPI_AINT, (*win_ptr)->comm_ptr, &errflag);
     MPIR_T_PVAR_TIMER_END(RMA, rma_wincreate_allgather);
     if (mpi_errno) {
         MPIR_ERR_POP(mpi_errno);
@@ -255,7 +255,7 @@ int MPIDI_CH3U_Win_allocate_no_shm(MPI_Aint size, int disp_unit, MPIR_Info * inf
     MPIR_FUNC_VERBOSE_RMA_ENTER(MPID_STATE_MPIDI_CH3U_WIN_ALLOCATE_NO_SHM);
 
     if (size > 0) {
-        MPIR_CHKPMEM_MALLOC(*base_pp, void *, size, mpi_errno, "(*win_ptr)->base");
+        MPIR_CHKPMEM_MALLOC(*base_pp, void *, size, mpi_errno, "(*win_ptr)->base", MPL_MEM_RMA);
         MPL_VG_MEM_INIT(*base_pp, size);
     }
     else if (size == 0) {
@@ -320,13 +320,13 @@ int MPID_Win_set_info(MPIR_Win * win, MPIR_Info * info)
 
     MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_WIN_SET_INFO);
 
-    /********************************************************/
-    /************** check for info no_locks *****************/
-    /********************************************************/
-
     if (info != NULL) {
         int info_flag = 0;
         char info_value[MPI_MAX_INFO_VAL + 1];
+
+        /********************************************************/
+        /************** check for info no_locks *****************/
+        /********************************************************/
         MPIR_Info_get_impl(info, "no_locks", MPI_MAX_INFO_VAL, info_value, &info_flag);
         if (info_flag) {
             if (!strncmp(info_value, "true", strlen("true")))
@@ -334,21 +334,11 @@ int MPID_Win_set_info(MPIR_Win * win, MPIR_Info * info)
             if (!strncmp(info_value, "false", strlen("false")))
                 win->info_args.no_locks = 0;
         }
-    }
 
-    /********************************************************/
-    /*************** check for info alloc_shm ***************/
-    /********************************************************/
-
-    if (win->create_flavor == MPI_WIN_FLAVOR_CREATE)
-        win->info_args.alloc_shm = FALSE;
-    if (win->create_flavor == MPI_WIN_FLAVOR_ALLOCATE ||
-        win->create_flavor == MPI_WIN_FLAVOR_SHARED)
-        win->info_args.alloc_shm = TRUE;
-
-    if (info != NULL) {
-        int info_flag = 0;
-        char info_value[MPI_MAX_INFO_VAL + 1];
+        /********************************************************/
+        /*************** check for info alloc_shm ***************/
+        /********************************************************/
+        info_flag = 0;
         MPIR_Info_get_impl(info, "alloc_shm", MPI_MAX_INFO_VAL, info_value, &info_flag);
         if (info_flag) {
             if (!strncmp(info_value, "true", sizeof("true")))
@@ -356,20 +346,14 @@ int MPID_Win_set_info(MPIR_Win * win, MPIR_Info * info)
             if (!strncmp(info_value, "false", sizeof("false")))
                 win->info_args.alloc_shm = FALSE;
         }
-    }
 
-    if (win->create_flavor == MPI_WIN_FLAVOR_DYNAMIC)
-        win->info_args.alloc_shm = FALSE;
+        if (win->create_flavor == MPI_WIN_FLAVOR_DYNAMIC)
+            win->info_args.alloc_shm = FALSE;
 
-    /********************************************************/
-    /******* check for info alloc_shared_noncontig **********/
-    /********************************************************/
-
-    if (win->create_flavor == MPI_WIN_FLAVOR_ALLOCATE)
-        win->info_args.alloc_shared_noncontig = 1;
-    if (info != NULL) {
-        int info_flag = 0;
-        char info_value[MPI_MAX_INFO_VAL + 1];
+        /********************************************************/
+        /******* check for info alloc_shared_noncontig **********/
+        /********************************************************/
+        info_flag = 0;
         MPIR_Info_get_impl(info, "alloc_shared_noncontig", MPI_MAX_INFO_VAL,
                            info_value, &info_flag);
         if (info_flag) {
@@ -378,7 +362,77 @@ int MPID_Win_set_info(MPIR_Win * win, MPIR_Info * info)
             if (!strncmp(info_value, "false", strlen("false")))
                 win->info_args.alloc_shared_noncontig = 0;
         }
+
+        /********************************************************/
+        /******* check for info accumulate_ordering    **********/
+        /********************************************************/
+        info_flag = 0;
+        MPIR_Info_get_impl(info, "accumulate_ordering", MPI_MAX_INFO_VAL, info_value, &info_flag);
+        if (info_flag) {
+            if (!strncmp(info_value, "none", strlen("none"))) {
+                win->info_args.accumulate_ordering = 0;
+            }
+            else {
+                char *token, *save_ptr;
+                int new_ordering = 0;
+
+                token = (char *) strtok_r(info_value, ",", &save_ptr);
+                while (token) {
+                    if (!memcmp(token, "rar", 3))
+                        new_ordering |= MPIDI_ACC_ORDER_RAR;
+                    else if (!memcmp(token, "raw", 3))
+                        new_ordering |= MPIDI_ACC_ORDER_RAW;
+                    else if (!memcmp(token, "war", 3))
+                        new_ordering |= MPIDI_ACC_ORDER_WAR;
+                    else if (!memcmp(token, "waw", 3))
+                        new_ordering |= MPIDI_ACC_ORDER_WAW;
+                    else
+                        MPIR_ERR_SETANDSTMT(mpi_errno, MPI_ERR_ARG, goto fn_fail, "**info");
+
+                    token = (char *) strtok_r(NULL, ",", &save_ptr);
+                }
+
+                win->info_args.accumulate_ordering = new_ordering;
+            }
+        }
+
+        /********************************************************/
+        /******* check for info accumulate_ops         **********/
+        /********************************************************/
+        info_flag = 0;
+        MPIR_Info_get_impl(info, "accumulate_ops", MPI_MAX_INFO_VAL, info_value, &info_flag);
+        if (info_flag) {
+            if (!strncmp(info_value, "same_op", sizeof("same_op")))
+                win->info_args.accumulate_ops = MPIDI_ACC_OPS_SAME_OP;
+            if (!strncmp(info_value, "same_op_no_op", sizeof("same_op_no_op")))
+                win->info_args.accumulate_ops = MPIDI_ACC_OPS_SAME_OP_NO_OP;
+        }
+
+        /********************************************************/
+        /******* check for info same_size              **********/
+        /********************************************************/
+        info_flag = 0;
+        MPIR_Info_get_impl(info, "same_size", MPI_MAX_INFO_VAL, info_value, &info_flag);
+        if (info_flag) {
+            if (!strncmp(info_value, "true", sizeof("true")))
+                win->info_args.same_size = TRUE;
+            if (!strncmp(info_value, "false", sizeof("false")))
+                win->info_args.same_size = FALSE;
+        }
+
+        /********************************************************/
+        /******* check for info same_disp_unit         **********/
+        /********************************************************/
+        info_flag = 0;
+        MPIR_Info_get_impl(info, "same_disp_unit", MPI_MAX_INFO_VAL, info_value, &info_flag);
+        if (info_flag) {
+            if (!strncmp(info_value, "true", sizeof("true")))
+                win->info_args.same_disp_unit = TRUE;
+            if (!strncmp(info_value, "false", sizeof("false")))
+                win->info_args.same_disp_unit = FALSE;
+        }
     }
+
 
   fn_exit:
     MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_WIN_SET_INFO);
@@ -418,15 +472,20 @@ int MPID_Win_get_info(MPIR_Win * win, MPIR_Info ** info_used)
     {
 #define BUFSIZE 32
         char buf[BUFSIZE];
-        int c = 0;
-        if (win->info_args.accumulate_ordering & MPIDI_ACC_ORDER_RAR)
-            c += snprintf(buf + c, BUFSIZE - c, "%srar", (c > 0) ? "," : "");
-        if (win->info_args.accumulate_ordering & MPIDI_ACC_ORDER_RAW)
-            c += snprintf(buf + c, BUFSIZE - c, "%sraw", (c > 0) ? "," : "");
-        if (win->info_args.accumulate_ordering & MPIDI_ACC_ORDER_WAR)
-            c += snprintf(buf + c, BUFSIZE - c, "%swar", (c > 0) ? "," : "");
-        if (win->info_args.accumulate_ordering & MPIDI_ACC_ORDER_WAW)
-            c += snprintf(buf + c, BUFSIZE - c, "%swaw", (c > 0) ? "," : "");
+        if (win->info_args.accumulate_ordering == 0) {
+            strncpy(buf, "none", BUFSIZE);
+        }
+        else {
+            int c = 0;
+            if (win->info_args.accumulate_ordering & MPIDI_ACC_ORDER_RAR)
+                c += snprintf(buf + c, BUFSIZE - c, "%srar", (c > 0) ? "," : "");
+            if (win->info_args.accumulate_ordering & MPIDI_ACC_ORDER_RAW)
+                c += snprintf(buf + c, BUFSIZE - c, "%sraw", (c > 0) ? "," : "");
+            if (win->info_args.accumulate_ordering & MPIDI_ACC_ORDER_WAR)
+                c += snprintf(buf + c, BUFSIZE - c, "%swar", (c > 0) ? "," : "");
+            if (win->info_args.accumulate_ordering & MPIDI_ACC_ORDER_WAW)
+                c += snprintf(buf + c, BUFSIZE - c, "%swaw", (c > 0) ? "," : "");
+        }
 
         MPIR_Info_set_impl(*info_used, "accumulate_ordering", buf);
         if (mpi_errno != MPI_SUCCESS) {
@@ -435,7 +494,7 @@ int MPID_Win_get_info(MPIR_Win * win, MPIR_Info ** info_used)
 #undef BUFSIZE
     }
 
-    if (win->info_args.accumulate_ordering == MPIDI_ACC_OPS_SAME_OP)
+    if (win->info_args.accumulate_ops == MPIDI_ACC_OPS_SAME_OP)
         mpi_errno = MPIR_Info_set_impl(*info_used, "accumulate_ops", "same_op");
     else
         mpi_errno = MPIR_Info_set_impl(*info_used, "accumulate_ops", "same_op_no_op");
@@ -453,25 +512,30 @@ int MPID_Win_get_info(MPIR_Win * win, MPIR_Info ** info_used)
         MPIR_ERR_POP(mpi_errno);
     }
 
-    if (win->create_flavor == MPI_WIN_FLAVOR_SHARED) {
-        if (win->info_args.alloc_shared_noncontig)
-            mpi_errno = MPIR_Info_set_impl(*info_used, "alloc_shared_noncontig", "true");
-        else
-            mpi_errno = MPIR_Info_set_impl(*info_used, "alloc_shared_noncontig", "false");
+    if (win->info_args.alloc_shared_noncontig)
+        mpi_errno = MPIR_Info_set_impl(*info_used, "alloc_shared_noncontig", "true");
+    else
+        mpi_errno = MPIR_Info_set_impl(*info_used, "alloc_shared_noncontig", "false");
 
-        if (mpi_errno != MPI_SUCCESS) {
-            MPIR_ERR_POP(mpi_errno);
-        }
+    if (mpi_errno != MPI_SUCCESS) {
+        MPIR_ERR_POP(mpi_errno);
     }
-    else if (win->create_flavor == MPI_WIN_FLAVOR_ALLOCATE) {
-        if (win->info_args.same_size)
-            mpi_errno = MPIR_Info_set_impl(*info_used, "same_size", "true");
-        else
-            mpi_errno = MPIR_Info_set_impl(*info_used, "same_size", "false");
 
-        if (mpi_errno != MPI_SUCCESS) {
-            MPIR_ERR_POP(mpi_errno);
-        }
+    if (win->info_args.same_size)
+        mpi_errno = MPIR_Info_set_impl(*info_used, "same_size", "true");
+    else
+        mpi_errno = MPIR_Info_set_impl(*info_used, "same_size", "false");
+
+    if (mpi_errno != MPI_SUCCESS) {
+        MPIR_ERR_POP(mpi_errno);
+    }
+
+    if (win->info_args.same_disp_unit)
+        mpi_errno = MPIR_Info_set_impl(*info_used, "same_disp_unit", "true");
+    else
+        mpi_errno = MPIR_Info_set_impl(*info_used, "same_disp_unit", "false");
+    if (mpi_errno != MPI_SUCCESS) {
+        MPIR_ERR_POP(mpi_errno);
     }
 
   fn_exit:

@@ -9,8 +9,8 @@
  *  Contributor License Agreement dated February 8, 2012.
  */
 
-#ifndef NETMOD_STUBNM_PRE_H_INCLUDED
-#define NETMOD_STUBNM_PRE_H_INCLUDED
+#ifndef STUBNM_PRE_H_INCLUDED
+#define STUBNM_PRE_H_INCLUDED
 
 typedef struct {
     int dummy;
@@ -38,10 +38,6 @@ typedef struct {
 
 typedef struct {
     int dummy;
-} MPIDI_STUBNM_gpid_t;
-
-typedef struct {
-    int dummy;
 } MPIDI_STUBNM_addr_t;
 
-#endif /* NETMOD_STUBNM_PRE_H_INCLUDED */
+#endif /* STUBNM_PRE_H_INCLUDED */

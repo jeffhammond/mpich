@@ -626,13 +626,6 @@ if test "$enable_strict_done" != "yes" ; then
        	  pac_cc_strict_flags="-O2"
        fi
        pac_cc_strict_flags="$pac_cc_strict_flags $pac_common_strict_flags"
-       case "$enable_posix" in
-            no)   : ;;
-            1995) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=199506L],[pac_cc_strict_flags]) ;;
-            2001) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=200112L],[pac_cc_strict_flags]) ;;
-            2008) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=200809L],[pac_cc_strict_flags]) ;;
-            *)    AC_MSG_ERROR([internal error, unexpected POSIX version: '$enable_posix']) ;;
-       esac
        # We only allow one of strict-C99 or strict-C89 to be
        # enabled. If C99 is enabled, we automatically disable C89.
        if test "${enable_c99}" = "yes" ; then
@@ -644,6 +637,19 @@ if test "$enable_strict_done" != "yes" ; then
        elif test "${enable_c89}" = "yes" ; then
        	  PAC_APPEND_FLAG([-std=c89],[pac_cc_strict_flags])
        	  PAC_APPEND_FLAG([-Wdeclaration-after-statement],[pac_cc_strict_flags])
+       fi
+       # POSIX 2001 should be used with C99. But the default standard for some
+       # compilers are not C99. We must test the support of POSIX 2001 after
+       # testing C99.
+       case "$enable_posix" in
+            no)   : ;;
+            1995) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=199506L],[pac_cc_strict_flags]) ;;
+            2001) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=200112L],[pac_cc_strict_flags]) ;;
+            2008) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=200809L],[pac_cc_strict_flags]) ;;
+            *)    AC_MSG_ERROR([internal error, unexpected POSIX version: '$enable_posix']) ;;
+       esac
+       if test "$enable_posix" != "no" ; then
+           AS_CASE([$host],[*-*-darwin*], [PAC_APPEND_FLAG([-D_DARWIN_C_SOURCE],[pac_cc_strict_flags])])
        fi
     fi
 
@@ -1689,4 +1695,24 @@ AC_TRY_LINK(, [
 if test x$have_builtin_expect = xyes ; then
     AC_DEFINE([HAVE_BUILTIN_EXPECT], [1], [Define to 1 if the compiler supports __builtin_expect.])
 fi
+])
+
+dnl
+dnl PAC_C_STATIC_ASSERT - Test whether C11 _Static_assert is supported
+dnl
+dnl will AC_DEFINE([HAVE_C11__STATIC_ASSERT]) if C11 _Static_assert is supported.
+dnl
+AC_DEFUN([PAC_C_STATIC_ASSERT], [
+    AC_MSG_CHECKING([for C11 _Static_assert functionality])
+    AC_LINK_IFELSE([AC_LANG_SOURCE([
+    int main(){
+        _Static_assert(1, "The impossible happened!");
+        return 0;
+    }
+    ])],[
+    AC_DEFINE([HAVE_C11__STATIC_ASSERT],[1],[Define if C11 _Static_assert is supported.])
+    AC_MSG_RESULT([yes])
+    ],[
+    AC_MSG_RESULT([no])
+    ])
 ])

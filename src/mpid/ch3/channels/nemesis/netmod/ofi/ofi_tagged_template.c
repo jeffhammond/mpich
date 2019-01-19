@@ -1,5 +1,5 @@
 /*
- *  (C) 2015 by Argonne National Laboratory.
+ *  (C) 2014 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  *
  *  Portions of this code were written by Intel Corporation.
@@ -17,7 +17,7 @@
 /* Handle an incoming receive completion event                              */
 /* ------------------------------------------------------------------------ */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_recv_callback)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_recv_callback)
 static inline
 int ADD_SUFFIX(MPID_nem_ofi_recv_callback)(cq_tagged_entry_t * wc, MPIR_Request * rreq)
 {
@@ -54,11 +54,11 @@ int ADD_SUFFIX(MPID_nem_ofi_recv_callback)(cq_tagged_entry_t * wc, MPIR_Request 
         }
     }
 
-    if ((wc->tag & MPID_PROTOCOL_MASK) == MPID_SYNC_SEND) {
+    if ((wc->tag & MPIDI_OFI_PROTOCOL_MASK) == MPIDI_OFI_SYNC_SEND) {
         /* ---------------------------------------------------- */
         /* Ack the sync send and wait for the send request      */
         /* completion(when callback executed.  A protocol bit   */
-        /* MPID_SYNC_SEND_ACK is set in the tag bits to provide */
+        /* MPIDI_OFI_SYNC_SEND_ACK is set in the tag bits to provide */
         /* separation of MPI messages and protocol messages     */
         /* ---------------------------------------------------- */
         vc = REQ_OFI(rreq)->vc;
@@ -68,10 +68,10 @@ int ADD_SUFFIX(MPID_nem_ofi_recv_callback)(cq_tagged_entry_t * wc, MPIR_Request 
         }
 #if API_SET == API_SET_1
         ssend_bits = init_sendtag(rreq->dev.match.parts.context_id,
-                                  rreq->comm->rank, rreq->status.MPI_TAG, MPID_SYNC_SEND_ACK);
+                                  rreq->comm->rank, rreq->status.MPI_TAG, MPIDI_OFI_SYNC_SEND_ACK);
 #elif API_SET == API_SET_2
         ssend_bits = init_sendtag_2(rreq->dev.match.parts.context_id,
-                                    rreq->status.MPI_TAG, MPID_SYNC_SEND_ACK);
+                                    rreq->status.MPI_TAG, MPIDI_OFI_SYNC_SEND_ACK);
 #endif
         MPID_nem_ofi_create_req(&sync_req, 1);
         sync_req->dev.OnDataAvail = NULL;
@@ -105,7 +105,7 @@ int ADD_SUFFIX(MPID_nem_ofi_recv_callback)(cq_tagged_entry_t * wc, MPIR_Request 
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(send_normal)
+#define FCNAME MPL_QUOTE(send_normal)
 static inline int ADD_SUFFIX(send_normal)(struct MPIDI_VC *vc,
                               const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPIR_Comm *comm,
@@ -142,7 +142,7 @@ static inline int ADD_SUFFIX(send_normal)(struct MPIDI_VC *vc,
     sreq->dev.match.parts.tag = match_bits;
     send_buffer = (char *) buf + dt_true_lb;
     if (!dt_contig) {
-        send_buffer = (char *) MPL_malloc(data_sz);
+        send_buffer = (char *) MPL_malloc(data_sz, MPL_MEM_BUFFER);
         MPIR_ERR_CHKANDJUMP1(send_buffer == NULL, mpi_errno,
                              MPI_ERR_OTHER, "**nomem", "**nomem %s", "Send buffer alloc");
         MPIDI_CH3U_Buffer_copy(buf, count, datatype, &err0,
@@ -150,7 +150,7 @@ static inline int ADD_SUFFIX(send_normal)(struct MPIDI_VC *vc,
         REQ_OFI(sreq)->pack_buffer = send_buffer;
     }
 
-    if (send_type == MPID_SYNC_SEND) {
+    if (send_type == MPIDI_OFI_SYNC_SEND) {
         /* ---------------------------------------------------- */
         /* For syncronous send, we post a receive to catch the  */
         /* match ack, but use the tag protocol bits to avoid    */
@@ -168,7 +168,7 @@ static inline int ADD_SUFFIX(send_normal)(struct MPIDI_VC *vc,
 #elif API_SET == API_SET_2
         ssend_match = init_recvtag_2(&ssend_mask, comm->context_id + context_offset, tag);
 #endif
-        ssend_match |= MPID_SYNC_SEND_ACK;
+        ssend_match |= MPIDI_OFI_SYNC_SEND_ACK;
         FI_RC_RETRY(fi_trecv(gl_data.endpoint,      /* endpoint    */
                            NULL,                    /* recvbuf     */
                            0,                       /* data sz     */
@@ -219,7 +219,7 @@ fn_fail:
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(send_lightweight)
+#define FCNAME MPL_QUOTE(send_lightweight)
 static inline int
 ADD_SUFFIX(send_lightweight)(struct MPIDI_VC *vc,
                              const void *buf,
@@ -259,7 +259,7 @@ ADD_SUFFIX(send_lightweight)(struct MPIDI_VC *vc,
 
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(do_isend)
+#define FCNAME MPL_QUOTE(do_isend)
 static inline int
 ADD_SUFFIX(do_isend)(struct MPIDI_VC *vc,
          const void *buf,
@@ -284,7 +284,7 @@ ADD_SUFFIX(do_isend)(struct MPIDI_VC *vc,
 
     MPIDI_Datatype_get_info(count, datatype, dt_contig, data_sz, dt_ptr, dt_true_lb);
 
-    if (likely((send_type != MPID_SYNC_SEND) &&
+    if (likely((send_type != MPIDI_OFI_SYNC_SEND) &&
                 dt_contig &&
                 (data_sz <= gl_data.max_buffered_send)))
     {
@@ -303,7 +303,7 @@ ADD_SUFFIX(do_isend)(struct MPIDI_VC *vc,
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_send)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_send)
 int ADD_SUFFIX(MPID_nem_ofi_send)(struct MPIDI_VC *vc,
                       const void *buf,
                       MPI_Aint count,
@@ -321,7 +321,7 @@ int ADD_SUFFIX(MPID_nem_ofi_send)(struct MPIDI_VC *vc,
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_isend)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_isend)
 int ADD_SUFFIX(MPID_nem_ofi_isend)(struct MPIDI_VC *vc,
                        const void *buf,
                        MPI_Aint count,
@@ -338,7 +338,7 @@ int ADD_SUFFIX(MPID_nem_ofi_isend)(struct MPIDI_VC *vc,
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_ssend)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_ssend)
 int ADD_SUFFIX(MPID_nem_ofi_ssend)(struct MPIDI_VC *vc,
                        const void *buf,
                        MPI_Aint count,
@@ -349,13 +349,13 @@ int ADD_SUFFIX(MPID_nem_ofi_ssend)(struct MPIDI_VC *vc,
     int mpi_errno = MPI_SUCCESS;
     BEGIN_FUNC(FCNAME);
     mpi_errno = ADD_SUFFIX(do_isend)(vc, buf, count, datatype, dest,
-                         tag, comm, context_offset, request, MPID_CREATE_REQ, MPID_SYNC_SEND);
+                         tag, comm, context_offset, request, MPID_CREATE_REQ, MPIDI_OFI_SYNC_SEND);
     END_FUNC(FCNAME);
     return mpi_errno;
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_issend)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_issend)
 int ADD_SUFFIX(MPID_nem_ofi_issend)(struct MPIDI_VC *vc,
                         const void *buf,
                         MPI_Aint count,
@@ -367,14 +367,14 @@ int ADD_SUFFIX(MPID_nem_ofi_issend)(struct MPIDI_VC *vc,
     int mpi_errno = MPI_SUCCESS;
     BEGIN_FUNC(FCNAME);
     mpi_errno = ADD_SUFFIX(do_isend)(vc, buf, count, datatype, dest,
-                         tag, comm, context_offset, request, MPID_CREATE_REQ, MPID_SYNC_SEND);
+                         tag, comm, context_offset, request, MPID_CREATE_REQ, MPIDI_OFI_SYNC_SEND);
     END_FUNC(FCNAME);
     return mpi_errno;
 }
 
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_recv_posted)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_recv_posted)
 int ADD_SUFFIX(MPID_nem_ofi_recv_posted)(struct MPIDI_VC *vc, struct MPIR_Request *rreq)
 {
     int mpi_errno = MPI_SUCCESS, dt_contig, src, tag;
@@ -382,7 +382,7 @@ int ADD_SUFFIX(MPID_nem_ofi_recv_posted)(struct MPIDI_VC *vc, struct MPIR_Reques
     fi_addr_t remote_proc = 0;
     intptr_t data_sz;
     MPI_Aint dt_true_lb;
-    MPIDU_Datatype*dt_ptr;
+    MPIR_Datatype*dt_ptr;
     MPIR_Context_id_t context_id;
     char *recv_buffer;
     BEGIN_FUNC(FCNAME);
@@ -415,7 +415,7 @@ int ADD_SUFFIX(MPID_nem_ofi_recv_posted)(struct MPIDI_VC *vc, struct MPIR_Reques
         recv_buffer = (char *) rreq->dev.user_buf + dt_true_lb;
     }
     else {
-        recv_buffer = (char *) MPL_malloc(data_sz);
+        recv_buffer = (char *) MPL_malloc(data_sz, MPL_MEM_BUFFER);
         MPIR_ERR_CHKANDJUMP1(recv_buffer == NULL, mpi_errno, MPI_ERR_OTHER,
                              "**nomem", "**nomem %s", "Recv Pack Buffer alloc");
         REQ_OFI(rreq)->pack_buffer = recv_buffer;
@@ -450,7 +450,7 @@ int ADD_SUFFIX(MPID_nem_ofi_recv_posted)(struct MPIDI_VC *vc, struct MPIR_Reques
 
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_anysource_posted)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_anysource_posted)
 void ADD_SUFFIX(MPID_nem_ofi_anysource_posted)(MPIR_Request * rreq)
 {
     int mpi_errno = MPI_SUCCESS;

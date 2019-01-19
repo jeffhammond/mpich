@@ -3,10 +3,10 @@
  * (C) 2016 by Argonne National Laboratory.
  *     See COPYRIGHT in top-level directory.
  */
-#ifndef MPID_PORT_H_
-#define MPID_PORT_H_
+#ifndef MPID_PORT_H_INCLUDED
+#define MPID_PORT_H_INCLUDED
 
-#include "mpl_utlist.h"
+#include "utlist.h"
 
 #ifndef MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS
 
@@ -91,7 +91,7 @@ static inline int MPIDI_CH3I_Port_local_close_vc(MPIDI_VC_t * vc)
 static inline void MPIDI_CH3I_Port_connreq_q_enqueue(MPIDI_CH3I_Port_connreq_q_t * connreq_q,
                                                      MPIDI_CH3I_Port_connreq_t * connreq)
 {
-    MPL_LL_APPEND(connreq_q->head, connreq_q->tail, connreq);
+    LL_APPEND(connreq_q->head, connreq_q->tail, connreq);
     connreq_q->size++;
 }
 
@@ -108,7 +108,7 @@ static inline void MPIDI_CH3I_Port_connreq_q_dequeue(MPIDI_CH3I_Port_connreq_q_t
     if (connreq_q->head != NULL) {
         connreq = connreq_q->head;
 
-        MPL_LL_DELETE(connreq_q->head, connreq_q->tail, connreq);
+        LL_DELETE(connreq_q->head, connreq_q->tail, connreq);
         connreq_q->size--;
     }
 
@@ -122,7 +122,7 @@ static inline void MPIDI_CH3I_Port_connreq_q_dequeue(MPIDI_CH3I_Port_connreq_q_t
 static inline void MPIDI_CH3I_Port_connreq_q_delete(MPIDI_CH3I_Port_connreq_q_t * connreq_q,
                                                     MPIDI_CH3I_Port_connreq_t * connreq)
 {
-    MPL_LL_DELETE(connreq_q->head, connreq_q->tail, connreq);
+    LL_DELETE(connreq_q->head, connreq_q->tail, connreq);
     connreq_q->size--;
 }
 
@@ -197,4 +197,4 @@ static inline int MPIDI_CH3I_Port_issue_conn_ack(MPIDI_VC_t * vc, int ack)
 
 #endif /* MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS */
 
-#endif /* MPID_PORT_H_ */
+#endif /* MPID_PORT_H_INCLUDED */

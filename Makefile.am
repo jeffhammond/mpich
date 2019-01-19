@@ -4,11 +4,12 @@
 #     See COPYRIGHT in top-level directory.
 #
 
-ACLOCAL_AMFLAGS = -I confdb
+ACLOCAL_AMFLAGS = -I confdb -I src/hwloc/config
 
 # automake requires that we initialize variables to something, even just empty,
 # before appending to them with "+="
-AM_CPPFLAGS =
+AM_CFLAGS = @VISIBILITY_CFLAGS@ @HWLOC_EMBEDDED_CFLAGS@
+AM_CPPFLAGS = @HWLOC_EMBEDDED_CPPFLAGS@
 AM_FFLAGS =
 AM_FCFLAGS =
 include_HEADERS =
@@ -48,11 +49,11 @@ pkgconfigdir = @pkgconfigdir@
 # to build src/mpi/errhan/defmsg.h
 errnames_txt_files = 
 
-external_subdirs = @mplsrcdir@ @opasrcdir@
-external_ldflags = @mpllibdir@ @opalibdir@
+external_subdirs = @mplsrcdir@ @opasrcdir@ @zmsrcdir@ @hwlocsrcdir@
+external_ldflags = @mpllibdir@ @opalibdir@ @zmlibdir@ @hwloclibdir@ @netloclibdir@
 external_libs = @WRAPPER_LIBS@
 mpi_convenience_libs =
-pmpi_convenience_libs = @opalib@ @mpllib@
+pmpi_convenience_libs = @opalib@ @mpllib@ @zmlib@ @hwloclib@
 
 # NOTE on our semi-unconventional usage of DIST_SUBDIRS:
 # The automake manual recommends thinking of DIST_SUBDIRS as the list of all
@@ -636,3 +637,11 @@ include $(top_srcdir)/doc/Makefile.mk
 # -local targets
 install-data-local: $(INSTALL_DATA_LOCAL_TARGETS)
 
+
+# sometimes helpful when debugging macros to see the preprocessed output.
+# Also using '-CC' because comments provide useful landmarks
+
+SUFFIXES += .i
+
+.c.i:
+	$(COMPILE) -CC -E -o $@ $<

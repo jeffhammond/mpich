@@ -48,8 +48,7 @@ static HYD_status lsf_get_path(char **path)
         *path = MPL_strdup(HYDT_bsci_info.launcher_exec);
 
     if (*path == NULL) {
-        MPL_env2str("LSF_BINDIR", (const char **) &bin_dir);
-        if (bin_dir) {
+        if (MPL_env2str("LSF_BINDIR", (const char **) &bin_dir) && bin_dir) {
             length = strlen(bin_dir) + 2 + strlen("blaunch");
             HYDU_MALLOC_OR_JUMP(*path, char *, length, status);
             MPL_snprintf(*path, length, "%s/blaunch", bin_dir);
@@ -77,9 +76,8 @@ static HYD_status sge_get_path(char **path)
         *path = MPL_strdup(HYDT_bsci_info.launcher_exec);
 
     if (*path == NULL) {
-        MPL_env2str("SGE_ROOT", (const char **) &sge_root);
-        MPL_env2str("ARC", (const char **) &arc);
-        if (sge_root && arc) {
+        if (MPL_env2str("SGE_ROOT", (const char **) &sge_root) &&
+            MPL_env2str("ARC", (const char **) &arc) && sge_root && arc) {
             length = strlen(sge_root) + strlen("/bin/") + strlen(arc) + 1 + strlen("qrsh") + 1;
             HYDU_MALLOC_OR_JUMP(*path, char *, length, status);
             MPL_snprintf(*path, length, "%s/bin/%s/qrsh", sge_root, arc);
@@ -114,26 +112,20 @@ HYD_status HYDT_bscd_common_launch_procs(char **args, struct HYD_proxy *proxy_li
     if (!strcmp(HYDT_bsci_info.launcher, "ssh")) {
         status = ssh_get_path(&path);
         HYDU_ERR_POP(status, "unable to get path to the ssh executable\n");
-    }
-    else if (!strcmp(HYDT_bsci_info.launcher, "rsh")) {
+    } else if (!strcmp(HYDT_bsci_info.launcher, "rsh")) {
         status = rsh_get_path(&path);
         HYDU_ERR_POP(status, "unable to get path to the rsh executable\n");
-    }
-    else if (!strcmp(HYDT_bsci_info.launcher, "fork")) {
+    } else if (!strcmp(HYDT_bsci_info.launcher, "fork")) {
         /* fork has no separate launcher */
-    }
-    else if (!strcmp(HYDT_bsci_info.launcher, "lsf")) {
+    } else if (!strcmp(HYDT_bsci_info.launcher, "lsf")) {
         status = lsf_get_path(&path);
         HYDU_ERR_POP(status, "unable to get path to the blaunch executable\n");
-    }
-    else if (!strcmp(HYDT_bsci_info.launcher, "sge")) {
+    } else if (!strcmp(HYDT_bsci_info.launcher, "sge")) {
         status = sge_get_path(&path);
         HYDU_ERR_POP(status, "unable to get path to the qrsh executable\n");
-    }
-    else if (!strcmp(HYDT_bsci_info.launcher, "manual")) {
+    } else if (!strcmp(HYDT_bsci_info.launcher, "manual")) {
         /* manual has no separate launcher */
-    }
-    else {
+    } else {
         HYDU_ERR_SETANDJUMP(status, HYD_INTERNAL_ERROR, "bad launcher type %s\n",
                             HYDT_bsci_info.launcher);
     }
@@ -151,17 +143,14 @@ HYD_status HYDT_bscd_common_launch_procs(char **args, struct HYD_proxy *proxy_li
             targs[idx++] = MPL_strdup("-x");
         else    /* default mode is disable X */
             targs[idx++] = MPL_strdup("-x");
-    }
-    else if (!strcmp(HYDT_bsci_info.launcher, "lsf")) {
+    } else if (!strcmp(HYDT_bsci_info.launcher, "lsf")) {
         targs[idx++] = MPL_strdup("-n");
-    }
-    else if (!strcmp(HYDT_bsci_info.launcher, "sge")) {
+    } else if (!strcmp(HYDT_bsci_info.launcher, "sge")) {
         targs[idx++] = MPL_strdup("-inherit");
         targs[idx++] = MPL_strdup("-V");
     }
 
-    MPL_env2str("HYDRA_LAUNCHER_EXTRA_ARGS", (const char **) &extra_arg_list);
-    if (extra_arg_list) {
+    if (MPL_env2str("HYDRA_LAUNCHER_EXTRA_ARGS", (const char **) &extra_arg_list)) {
         extra_arg = strtok(extra_arg_list, " ");
         while (extra_arg) {
             targs[idx++] = MPL_strdup(extra_arg);
@@ -217,8 +206,7 @@ HYD_status HYDT_bscd_common_launch_procs(char **args, struct HYD_proxy *proxy_li
             MPL_free(targs[host_idx]);
         if (proxy->node->user == NULL) {
             targs[host_idx] = MPL_strdup(proxy->node->hostname);
-        }
-        else {
+        } else {
             len = strlen(proxy->node->user) + strlen("@") + strlen(proxy->node->hostname) + 1;
 
             HYDU_MALLOC_OR_JUMP(targs[host_idx], char *, len, status);
@@ -231,8 +219,7 @@ HYD_status HYDT_bscd_common_launch_procs(char **args, struct HYD_proxy *proxy_li
         targs[idx] = HYDU_int_to_str(proxy->proxy_id);
         targs[idx + 1] = NULL;
 
-        status = HYDU_sock_is_local(proxy->node->hostname, &lh);
-        HYDU_ERR_POP(status, "error checking if node is localhost\n");
+        lh = MPL_host_is_local(proxy->node->hostname);
 
         /* If launcher is 'fork', or this is the localhost, use fork
          * to launch the process */
@@ -260,8 +247,7 @@ HYD_status HYDT_bscd_common_launch_procs(char **args, struct HYD_proxy *proxy_li
             }
 
             dummy = NULL;
-        }
-        else {
+        } else {
             offset = 0;
 
             /* We are not launching the executable directly; use the

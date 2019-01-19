@@ -84,8 +84,7 @@ int main(int argc, char *argv[])
                 errs++;
             }
             free(buf);
-        }
-        else if (rank == dest) {
+        } else if (rank == dest) {
             double tstart;
 
             /* Clear the message buffers */
@@ -129,7 +128,6 @@ int main(int argc, char *argv[])
                     errs++;
                 }
             }
-
         }
 
 
@@ -138,6 +136,5 @@ int main(int argc, char *argv[])
     free(msg1);
 
     MTest_Finalize(errs);
-    MPI_Finalize();
-    return 0;
+    return MTestReturnValue(errs);
 }

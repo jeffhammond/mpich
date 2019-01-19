@@ -2,7 +2,7 @@
 # (Tested with -w; 10/5/04)
 # 
 # Find the parse.sub routine.
-my $maintdir = "maint";
+my $maintdir = "./maint";
 my $rootdir  = ".";
 if ( ! -s "maint/parse.sub" ) {
     my $program = $0;
@@ -900,4 +900,3 @@ sub ExpandDir {
 # layer, forcing all routines to document all MPI error classes that they might
 # return (this is like requiring routines to document the exceptions that 
 # they may throw).
-

@@ -70,10 +70,9 @@ C
           call checkdtype( MPI_UINT64_T, "MPI_UINT64_T", ierr )
 C other C99 types
           call checkdtype( MPI_C_BOOL, "MPI_C_BOOL", ierr )
-          call checkdtype( MPI_C_FLOAT_COMPLEX, "MPI_C_FLOAT_COMPLEX",
-     *                     ierr)
-          call checkdtype2( MPI_C_COMPLEX, "MPI_C_COMPLEX", 
-     *                      "MPI_C_FLOAT_COMPLEX", ierr )
+          call checkdtype2( MPI_C_FLOAT_COMPLEX, "MPI_C_COMPLEX",
+     *                      "MPI_C_FLOAT_COMPLEX", ierr)
+          call checkdtype( MPI_C_COMPLEX, "MPI_C_COMPLEX", ierr )
           call checkdtype( MPI_C_DOUBLE_COMPLEX, "MPI_C_DOUBLE_COMPLEX", 
      *                     ierr )
           if (MPI_C_LONG_DOUBLE_COMPLEX .ne. MPI_DATATYPE_NULL) then
@@ -86,7 +85,6 @@ C address/offset types
        endif
 C
        call mtest_finalize( ierr )
-       call MPI_Finalize( ierr )
        end
 C
 C Check name of datatype

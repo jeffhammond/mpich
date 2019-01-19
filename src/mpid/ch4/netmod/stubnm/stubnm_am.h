@@ -8,18 +8,10 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_STUBNM_AM_H_INCLUDED
-#define NETMOD_STUBNM_AM_H_INCLUDED
+#ifndef STUBNM_AM_H_INCLUDED
+#define STUBNM_AM_H_INCLUDED
 
 #include "stubnm_impl.h"
-
-static inline int MPIDI_NM_am_reg_handler(int handler_id,
-                                          MPIDI_NM_am_origin_handler_fn origin_handler_fn,
-                                          MPIDI_NM_am_target_handler_fn target_handler_fn)
-{
-    MPIR_Assert(0);
-    return MPI_SUCCESS;
-}
 
 static inline int MPIDI_NM_am_isend(int rank,
                                     MPIR_Comm * comm,
@@ -27,9 +19,7 @@ static inline int MPIDI_NM_am_isend(int rank,
                                     const void *am_hdr,
                                     size_t am_hdr_sz,
                                     const void *data,
-                                    MPI_Count count,
-                                    MPI_Datatype datatype, MPIR_Request * sreq,
-                                    void *netmod_context)
+                                    MPI_Count count, MPI_Datatype datatype, MPIR_Request * sreq)
 {
     MPIR_Assert(0);
     return MPI_SUCCESS;
@@ -41,9 +31,7 @@ static inline int MPIDI_NM_am_isendv(int rank,
                                      struct iovec *am_hdr,
                                      size_t iov_len,
                                      const void *data,
-                                     MPI_Count count,
-                                     MPI_Datatype datatype,
-                                     MPIR_Request * sreq, void *netmod_context)
+                                     MPI_Count count, MPI_Datatype datatype, MPIR_Request * sreq)
 {
     MPIR_Assert(0);
     return MPI_SUCCESS;
@@ -69,8 +57,7 @@ static inline size_t MPIDI_NM_am_hdr_max_sz(void)
 
 static inline int MPIDI_NM_am_send_hdr(int rank,
                                        MPIR_Comm * comm,
-                                       int handler_id,
-                                       const void *am_hdr, size_t am_hdr_sz, void *netmod_context)
+                                       int handler_id, const void *am_hdr, size_t am_hdr_sz)
 {
     MPIR_Assert(0);
     return MPI_SUCCESS;
@@ -89,4 +76,4 @@ static inline int MPIDI_NM_am_recv(MPIR_Request * req)
     return 0;
 }
 
-#endif /* NETMOD_STUBNM_AM_H_INCLUDED */
+#endif /* STUBNM_AM_H_INCLUDED */

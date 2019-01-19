@@ -28,6 +28,8 @@ char *MPIDI_DBG_parent_str = "?";
 #include "pmi.h"
 #endif
 
+#include "datatype.h"
+
 int MPIDI_Use_pmi2_api = 0;
 
 static int init_pg( int *argc_p, char ***argv_p,
@@ -103,6 +105,7 @@ static int set_eager_threshold(MPIR_Comm *comm_ptr, MPIR_Info *info, void *state
 int MPID_Init(int *argc, char ***argv, int requested, int *provided, 
 	      int *has_args, int *has_env)
 {
+    int pmi_errno;
     int mpi_errno = MPI_SUCCESS;
     int has_parent;
     MPIDI_PG_t * pg=NULL;
@@ -114,6 +117,11 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_INIT);
 
     MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_INIT);
+
+    /* Call any and all MPID_Init type functions */
+    MPIR_Err_init();
+    MPIR_Datatype_init();
+    MPIR_Group_init();
 
     /* initialization routine for ch3u_comm.c */
     mpi_errno = MPIDI_CH3I_Comm_init();
@@ -140,17 +148,22 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     /* Create the string that will cache the last group of failed processes
      * we received from PMI */
 #ifdef USE_PMI2_API
-    MPIDI_failed_procs_string = MPL_malloc(sizeof(char) * PMI2_MAX_VALLEN);
+    MPIDI_failed_procs_string = MPL_malloc(sizeof(char) * PMI2_MAX_VALLEN, MPL_MEM_STRINGS);
 #else
-    PMI_KVS_Get_value_length_max(&val);
-    MPIDI_failed_procs_string = MPL_malloc(sizeof(char) * (val+1));
+    pmi_errno = PMI_KVS_Get_value_length_max(&val);
+    if (pmi_errno != PMI_SUCCESS)
+    {
+        MPIR_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER,
+                             "**pmi_kvs_get_value_length_max",
+                             "**pmi_kvs_get_value_length_max %d", pmi_errno);
+    }
+    MPIDI_failed_procs_string = MPL_malloc(sizeof(char) * (val+1), MPL_MEM_STRINGS);
 #endif
 
     /*
      * Set global process attributes.  These can be overridden by the channel 
      * if necessary.
      */
-    MPIR_Process.attrs.tag_ub = INT_MAX;
     MPIR_Process.attrs.io = MPI_ANY_SOURCE;
 
     /*
@@ -226,6 +239,7 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     comm->rank        = pg_rank;
     comm->remote_size = pg_size;
     comm->local_size  = pg_size;
+    comm->pof2        = MPL_pof2(comm->local_size);
     
     mpi_errno = MPIDI_VCRT_Create(comm->remote_size, &comm->dev.vcrt);
     if (mpi_errno != MPI_SUCCESS)
@@ -251,6 +265,7 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     comm->rank        = 0;
     comm->remote_size = 1;
     comm->local_size  = 1;
+    comm->pof2        = 0;
     
     mpi_errno = MPIDI_VCRT_Create(comm->remote_size, &comm->dev.vcrt);
     if (mpi_errno != MPI_SUCCESS)
@@ -275,6 +290,7 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     comm->rank        = pg_rank;
     comm->remote_size = pg_size;
     comm->local_size  = pg_size;
+    comm->pof2        = MPL_pof2(comm->local_size);
     MPIDI_VCRT_Add_ref( MPIR_Process.comm_world->dev.vcrt );
     comm->dev.vcrt = MPIR_Process.comm_world->dev.vcrt;
     
@@ -296,7 +312,7 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
 	char * parent_port;
 
 	/* FIXME: To allow just the "root" process to 
-	   request the port and then use MPIR_Bcast_intra to 
+	   request the port and then use MPIR_Bcast_intra_auto to
 	   distribute it to the rest of the processes,
 	   we need to perform the Bcast after MPI is
 	   otherwise initialized.  We could do this
@@ -456,7 +472,7 @@ static int init_pg( int *argc, char ***argv,
 #ifdef USE_PMI2_API
         
         /* This memory will be freed by the PG_Destroy if there is an error */
-	pg_id = MPL_malloc(MAX_JOBID_LEN);
+	pg_id = MPL_malloc(MAX_JOBID_LEN, MPL_MEM_STRINGS);
 	if (pg_id == NULL) {
 	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**nomem","**nomem %d",
 				 MAX_JOBID_LEN);
@@ -479,7 +495,7 @@ static int init_pg( int *argc, char ***argv,
 	}
 
 	/* This memory will be freed by the PG_Destroy if there is an error */
-	pg_id = MPL_malloc(pg_id_sz + 1);
+	pg_id = MPL_malloc(pg_id_sz + 1, MPL_MEM_OTHER);
 	if (pg_id == NULL) {
 	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**nomem","**nomem %d",
 				 pg_id_sz+1);
@@ -497,7 +513,7 @@ static int init_pg( int *argc, char ***argv,
     }
     else {
 	/* Create a default pg id */
-	pg_id = MPL_malloc(2);
+	pg_id = MPL_malloc(2, MPL_MEM_OTHER);
 	if (pg_id == NULL) {
 	    MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**nomem");
 	}
@@ -578,7 +594,7 @@ int MPIDI_CH3I_BCInit( char **bc_val_p, int *val_max_sz_p )
     }
 #endif
     /* This memroy is returned by this routine */
-    *bc_val_p = MPL_malloc(*val_max_sz_p);
+    *bc_val_p = MPL_malloc(*val_max_sz_p, MPL_MEM_ADDRESS);
     if (*bc_val_p == NULL) {
 	MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**nomem","**nomem %d",
 			     *val_max_sz_p);

@@ -34,7 +34,6 @@ static void signal_cb(int signum)
             HYDU_dump(stderr, "No checkpoint prefix provided\n");
             return;
         }
-
 #if HAVE_ALARM
         if (HYD_ui_mpich_info.ckpoint_int != -1)
             alarm(HYD_ui_mpich_info.ckpoint_int);
@@ -174,8 +173,7 @@ int main(int argc, char **argv)
         /* If we already have a host list at this point, it must have
          * come from the user */
         user_provided_host_list = 1;
-    }
-    else {
+    } else {
         /* Node list is not created yet. The user might not have
          * provided the host file. Query the RMK. */
         status = HYDT_bsci_query_node_list(&HYD_server_info.node_list);
@@ -253,9 +251,13 @@ int main(int argc, char **argv)
 
     /* If the number of processes is not given, we allocate all the
      * available nodes to each executable */
+    /* NOTE:
+     *   user may accidently give on command line -np 0, or even -np -1,
+     *   these cases will all be treated as if it is being ignored.
+     */
     HYD_server_info.pg_list.pg_process_count = 0;
     for (exec = HYD_uii_mpx_exec_list; exec; exec = exec->next) {
-        if (exec->proc_count == -1) {
+        if (exec->proc_count <= 0) {
             global_core_count = 0;
             for (node = HYD_server_info.node_list, i = 0; node; node = node->next, i++)
                 global_core_count += node->core_count;
@@ -280,15 +282,9 @@ int main(int argc, char **argv)
      * the list of nodes passed to us */
     if (HYD_server_info.localhost == NULL) {
         /* See if the node list contains a localhost */
-        for (node = HYD_server_info.node_list; node; node = node->next) {
-            int is_local;
-
-            status = HYDU_sock_is_local(node->hostname, &is_local);
-            HYDU_ERR_POP(status, "unable to check if %s is local\n", node->hostname);
-
-            if (is_local)
+        for (node = HYD_server_info.node_list; node; node = node->next)
+            if (MPL_host_is_local(node->hostname))
                 break;
-        }
 
         if (node)
             HYD_server_info.localhost = MPL_strdup(node->hostname);
@@ -399,14 +395,11 @@ int main(int argc, char **argv)
         printf("This typically refers to a problem with your application.\n");
         printf("Please see the FAQ page for debugging suggestions\n");
         return exit_status;
-    }
-    else if (WIFEXITED(exit_status)) {
+    } else if (WIFEXITED(exit_status)) {
         return WEXITSTATUS(exit_status);
-    }
-    else if (WIFSTOPPED(exit_status)) {
+    } else if (WIFSTOPPED(exit_status)) {
         return WSTOPSIG(exit_status);
-    }
-    else {
+    } else {
         return exit_status;
     }
 

@@ -17,6 +17,8 @@ dnl must come before LT_INIT, which AC_REQUIREs AC_PROG_CC
 PAC_PROG_CC
 AM_PROG_CC_C_O
 
+AC_USE_SYSTEM_EXTENSIONS
+
 AM_PROG_AR
 
 LT_PREREQ([2.2.6])
@@ -52,6 +54,7 @@ AC_C_INLINE
 
 PAC_C_MACRO_VA_ARGS
 PAC_C_BUILTIN_EXPECT
+PAC_C_STATIC_ASSERT
 
 AC_ARG_ENABLE(embedded,
     AC_HELP_STRING([--enable-embedded], [Build MPL in embedded mode (default is no)]),
@@ -125,10 +128,11 @@ if test "$pac_cv_have___typeof" = "yes" ; then
 fi
 
 dnl Check if the necessary headers are available
-AC_CHECK_HEADERS(stdio.h stdlib.h string.h stdarg.h ctype.h sys/types.h sys/uio.h execinfo.h backtrace.h libunwind.h unistd.h errno.h windows.h)
+AC_CHECK_HEADERS(stdio.h stdlib.h string.h stdarg.h ctype.h sys/types.h sys/uio.h execinfo.h unistd.h errno.h windows.h sys/mman.h)
 
 # A C99 compliant compiler should have inttypes.h for fixed-size int types
 AC_CHECK_HEADERS(inttypes.h stdint.h)
+AC_HEADER_STDBOOL
 
 #######################################################################
 # valgrind support
@@ -234,11 +238,13 @@ dnl    Unix    gettimeofday (one of two versions)
 dnl
 dnl Also available are various hardware time stamps
 dnl    Linux-x86 cycle counter
+dnl    Powerpc-64bit timebase cycle counter
 dnl
 dnl We also allow --enable-timer-type=name to select a timer type
 AC_ARG_ENABLE(timer-type,
 [  --enable-timer-type=name - Select the timer to use for MPI_Wtime and
                              internal timestamps.
+        ppc64_cycle        - Powerpc-64bit; returns cycle counts using timebase register
         gethrtime          - Solaris timer (Solaris systems only)
         clock_gettime      - Posix timer (where available)
         gettimeofday       - Most Unix systems
@@ -256,7 +262,7 @@ AC_ARG_ENABLE(timer-type,
 
 ## The user did not specify a timer type.  Try to find a sane option
 ## that is supported by the platform.
-if test -z "$timer_type" ; then 
+if test -z "$timer_type" ; then
     # Try to pick a timer based on what is available
     AC_CHECK_FUNCS(clock_gettime clock_getres gethrtime mach_absolute_time gettimeofday)
     if test "$ac_cv_func_gethrtime" = "yes" ; then
@@ -273,8 +279,14 @@ pac_cv_hrtime_works=yes,pac_cv_hrtime_works=no)])
 	# hrtime_t to int64_t works, and even more ambitious
 	# would check whether long or long long was 64 bits (or even
 	# better, the sizeof hrtime_t).  
+
+        # AC_CHECK_FUNCS has false positive when checking whether gethrtime is
+        # available on Solaris with strict configuration. We must use
+        # AC_CHECK_DECL to confirm it.
+        AC_CHECK_DECL(gethrtime)
     fi
     if test "$ac_cv_func_gethrtime" = "yes" -a \
+            "$ac_cv_has_decl_gethrtime" = "yes" -a \
             "$pac_cv_hrtime_works" = "yes" ; then
         timer_type=gethrtime
     elif test "$ac_cv_func_clock_gettime" = "yes" -a \
@@ -498,6 +510,21 @@ pac_cv_ia64_cycle,[
     MPL_TIMER_TYPE="void *"
     ;;
 
+    ppc64_cycle)
+    AC_CACHE_CHECK([that ppc64 timebase cycle counter is available],
+                pac_cv_ppc64_cycle,[
+    AC_TRY_COMPILE([
+    ],[
+        unsigned temp;
+        asm volatile ("mfspr %0,%1" : "=r" (temp)        : "i" (0x10D));
+    ],pac_cv_ppc64_cycle=yes,
+    pac_cv_ppc64_cycle=no)
+    ])
+    if test "$pac_cv_ppc64_cycle" != "yes" ; then
+        AC_MSG_ERROR([The PPC64 cycle counter is not available on this system and or with the $CC compiler])
+    fi
+    MPL_TIMER_TYPE="uint64_t"
+    ;;
     *)
     AC_MSG_ERROR([Invalid timer type $timer_type])
     ;;
@@ -508,6 +535,7 @@ timer_type=`echo $timer_type | \
 MPL_TIMER_KIND=MPL_TIMER_KIND__$timer_type
 AC_SUBST(MPL_TIMER_KIND)
 AC_SUBST(MPL_TIMER_TYPE)
+AC_MSG_NOTICE([Timer type selected is $timer_type])
 
 #######################################################################
 ## END OF TIMER CODE
@@ -587,11 +615,15 @@ AS_CASE([$enable_yield],
 #######################################################################
 ## START OF THREADS CODE
 #######################################################################
+PAC_SET_HEADER_LIB_PATH(uti)
+
 AC_ARG_WITH([thread-package],
 [  --with-thread-package=package     Thread package to use. Supported thread packages include:
         posix or pthreads - POSIX threads (default, if required)
         solaris - Solaris threads (Solaris OS only)
+        abt or argobots - Argobots threads
         win - windows threads
+        uti - POSIX threads plus Utility Thread Offloading library
         none - no threads
 ],,with_thread_package=posix)
 
@@ -609,8 +641,10 @@ fi
 
 THREAD_PACKAGE_NAME=MPL_THREAD_PACKAGE_INVALID
 case $with_thread_package in
-    posix|pthreads)
-	with_thread_package=posix
+    posix|pthreads|uti)
+	if test "${with_thread_package}" = "pthreads" ; then
+	    with_thread_package=posix
+	fi
 	AC_CHECK_HEADERS(pthread.h)
 
         # If pthreads library is found, just include it on the link line. We don't try
@@ -654,31 +688,18 @@ void f1(void *a) { return; }],
 
         fi
 
-        # Check for PTHREAD_MUTEX_ERRORCHECK_NP and PTHREAD_MUTEX_ERRORCHECK
-        AC_CACHE_CHECK([whether pthread.h defines PTHREAD_MUTEX_ERRORCHECK_NP],
-        pac_cv_has_pthread_mutex_errorcheck_np,[
-        AC_TRY_COMPILE([#include <pthread.h>],
-                       [int a=PTHREAD_MUTEX_ERRORCHECK_NP;],
-                       pac_cv_has_pthread_mutex_errorcheck_np=yes,
-                       pac_cv_has_pthread_mutex_errorcheck_np=no)])
-        AC_CACHE_CHECK([whether pthread.h defines PTHREAD_MUTEX_ERRORCHECK],
-        pac_cv_has_pthread_mutex_errorcheck,[
-        AC_TRY_COMPILE([#include <pthread.h>],
-                       [int a=PTHREAD_MUTEX_ERRORCHECK;],
-                       pac_cv_has_pthread_mutex_errorcheck=yes,
-                       pac_cv_has_pthread_mutex_errorcheck=no)])
-
-        if test "$pac_cv_has_pthread_mutex_errorcheck" = yes ; then
-            AC_DEFINE(PTHREAD_MUTEX_ERRORCHECK_VALUE,PTHREAD_MUTEX_ERRORCHECK,
-                      [Define to an expression that will result in an error checking mutex type.])
-        elif test "$pac_cv_has_pthread_mutex_errorcheck_np" = yes ; then
-            AC_DEFINE(PTHREAD_MUTEX_ERRORCHECK_VALUE,PTHREAD_MUTEX_ERRORCHECK_NP,
-                      [Define to an expression that will result in an error checking mutex type.])
-        fi
-
-	PAC_FUNC_NEEDS_DECL([#include <pthread.h>],pthread_mutexattr_settype)
-
-        THREAD_PACKAGE_NAME=MPL_THREAD_PACKAGE_POSIX
+	if test "${with_thread_package}" = "uti" ; then
+	    PAC_CHECK_HEADER_LIB(uti.h,uti,uti_attr_init,have_uti=yes,have_uti=no)
+	    if test "${have_uti}" = "yes" ; then
+		AC_MSG_NOTICE([Using POSIX and Utility Thread Offloading library for thread package])
+	    else
+		AC_MSG_ERROR([Unable to find Utility Thread Offloading library])
+	    fi
+	    THREAD_PACKAGE_NAME=MPL_THREAD_PACKAGE_UTI
+	else
+	    AC_MSG_NOTICE([POSIX will be used for thread package.])
+	    THREAD_PACKAGE_NAME=MPL_THREAD_PACKAGE_POSIX
+	fi
 	;;
     solaris)
 	AC_CHECK_HEADERS(thread.h)
@@ -695,6 +716,18 @@ void f1(void *a) { return; }],
         THREAD_PACKAGE_NAME=MPL_THREAD_PACKAGE_WIN
         AC_MSG_ERROR([The 'win' thread package is not supported via autoconf builds at this time.])
         ;;
+    abt|argobots)
+        with_thread_package=argobots
+        AC_CHECK_HEADERS(abt.h)
+        AC_CHECK_LIB([abt],[abt_key_create],have_abt=yes)
+        if test "$have_abt" = "yes"; then
+           PAC_PREPEND_FLAG([-labt],[LIBS])
+        fi
+        AC_CHECK_FUNCS(ABT_thread_yield)
+        AC_CHECK_FUNC([abt_key_create],[],[AC_MSG_ERROR([unable to find Argobots library])])
+        AC_CHECK_FUNCS(abt_cleanup_push)
+        THREAD_PACKAGE_NAME=MPL_THREAD_PACKAGE_ARGOBOTS
+        ;;
     no|none)
 	with_thread_package=none
         THREAD_PACKAGE_NAME=MPL_THREAD_PACKAGE_NONE
@@ -709,12 +742,110 @@ esac
 AC_DEFINE_UNQUOTED([THREAD_PACKAGE_NAME],[$THREAD_PACKAGE_NAME],[set to the name of the thread package])
 
 # check for compiler-support for thread-local storage (MPL_TLS_SPECIFIER)
-AX_TLS
+if test "${with_thread_package}" != "argobots" ; then
+    AX_TLS
+fi
 
 #######################################################################
 ## END OF THREADS CODE
 #######################################################################
 
+#######################################################################
+## START OF PROCESS MUTEX CODE
+#######################################################################
+
+AC_ARG_WITH([proc-mutex-package],
+[  --with-proc-mutex-package=package     Interprocess mutex package to use. Supported packages include:
+        posix or pthreads - POSIX threads (default, if required)
+        none - no interprocess mutex support
+],,with_proc_mutex_package=posix)
+
+if test "${with_proc_mutex_package}" = "no" ; then
+   with_proc_mutex_package=none
+fi
+if test "${with_proc_mutex_package}" = "yes" ; then
+   with_proc_mutex_package=posix
+fi
+
+PROC_MUTEX_PACKAGE_NAME=MPL_PROC_MUTEX_PACKAGE_INVALID
+case $with_proc_mutex_package in
+  posix|pthreads)
+    if test "${with_proc_mutex_package}" = "pthreads" ; then
+        with_proc_mutex_package=posix
+    fi
+
+    # Do not prepend -lpthread again if already checked by thread package
+    if test "${with_thread_package}" != "posix" ; then
+        AC_CHECK_HEADERS(pthread.h)
+
+        # If pthreads library is found, just include it on the link line. We don't try
+        # to test if the C compiler needs it or not, since the C++ or Fortran
+        # compilers might need it even if the C compiler doesn't
+        # (nvcc with gfortran, for example).
+        AC_CHECK_LIB([pthread],[pthread_mutex_init],have_pthreads=yes)
+        if test "$have_pthreads" = "yes" ; then
+           PAC_PREPEND_FLAG([-lpthread],[LIBS])
+        fi
+    fi
+
+    # this check should come after the AC_CHECK_LIB for -lpthread
+    AC_CHECK_FUNC([pthread_mutex_init],[],[AC_MSG_ERROR([unable to find pthreads library])])
+    # pthread_mutexattr_setpshared is first released in Issue 5
+    AC_CHECK_FUNCS(pthread_mutexattr_setpshared)
+    if test "$ac_cv_func_pthread_mutexattr_setpshared" = "no" ; then
+      AC_DEFINE(HAVE_PTHREAD_MUTEXATTR_SETPSHARED,1, [Define if pthread_mutexattr_setpshared is available.])
+    fi
+
+    AC_MSG_NOTICE([POSIX will be used for interprocess mutex package.])
+    PROC_MUTEX_PACKAGE_NAME=MPL_PROC_MUTEX_PACKAGE_POSIX
+  ;;
+  no|none)
+    with_proc_mutex_package=none
+    PROC_MUTEX_PACKAGE_NAME=MPL_PROC_MUTEX_PACKAGE_NONE
+  ;;
+  *)
+    AC_MSG_ERROR([The specified interprocess mutex package, $with_proc_mutex_package, is not supported.])
+  ;;
+esac
+
+# Define and export the selected interprocess mutex package so that other packages
+# know what's used in MPL
+AC_DEFINE_UNQUOTED([PROC_MUTEX_PACKAGE_NAME],[$PROC_MUTEX_PACKAGE_NAME],[set to the name of the interprocess mutex package])
+#######################################################################
+## END OF PROCESS MUTEX CODE
+#######################################################################
+
+#######################################################################
+## START OF PTHREAD MUTEX COMMON CHECK
+#######################################################################
+if test "${with_thread_package}" = "pthreads" -o "${with_proc_mutex_package}" = "pthreads"; then
+  # Check for PTHREAD_MUTEX_ERRORCHECK_NP and PTHREAD_MUTEX_ERRORCHECK
+  AC_CACHE_CHECK([whether pthread.h defines PTHREAD_MUTEX_ERRORCHECK_NP],
+  pac_cv_has_pthread_mutex_errorcheck_np,[
+  AC_TRY_COMPILE([#include <pthread.h>],
+                 [int a=PTHREAD_MUTEX_ERRORCHECK_NP;],
+                 pac_cv_has_pthread_mutex_errorcheck_np=yes,
+                 pac_cv_has_pthread_mutex_errorcheck_np=no)])
+  AC_CACHE_CHECK([whether pthread.h defines PTHREAD_MUTEX_ERRORCHECK],
+  pac_cv_has_pthread_mutex_errorcheck,[
+  AC_TRY_COMPILE([#include <pthread.h>],
+                 [int a=PTHREAD_MUTEX_ERRORCHECK;],
+                 pac_cv_has_pthread_mutex_errorcheck=yes,
+                 pac_cv_has_pthread_mutex_errorcheck=no)])
+
+  if test "$pac_cv_has_pthread_mutex_errorcheck" = yes ; then
+      AC_DEFINE(PTHREAD_MUTEX_ERRORCHECK_VALUE,PTHREAD_MUTEX_ERRORCHECK_NPRRORCHECK,
+                [Define to an expression that will result in an error checking mutex type.])
+  elif test "$pac_cv_has_pthread_mutex_errorcheck_np" = yes ; then
+      AC_DEFINE(PTHREAD_MUTEX_ERRORCHECK_VALUE,PTHREAD_MUTEX_ERRORCHECK_NP,
+                [Define to an expression that will result in an error checking mutex type.])
+  fi
+
+  PAC_FUNC_NEEDS_DECL([#include <pthread.h>],pthread_mutexattr_settype)
+fi
+#######################################################################
+## END OF PTHREAD MUTEX COMMON CHECK
+#######################################################################
 
 #######################################################################
 ## START OF DBG CODE
@@ -815,14 +946,74 @@ if test "$ac_cv_func_usleep" = "yes" ; then
     PAC_FUNC_NEEDS_DECL([#include <unistd.h>],usleep)
 fi
 
-AC_CHECK_FUNCS(backtrace_symbols)
-AC_CHECK_LIB(backtrace, backtrace_create_state)
-AC_CHECK_LIB(unwind, unw_backtrace)
+# Check if we can implement MPL_aligned_alloc
+AC_CHECK_FUNCS(posix_memalign)
+AC_CHECK_FUNCS(aligned_alloc)
+if test "$ac_cv_func_aligned_alloc" = "yes" ; then
+    PAC_FUNC_NEEDS_DECL([#include <stdlib.h>],aligned_alloc)
+fi
+if test "$ac_cv_func_posix_memalign" = "yes" -o "$ac_cv_func_aligned_alloc" = "yes"; then
+   AC_DEFINE([DEFINE_ALIGNED_ALLOC],[1],[Define to 1 if MPL enables MPL_aligned_alloc.])
+fi
 
+AC_CHECK_FUNCS(backtrace_symbols)
+
+# Check for libbacktrace support
+PAC_PUSH_FLAG([LIBS])
+PAC_PREPEND_FLAG([-lbacktrace],[LIBS])
+AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([
+#include <backtrace.h>
+],[
+backtrace_create_state(0, 0, 0, 0);
+backtrace_print(0, 0, 0);
+])],
+    [ac_cv_lib_backtrace=yes],
+    [ac_cv_lib_backtrace=no]
+)
+PAC_POP_FLAG([LIBS])
+
+if test "$ac_cv_lib_backtrace" = "yes" ; then
+    AC_DEFINE([HAVE_LIBBACKTRACE],[1],[Define to 1 if you have the backtrace header (backtrace.h) and library (-lbacktrace)])
+    PAC_PREPEND_FLAG([-lbacktrace],[LIBS])
+fi
 AC_CHECK_DECLS([backtrace_create_state, backtrace_print])
+
+# Check for libunwind support
+PAC_PUSH_FLAG([LIBS])
+PAC_PREPEND_FLAG([-lunwind],[LIBS])
+AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([
+#include<libunwind.h>
+],[
+unw_backtrace(0, 0);
+])],
+    [ac_cv_lib_libunwind=yes],
+    [ac_cv_lib_libunwind=no]
+)
+PAC_POP_FLAG([LIBS])
+
+if test "$ac_cv_lib_libunwind" = "yes" ; then
+    AC_DEFINE([HAVE_LIBUNWIND],[1],[Define to 1 if you have the libunwind header (libunwind.h) and library (-lunwind)])
+    PAC_PREPEND_FLAG([-lunwind],[LIBS])
+fi
+
+AX_LIB_SOCKET_NSL
+AC_CHECK_HEADERS(ifaddrs.h arpa/inet.h)
+AC_CHECK_FUNCS(inet_ntop getifaddrs)
 
 dnl Check for ATTRIBUTE
 PAC_C_GNU_ATTRIBUTE
+AX_GCC_VAR_ATTRIBUTE(aligned)
+AX_GCC_VAR_ATTRIBUTE(used)
+
+dnl Check for fallthrough attribute
+PAC_PUSH_ALL_FLAGS
+dnl This check requires removing -Wall and -Wextra first or it will fail. Just
+dnl clear them all.
+CFLAGS=""
+AX_GCC_FUNC_ATTRIBUTE(fallthrough)
+PAC_POP_ALL_FLAGS
 
 dnl Final output
 AC_CONFIG_FILES([Makefile localdefs include/mpl_timer.h])

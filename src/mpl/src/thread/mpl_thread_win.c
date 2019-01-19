@@ -41,7 +41,8 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * idp
     struct MPLI_thread_info *thread_info;
     int err = MPL_THREAD_SUCCESS;
 
-    thread_info = (struct MPLI_thread_info *) MPL_malloc(sizeof(struct MPLI_thread_info));
+    thread_info =
+        (struct MPLI_thread_info *) MPL_malloc(sizeof(struct MPLI_thread_info), MPL_MEM_THREAD);
     if (thread_info != NULL) {
         thread_info->func = func;
         thread_info->data = data;
@@ -49,8 +50,7 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * idp
         if (*idp == NULL) {
             err = GetLastError();
         }
-    }
-    else {
+    } else {
         err = 1000000000;
     }
 
@@ -109,8 +109,7 @@ void MPL_thread_mutex_create(MPL_thread_mutex_t * mutex, int *err)
     if (err != NULL) {
         if (*mutex == NULL) {
             *err = GetLastError();
-        }
-        else {
+        } else {
             *err = MPL_THREAD_SUCCESS;
         }
     }
@@ -124,14 +123,13 @@ void MPL_thread_mutex_destroy(MPL_thread_mutex_t * mutex, int *err)
     if (err != NULL) {
         if (result) {
             *err = MPL_THREAD_SUCCESS;
-        }
-        else {
+        } else {
             *err = GetLastError();
         }
     }
 }
 
-void MPL_thread_mutex_lock(MPL_thread_mutex_t * mutex, int *err)
+void MPL_thread_mutex_lock(MPL_thread_mutex_t * mutex, int *err, int prio __attribute__ ((unused)))
 {
     DWORD result;
 
@@ -139,12 +137,10 @@ void MPL_thread_mutex_lock(MPL_thread_mutex_t * mutex, int *err)
     if (err != NULL) {
         if (result == WAIT_OBJECT_0) {
             *err = MPL_THREAD_SUCCESS;
-        }
-        else {
+        } else {
             if (result == WAIT_FAILED) {
                 *err = GetLastError();
-            }
-            else {
+            } else {
                 *err = result;
             }
         }
@@ -159,8 +155,7 @@ void MPL_thread_mutex_unlock(MPL_thread_mutex_t * mutex, int *err)
     if (err != NULL) {
         if (result) {
             *err = MPL_THREAD_SUCCESS;
-        }
-        else {
+        } else {
             *err = GetLastError();
         }
     }
@@ -234,17 +229,19 @@ void MPL_thread_cond_wait(MPL_thread_cond_t * cond, MPL_thread_mutex_t * mutex, 
             return;
         }
     }
-    MPL_thread_mutex_lock(&cond->fifo_mutex, err);
+    MPL_thread_mutex_lock(&cond->fifo_mutex, err, MPL_THREAD_PRIO_HIGH);
     if (err != NULL && *err != MPL_THREAD_SUCCESS) {
         return;
     }
     if (cond->fifo_tail == NULL) {
-        cond->fifo_tail = (MPLI_win_thread_cond_fifo_t *) MPL_malloc(sizeof(MPLI_win_thread_cond_fifo_t));
+        cond->fifo_tail =
+            (MPLI_win_thread_cond_fifo_t *) MPL_malloc(sizeof(MPLI_win_thread_cond_fifo_t),
+                                                       MPL_MEM_THREAD);
         cond->fifo_head = cond->fifo_tail;
-    }
-    else {
+    } else {
         cond->fifo_tail->next =
-            (MPLI_win_thread_cond_fifo_t *) MPL_malloc(sizeof(MPLI_win_thread_cond_fifo_t));
+            (MPLI_win_thread_cond_fifo_t *) MPL_malloc(sizeof(MPLI_win_thread_cond_fifo_t),
+                                                       MPL_MEM_THREAD);
         cond->fifo_tail = cond->fifo_tail->next;
     }
     if (cond->fifo_tail == NULL) {
@@ -268,8 +265,7 @@ void MPL_thread_cond_wait(MPL_thread_cond_t * cond, MPL_thread_mutex_t * mutex, 
         if (result != WAIT_OBJECT_0) {
             if (result == WAIT_FAILED) {
                 *err = GetLastError();
-            }
-            else {
+            } else {
                 *err = result;
             }
             return;
@@ -280,7 +276,7 @@ void MPL_thread_cond_wait(MPL_thread_cond_t * cond, MPL_thread_mutex_t * mutex, 
         *err = GetLastError();
         return;
     }
-    MPL_thread_mutex_lock(mutex, err);
+    MPL_thread_mutex_lock(mutex, err, MPL_THREAD_PRIO_HIGH);
     /*
      * if (err != NULL)
      * {
@@ -292,7 +288,7 @@ void MPL_thread_cond_wait(MPL_thread_cond_t * cond, MPL_thread_mutex_t * mutex, 
 void MPL_thread_cond_broadcast(MPL_thread_cond_t * cond, int *err)
 {
     MPLI_win_thread_cond_fifo_t *fifo, *temp;
-    MPL_thread_mutex_lock(&cond->fifo_mutex, err);
+    MPL_thread_mutex_lock(&cond->fifo_mutex, err, MPL_THREAD_PRIO_HIGH);
     if (err != NULL && *err != MPL_THREAD_SUCCESS) {
         return;
     }
@@ -322,7 +318,7 @@ void MPL_thread_cond_broadcast(MPL_thread_cond_t * cond, int *err)
 void MPL_thread_cond_signal(MPL_thread_cond_t * cond, int *err)
 {
     MPLI_win_thread_cond_fifo_t *fifo;
-    MPL_thread_mutex_lock(&cond->fifo_mutex, err);
+    MPL_thread_mutex_lock(&cond->fifo_mutex, err, MPL_THREAD_PRIO_HIGH);
     if (err != NULL && *err != MPL_THREAD_SUCCESS) {
         return;
     }

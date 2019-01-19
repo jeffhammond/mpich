@@ -7,7 +7,7 @@
 /* FIXME: This header should contain only the definitions exported to the
    mpiimpl.h level */
 
-#if !defined(MPIDPRE_H_INCLUDED)
+#ifndef MPIDPRE_H_INCLUDED
 #define MPIDPRE_H_INCLUDED
 
 /* Tell the compiler that we're going to declare struct MPIR_Request later */
@@ -17,7 +17,17 @@ struct MPIR_Request;
 #include <sys/types.h>
 #endif
 
-#include "mpid_datatype_fallback.h"
+#ifdef HAVE_LIBHCOLL
+#include "hcoll/api/hcoll_dte.h"
+#endif
+
+typedef struct {
+#ifdef HAVE_LIBHCOLL
+    hcoll_datatype_t hcoll_datatype;
+#endif
+    int foo; /* Shut up the compiler */
+} MPIDI_Devdt_t;
+#define MPID_DEV_DATATYPE_DECL   MPIDI_Devdt_t   dev;
 
 /* FIXME: Include here? */
 #include "opa_primitives.h"
@@ -36,7 +46,8 @@ struct MPIR_Request;
 
 /* PktHandler function:
    vc  (INPUT) -- vc on which the packet was received
-   pkt (INPUT) -- pointer to packet header at beginning of receive buffer
+   pkt (INPUT) -- pointer to packet header (aligned access).
+   data (INPUT) -- pointer to beginning of data
    buflen (I/O) -- IN: number of bytes received into receive buffer
                    OUT: number of bytes processed by the handler function
    req (OUTPUT) -- NULL, if the whole message has been processed by the handler
@@ -45,7 +56,7 @@ struct MPIR_Request;
                    message should be received.
    (This decl needs to come before mpidi_ch3_pre.h)
 */
-typedef int MPIDI_CH3_PktHandler_Fcn(struct MPIDI_VC *vc, union MPIDI_CH3_Pkt *pkt,
+typedef int MPIDI_CH3_PktHandler_Fcn(struct MPIDI_VC *vc, union MPIDI_CH3_Pkt *pkt, void *data,
 				     intptr_t *buflen, struct MPIR_Request **req );
 
 /* Include definitions from the channel which must exist before items in this 
@@ -75,12 +86,6 @@ typedef int16_t MPIDI_Rank_t;
 #elif CH3_RANK_BITS == 32
 typedef int32_t MPIDI_Rank_t;
 #endif /* CH3_RANK_BITS */
-
-/* Indicates that this device is topology aware and implements the
-   MPID_Get_node_id function (and friends). */
-#define MPID_USE_NODE_IDS
-typedef MPIDI_Rank_t MPID_Node_id_t;
-
 
 /* For the typical communication system for which the ch3 channel is
    appropriate, 16 bits is sufficient for the rank.  By also using 16
@@ -291,9 +296,10 @@ struct MPIDI_Win_info_args {
     int no_locks;               /* valid flavor = all */
     int accumulate_ordering;
     int accumulate_ops;
-    int same_size;              /* valid flavor = allocate */
-    int alloc_shared_noncontig; /* valid flavor = allocate shared */
-    int alloc_shm;              /* valid flavor = allocate */
+    int same_size;
+    int same_disp_unit;
+    int alloc_shared_noncontig;
+    int alloc_shm;
 };
 
 struct MPIDI_RMA_op;            /* forward decl from mpidrma.h */
@@ -379,13 +385,14 @@ typedef struct MPIDI_Request {
 
     /* segment, segment_first, and segment_size are used when processing 
        non-contiguous datatypes */
-    /*    MPIDU_Segment   segment; */
-    struct MPIDU_Segment *segment_ptr;
+    /*    MPIR_Segment   segment; */
+    struct MPIR_Segment *segment_ptr;
     intptr_t segment_first;
     intptr_t segment_size;
+    intptr_t orig_segment_first;
 
     /* Pointer to datatype for reference counting purposes */
-    struct MPIDU_Datatype* datatype_ptr;
+    struct MPIR_Datatype* datatype_ptr;
 
     /* iov and iov_count define the data to be transferred/received.  
        iov_offset points to the current head element in the IOV */
@@ -464,6 +471,30 @@ typedef struct MPIDI_Request {
        a fixed spot in the request? */
     MPIDI_CH3_Pkt_t pending_pkt;
 
+    /* Notes about request_completed_cb:
+     *
+     *   1. The callback function is triggered when this requests
+     *      completion count reaches 0.
+     *
+     *   2. The callback function should be nonblocking.
+     *
+     *   3. The callback function should not poke the progress engine,
+     *      or call any function that pokes the progress engine.
+     *
+     *   4. The callback function can complete other requests, thus
+     *      calling those requests' callback functions.  However, the
+     *      recursion depth of request completion function is limited.
+     *      If we ever need deeper recurisve calls, we need to change
+     *      to an iterative design instead of a recursive design for
+     *      request completion.
+     *
+     *   5. In multithreaded programs, since the callback function is
+     *      nonblocking and never calls the progress engine, it would
+     *      never yield the lock to other threads.  So the recursion
+     *      should be multithreading-safe.
+     */
+    int (*request_completed_cb)(struct MPIR_Request *);
+
     /* partner send request when a receive request is created by the
      * sender (only used for self send) */
     struct MPIR_Request * partner_request;
@@ -501,7 +532,9 @@ typedef struct {
 #endif
 } MPID_Progress_state;
 
-#define MPID_DEV_GPID_DECL int gpid[2];
+typedef struct {
+    int gpid[2];
+} MPIDI_Gpid;
 
 /* Tell initthread to prepare a private comm_world */
 #define MPID_NEEDS_ICOMM_WORLD
@@ -512,6 +545,7 @@ int MPID_Init( int *argc_p, char ***argv_p, int requested,
 int MPID_InitCompleted( void );
 
 int MPID_Finalize(void);
+#define MPID_CS_finalize() do {} while (0)
 int MPID_Abort( MPIR_Comm *comm, int mpi_errno, int exit_code, const char *error_msg );
 
 int MPID_Open_port(MPIR_Info *, char *);
@@ -601,14 +635,10 @@ int MPID_Imrecv(void *buf, int count, MPI_Datatype datatype,
                 MPIR_Request *message, MPIR_Request **rreqp);
 
 int MPID_Mrecv(void *buf, int count, MPI_Datatype datatype,
-               MPIR_Request *message, MPI_Status *status);
+               MPIR_Request *message, MPI_Status *status, MPIR_Request **rreq);
 
 int MPID_Cancel_send(MPIR_Request *);
 int MPID_Cancel_recv(MPIR_Request *);
-
-int MPID_Comm_AS_enabled(MPIR_Comm *);
-
-int MPID_Request_is_anysource(MPIR_Request *);
 
 MPI_Aint MPID_Aint_add(MPI_Aint base, MPI_Aint disp);
 
@@ -686,15 +716,15 @@ int MPID_Win_sync(MPIR_Win *win);
 void MPID_Progress_start(MPID_Progress_state * state);
 int MPID_Progress_wait(MPID_Progress_state * state);
 void MPID_Progress_end(MPID_Progress_state * stae);
-int MPID_Progress_test(void);
 int MPID_Progress_poke(void);
 
 int MPID_Get_processor_name( char *name, int namelen, int *resultlen);
 int MPID_Get_universe_size(int  * universe_size);
-int MPID_Comm_get_lpid(MPIR_Comm *comm_ptr, int idx, int * lpid_ptr, MPL_bool is_remote);
+int MPID_Comm_get_lpid(MPIR_Comm *comm_ptr, int idx, int * lpid_ptr, bool is_remote);
 
 void MPID_Request_create_hook(MPIR_Request *);
 void MPID_Request_free_hook(MPIR_Request *);
+void MPID_Request_destroy_hook(MPIR_Request *);
 int MPID_Request_complete(MPIR_Request *);
 
 void *MPID_Alloc_mem( size_t size, MPIR_Info *info );
@@ -702,10 +732,7 @@ int MPID_Free_mem( void *ptr );
 
 /* Prototypes and definitions for the node ID code.  This is used to support
    hierarchical collectives in a (mostly) device-independent way. */
-#if defined(MPID_USE_NODE_IDS)
-/* MPID_Node_id_t is a signed integer type defined by the device in mpidpre.h. */
-int MPID_Get_node_id(MPIR_Comm *comm, int rank, MPID_Node_id_t *id_p);
-int MPID_Get_max_node_id(MPIR_Comm *comm, MPID_Node_id_t *max_id_p);
-#endif
+int MPID_Get_node_id(MPIR_Comm *comm, int rank, int *id_p);
+int MPID_Get_max_node_id(MPIR_Comm *comm, int *max_id_p);
 
-#endif /* !defined(MPIDPRE_H_INCLUDED) */
+#endif /* MPIDPRE_H_INCLUDED */

@@ -57,8 +57,7 @@ int main(int argc, char *argv[])
     if (err) {
         errs++;
         MTestPrintErrorMsg("MPI_LOR and MPI_CHAR", err);
-    }
-    else {
+    } else {
         if (rank == 0) {
             if (!coutbuf[0]) {
                 errs++;
@@ -89,8 +88,7 @@ int main(int argc, char *argv[])
     if (err) {
         errs++;
         MTestPrintErrorMsg("MPI_LOR and MPI_SIGNED_CHAR", err);
-    }
-    else {
+    } else {
         if (rank == 0) {
             if (!scoutbuf[0]) {
                 errs++;
@@ -120,8 +118,7 @@ int main(int argc, char *argv[])
     if (err) {
         errs++;
         MTestPrintErrorMsg("MPI_LOR and MPI_UNSIGNED_CHAR", err);
-    }
-    else {
+    } else {
         if (rank == 0) {
             if (!ucoutbuf[0]) {
                 errs++;
@@ -137,109 +134,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-
-#ifndef USE_STRICT_MPI
-    /* float */
-    MTestPrintfMsg(10, "Reduce of MPI_FLOAT\n");
-    finbuf[0] = 1;
-    finbuf[1] = 0;
-    finbuf[2] = (rank > 0);
-
-    foutbuf[0] = 0;
-    foutbuf[1] = 1;
-    foutbuf[2] = 1;
-    err = MPI_Reduce(finbuf, foutbuf, 3, MPI_FLOAT, MPI_LOR, 0, comm);
-    if (err) {
-        errs++;
-        MTestPrintErrorMsg("MPI_LOR and MPI_FLOAT", err);
-    }
-    else {
-        if (rank == 0) {
-            if (!foutbuf[0]) {
-                errs++;
-                fprintf(stderr, "float OR(1) test failed\n");
-            }
-            if (foutbuf[1]) {
-                errs++;
-                fprintf(stderr, "float OR(0) test failed\n");
-            }
-            if (!foutbuf[2] && size > 1) {
-                errs++;
-                fprintf(stderr, "float OR(>) test failed\n");
-            }
-        }
-    }
-
-    /* double */
-    MTestPrintfMsg(10, "Reduce of MPI_DOUBLE\n");
-    dinbuf[0] = 1;
-    dinbuf[1] = 0;
-    dinbuf[2] = (rank > 0);
-
-    doutbuf[0] = 0;
-    doutbuf[1] = 1;
-    doutbuf[2] = 1;
-    err = MPI_Reduce(dinbuf, doutbuf, 3, MPI_DOUBLE, MPI_LOR, 0, comm);
-    if (err) {
-        errs++;
-        MTestPrintErrorMsg("MPI_LOR and MPI_DOUBLE", err);
-    }
-    else {
-        if (rank == 0) {
-            if (!doutbuf[0]) {
-                errs++;
-                fprintf(stderr, "double OR(1) test failed\n");
-            }
-            if (doutbuf[1]) {
-                errs++;
-                fprintf(stderr, "double OR(0) test failed\n");
-            }
-            if (!doutbuf[2] && size > 1) {
-                errs++;
-                fprintf(stderr, "double OR(>) test failed\n");
-            }
-        }
-    }
-
-#ifdef HAVE_LONG_DOUBLE
-    {
-        long double ldinbuf[3], ldoutbuf[3];
-        /* long double */
-        MTEST_VG_MEM_INIT(ldinbuf, 3* sizeof(ldinbuf[0]));
-        ldinbuf[0] = 1;
-        ldinbuf[1] = 0;
-        ldinbuf[2] = (rank > 0);
-
-        ldoutbuf[0] = 0;
-        ldoutbuf[1] = 1;
-        ldoutbuf[2] = 1;
-        if (MPI_LONG_DOUBLE != MPI_DATATYPE_NULL) {
-            MTestPrintfMsg(10, "Reduce of MPI_LONG_DOUBLE\n");
-            err = MPI_Reduce(ldinbuf, ldoutbuf, 3, MPI_LONG_DOUBLE, MPI_LOR, 0, comm);
-            if (err) {
-                errs++;
-                MTestPrintErrorMsg("MPI_LOR and MPI_LONG_DOUBLE", err);
-            }
-            else {
-                if (rank == 0) {
-                    if (!ldoutbuf[0]) {
-                        errs++;
-                        fprintf(stderr, "long double OR(1) test failed\n");
-                    }
-                    if (ldoutbuf[1]) {
-                        errs++;
-                        fprintf(stderr, "long double OR(0) test failed\n");
-                    }
-                    if (!ldoutbuf[2] && size > 1) {
-                        errs++;
-                        fprintf(stderr, "long double OR(>) test failed\n");
-                    }
-                }
-            }
-        }
-    }
-#endif /* HAVE_LONG_DOUBLE */
-#endif /* USE_STRICT_MPI */
 
 #ifdef HAVE_LONG_LONG
     {
@@ -258,8 +152,7 @@ int main(int argc, char *argv[])
             if (err) {
                 errs++;
                 MTestPrintErrorMsg("MPI_LOR and MPI_LONG_LONG", err);
-            }
-            else {
+            } else {
                 if (rank == 0) {
                     if (!lloutbuf[0]) {
                         errs++;
@@ -281,6 +174,5 @@ int main(int argc, char *argv[])
 
     MPI_Errhandler_set(comm, MPI_ERRORS_ARE_FATAL);
     MTest_Finalize(errs);
-    MPI_Finalize();
-    return 0;
+    return MTestReturnValue(errs);
 }

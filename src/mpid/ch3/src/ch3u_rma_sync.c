@@ -512,35 +512,32 @@ int MPID_Win_fence(int assert, MPIR_Win * win_ptr)
             goto finish_fence;
         }
         else {
-            MPI_Request fence_sync_req;
+            MPIR_Request* fence_sync_req_ptr;
 
             if (win_ptr->shm_allocated == TRUE) {
                 MPIR_Comm *node_comm_ptr = win_ptr->comm_ptr->node_comm;
 
-                mpi_errno = MPIR_Barrier_impl(node_comm_ptr, &errflag);
+                mpi_errno = MPIR_Barrier(node_comm_ptr, &errflag);
                 if (mpi_errno != MPI_SUCCESS)
                     MPIR_ERR_POP(mpi_errno);
                 MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
             }
 
-            mpi_errno = MPIR_Ibarrier_impl(win_ptr->comm_ptr, &fence_sync_req);
+            mpi_errno = MPIR_Ibarrier(win_ptr->comm_ptr, &fence_sync_req_ptr);
             if (mpi_errno != MPI_SUCCESS)
                 MPIR_ERR_POP(mpi_errno);
 
-            if (fence_sync_req == MPI_REQUEST_NULL) {
+            if (fence_sync_req_ptr == NULL) {
                 /* ibarrier completed immediately. */
                 win_ptr->states.access_state = MPIDI_RMA_FENCE_GRANTED;
             }
             else {
-                MPIR_Request *req_ptr;
-
                 /* Set window access state properly. */
                 win_ptr->states.access_state = MPIDI_RMA_FENCE_ISSUED;
 
-                MPIR_Request_get_ptr(fence_sync_req, req_ptr);
-                if (!MPIR_Request_is_complete(req_ptr)) {
-                    req_ptr->dev.source_win_handle = win_ptr->handle;
-                    req_ptr->request_completed_cb = fence_barrier_complete;
+                if (!MPIR_Request_is_complete(fence_sync_req_ptr)) {
+                    fence_sync_req_ptr->dev.source_win_handle = win_ptr->handle;
+                    fence_sync_req_ptr->dev.request_completed_cb = fence_barrier_complete;
                     win_ptr->sync_request_cnt++;
                 }
                 else {
@@ -548,7 +545,7 @@ int MPID_Win_fence(int assert, MPIR_Win * win_ptr)
                     win_ptr->states.access_state = MPIDI_RMA_FENCE_GRANTED;
                 }
 
-                MPIR_Request_free(req_ptr);
+                MPIR_Request_free(fence_sync_req_ptr);
             }
 
             goto finish_fence;
@@ -557,8 +554,8 @@ int MPID_Win_fence(int assert, MPIR_Win * win_ptr)
 
     /* Perform basic algorithm by calling reduce-scatter */
     if (!scalable_fence_enabled) {
-        MPIR_CHKLMEM_MALLOC(rma_target_marks, int *, comm_size * sizeof(int),
-                            mpi_errno, "rma_target_marks");
+      MPIR_CHKLMEM_MALLOC(rma_target_marks, int *, comm_size * sizeof(int),
+                            mpi_errno, "rma_target_marks", MPL_MEM_RMA);
         for (i = 0; i < comm_size; i++)
             rma_target_marks[i] = 0;
 
@@ -572,8 +569,8 @@ int MPID_Win_fence(int assert, MPIR_Win * win_ptr)
 
         win_ptr->at_completion_counter += comm_size;
 
-        mpi_errno = MPIR_Reduce_scatter_block_impl(MPI_IN_PLACE, rma_target_marks, 1,
-                                                   MPI_INT, MPI_SUM, win_ptr->comm_ptr, &errflag);
+        mpi_errno = MPIR_Reduce_scatter_block(MPI_IN_PLACE, rma_target_marks, 1,
+                                              MPI_INT, MPI_SUM, win_ptr->comm_ptr, &errflag);
         if (mpi_errno != MPI_SUCCESS)
             MPIR_ERR_POP(mpi_errno);
 
@@ -620,7 +617,7 @@ int MPID_Win_fence(int assert, MPIR_Win * win_ptr)
         MPIR_ERR_POP(mpi_errno);
 
     if (scalable_fence_enabled) {
-        mpi_errno = MPIR_Barrier_impl(win_ptr->comm_ptr, &errflag);
+        mpi_errno = MPIR_Barrier(win_ptr->comm_ptr, &errflag);
         if (mpi_errno != MPI_SUCCESS)
             MPIR_ERR_POP(mpi_errno);
         MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
@@ -645,26 +642,23 @@ int MPID_Win_fence(int assert, MPIR_Win * win_ptr)
             win_ptr->states.access_state = MPIDI_RMA_NONE;
         }
         else {
-            MPI_Request fence_sync_req;
+            MPIR_Request* fence_sync_req_ptr;
 
             /* Prepare for the next possible epoch */
-            mpi_errno = MPIR_Ibarrier_impl(win_ptr->comm_ptr, &fence_sync_req);
+            mpi_errno = MPIR_Ibarrier(win_ptr->comm_ptr, &fence_sync_req_ptr);
             if (mpi_errno != MPI_SUCCESS)
                 MPIR_ERR_POP(mpi_errno);
 
-            if (fence_sync_req == MPI_REQUEST_NULL) {
+            if (fence_sync_req_ptr == NULL) {
                 /* ibarrier completed immediately. */
                 win_ptr->states.access_state = MPIDI_RMA_FENCE_GRANTED;
             }
             else {
-                MPIR_Request *req_ptr;
-
                 win_ptr->states.access_state = MPIDI_RMA_FENCE_ISSUED;
 
-                MPIR_Request_get_ptr(fence_sync_req, req_ptr);
-                if (!MPIR_Request_is_complete(req_ptr)) {
-                    req_ptr->dev.source_win_handle = win_ptr->handle;
-                    req_ptr->request_completed_cb = fence_barrier_complete;
+                if (!MPIR_Request_is_complete(fence_sync_req_ptr)) {
+                    fence_sync_req_ptr->dev.source_win_handle = win_ptr->handle;
+                    fence_sync_req_ptr->dev.request_completed_cb = fence_barrier_complete;
                     win_ptr->sync_request_cnt++;
                 }
                 else {
@@ -672,12 +666,12 @@ int MPID_Win_fence(int assert, MPIR_Win * win_ptr)
                     win_ptr->states.access_state = MPIDI_RMA_FENCE_GRANTED;
                 }
 
-                MPIR_Request_free(req_ptr);
+                MPIR_Request_free(fence_sync_req_ptr);
             }
 
             if (win_ptr->shm_allocated == TRUE) {
                 MPIR_Comm *node_comm_ptr = win_ptr->comm_ptr->node_comm;
-                mpi_errno = MPIR_Barrier_impl(node_comm_ptr, &errflag);
+                mpi_errno = MPIR_Barrier(node_comm_ptr, &errflag);
                 if (mpi_errno != MPI_SUCCESS)
                     MPIR_ERR_POP(mpi_errno);
                 MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
@@ -746,15 +740,15 @@ int MPID_Win_post(MPIR_Group * post_grp_ptr, int assert, MPIR_Win * win_ptr)
         rank = win_ptr->comm_ptr->rank;
 
         MPIR_CHKLMEM_MALLOC(post_ranks_in_win_grp, int *,
-                            post_grp_size * sizeof(int), mpi_errno, "post_ranks_in_win_grp");
+                            post_grp_size * sizeof(int), mpi_errno, "post_ranks_in_win_grp", MPL_MEM_RMA);
         mpi_errno = fill_ranks_in_win_grp(win_ptr, post_grp_ptr, post_ranks_in_win_grp);
         if (mpi_errno != MPI_SUCCESS)
             MPIR_ERR_POP(mpi_errno);
 
         MPIR_CHKLMEM_MALLOC(req, MPI_Request *, post_grp_size * sizeof(MPI_Request),
-                            mpi_errno, "req");
+                            mpi_errno, "req", MPL_MEM_RMA);
         MPIR_CHKLMEM_MALLOC(status, MPI_Status *, post_grp_size * sizeof(MPI_Status),
-                            mpi_errno, "status");
+                            mpi_errno, "status", MPL_MEM_RMA);
 
         /* Send a 0-byte message to the source processes */
         for (i = 0; i < post_grp_size; i++) {
@@ -773,7 +767,7 @@ int MPID_Win_post(MPIR_Group * post_grp_ptr, int assert, MPIR_Win * win_ptr)
             }
         }
 
-        mpi_errno = MPIR_Waitall_impl(post_grp_size, req, status);
+        mpi_errno = MPIR_Waitall(post_grp_size, req, status);
         if (mpi_errno && mpi_errno != MPI_ERR_IN_STATUS)
             MPIR_ERR_POP(mpi_errno);
 
@@ -859,7 +853,8 @@ int MPID_Win_start(MPIR_Group * group_ptr, int assert, MPIR_Win * win_ptr)
 
     MPIR_CHKPMEM_MALLOC(win_ptr->start_ranks_in_win_grp, int *,
                         win_ptr->start_grp_size * sizeof(int),
-                        mpi_errno, "win_ptr->start_ranks_in_win_grp");
+                        mpi_errno, "win_ptr->start_ranks_in_win_grp",
+                        MPL_MEM_RMA);
 
     mpi_errno = fill_ranks_in_win_grp(win_ptr, group_ptr, win_ptr->start_ranks_in_win_grp);
     if (mpi_errno)
@@ -878,10 +873,10 @@ int MPID_Win_start(MPIR_Group * group_ptr, int assert, MPIR_Win * win_ptr)
         if (win_ptr->shm_allocated == TRUE) {
             int node_comm_size = comm_ptr->node_comm->local_size;
             MPIR_CHKLMEM_MALLOC(intra_start_req, MPI_Request *,
-                                node_comm_size * sizeof(MPI_Request), mpi_errno, "intra_start_req");
+                                node_comm_size * sizeof(MPI_Request), mpi_errno, "intra_start_req", MPL_MEM_RMA);
             MPIR_CHKLMEM_MALLOC(intra_start_status, MPI_Status *,
                                 node_comm_size * sizeof(MPI_Status),
-                                mpi_errno, "intra_start_status");
+                                mpi_errno, "intra_start_status", MPL_MEM_RMA);
         }
 
         intra_cnt = 0;
@@ -905,7 +900,7 @@ int MPID_Win_start(MPIR_Group * group_ptr, int assert, MPIR_Win * win_ptr)
                 else {
                     if (!MPIR_Request_is_complete(req_ptr)) {
                         req_ptr->dev.source_win_handle = win_ptr->handle;
-                        req_ptr->request_completed_cb = start_req_complete;
+                        req_ptr->dev.request_completed_cb = start_req_complete;
                         win_ptr->sync_request_cnt++;
                     }
 
@@ -916,7 +911,7 @@ int MPID_Win_start(MPIR_Group * group_ptr, int assert, MPIR_Win * win_ptr)
 
         /* for targets on SHM, waiting until their IRECVs to be finished */
         if (intra_cnt) {
-            mpi_errno = MPIR_Waitall_impl(intra_cnt, intra_start_req, intra_start_status);
+            mpi_errno = MPIR_Waitall(intra_cnt, intra_start_req, intra_start_status);
             if (mpi_errno && mpi_errno != MPI_ERR_IN_STATUS)
                 MPIR_ERR_POP(mpi_errno);
             /* --BEGIN ERROR HANDLING-- */

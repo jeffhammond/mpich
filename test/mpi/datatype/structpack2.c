@@ -98,8 +98,7 @@ int main(int argc, char *argv[])
              * believes is a binary file */
             if (isprint((int) (s1[j].c))) {
                 printf("Got s[%d].c = %c; expected %c\n", j, s1[j].c, j + rank + 'a');
-            }
-            else {
+            } else {
                 printf("Got s[%d].c = %x; expected %c\n", j, (int) s1[j].c, j + rank + 'a');
             }
         }
@@ -109,6 +108,5 @@ int main(int argc, char *argv[])
     MPI_Type_free(&str);
     MPI_Type_free(&con);
     MTest_Finalize(errs);
-    MPI_Finalize();
-    return 0;
+    return MTestReturnValue(errs);
 }

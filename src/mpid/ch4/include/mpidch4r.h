@@ -15,12 +15,14 @@
 #include "ch4r_recvq.h"
 #include "ch4r_proc.h"
 #include "ch4r_init.h"
+#include "ch4r_comm.h"
 #include "ch4r_probe.h"
-#include "ch4r_recv.h"
+#include "mpidig_recv.h"
 #include "ch4r_rma.h"
-#include "ch4r_send.h"
+#include "mpidig_send.h"
 #include "ch4r_win.h"
 #include "ch4r_buf.h"
 #include "ch4r_request.h"
+#include "mpidig_startall.h"
 
 #endif /* MPIDCH4R_H_INCLUDED */

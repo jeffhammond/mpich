@@ -4,7 +4,7 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#if !defined(MPL_STR_H_INCLUDED)
+#ifndef MPL_STR_H_INCLUDED
 #define MPL_STR_H_INCLUDED
 
 #include "mplconfig.h"
@@ -48,6 +48,8 @@ char *MPL_strerror(int errnum);
 #endif /* MPL_HAVE_STRERROR */
 
 int MPL_strnapp(char *dest, const char *src, size_t n);
+void MPL_create_pathname(char *dest_filename, const char *dirname,
+                         const char *prefix, const int is_dir);
 
 /* *INDENT-ON* */
 #if defined(__cplusplus)
@@ -55,4 +57,4 @@ int MPL_strnapp(char *dest, const char *src, size_t n);
 #endif
 /* *INDENT-OFF* */
 
-#endif /* !defined(MPL_STR_H_INCLUDED) */
+#endif /* MPL_STR_H_INCLUDED */

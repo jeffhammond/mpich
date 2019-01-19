@@ -24,7 +24,9 @@ cvars:
       verbosity   : MPI_T_VERBOSITY_MPIDEV_DETAIL
       scope       : MPI_T_SCOPE_LOCAL
       description : >-
-        If non-null, choose an OFI provider by name
+        If non-null, choose an OFI provider by name. If using with the CH4
+        device and using an older libfabric installation than the recommended
+        version to accompany this MPICH version, unexpected results may occur.
 
     - name        : MPIR_CVAR_OFI_DUMP_PROVIDERS
       category    : DEVELOPER
@@ -39,7 +41,7 @@ cvars:
 === END_MPI_T_CVAR_INFO_BLOCK ===
 */
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_init)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_init)
 int MPID_nem_ofi_init(MPIDI_PG_t * pg_p, int pg_rank, char **bc_val_p, int *val_max_sz_p)
 {
     int ret, fi_version, i, len, pmi_errno;
@@ -47,7 +49,7 @@ int MPID_nem_ofi_init(MPIDI_PG_t * pg_p, int pg_rank, char **bc_val_p, int *val_
     info_t *hints, *prov_tagged, *prov_use;
     cq_attr_t cq_attr;
     av_attr_t av_attr;
-    char kvsname[OFI_KVSAPPSTRLEN], key[OFI_KVSAPPSTRLEN], bc[OFI_KVSAPPSTRLEN];
+    char kvsname[MPIDI_OFI_KVSAPPSTRLEN], key[MPIDI_OFI_KVSAPPSTRLEN], bc[MPIDI_OFI_KVSAPPSTRLEN];
     char *my_bc, *addrs, *null_addr;
     fi_addr_t *fi_addrs = NULL;
     MPIDI_VC_t *vc;
@@ -85,7 +87,7 @@ int MPID_nem_ofi_init(MPIDI_PG_t * pg_p, int pg_rank, char **bc_val_p, int *val_
     hints->rx_attr->msg_order = FI_ORDER_SAS;
 
     hints->ep_attr->mem_tag_format = MEM_TAG_FORMAT;
-    MPIR_Assert(pg_p->size < ((1 << MPID_RANK_BITS) - 1));
+    MPIR_Assert(pg_p->size < ((1 << MPIDI_OFI_RANK_BITS) - 1));
 
     /* ------------------------------------------------------------------------ */
     /* FI_VERSION provides binary backward and forward compatibility support    */
@@ -223,16 +225,16 @@ int MPID_nem_ofi_init(MPIDI_PG_t * pg_p, int pg_rank, char **bc_val_p, int *val_
     /* Publish the business card        */
     /* to the KVS                       */
     /* -------------------------------- */
-    PMI_RC(PMI_KVS_Get_my_name(kvsname, OFI_KVSAPPSTRLEN), pmi);
-    sprintf(key, "OFI-%d", pg_rank);
+    PMI_RC(PMI_KVS_Get_my_name(kvsname, MPIDI_OFI_KVSAPPSTRLEN), pmi);
+    MPL_snprintf(key, sizeof(key), "OFI-%d", pg_rank);
 
     PMI_RC(PMI_KVS_Put(kvsname, key, my_bc), pmi);
     PMI_RC(PMI_KVS_Commit(kvsname), pmi);
 
     /* -------------------------------- */
-    /* Set the MPI maximum tag value    */
+    /* Set the number of tag bits       */
     /* -------------------------------- */
-    MPIR_Process.attrs.tag_ub = (1 << MPID_TAG_BITS) - 1;
+    MPIR_Process.tag_bits = MPIDI_OFI_TAG_BITS;
 
     /* --------------------------------- */
     /* Wait for all the ranks to publish */
@@ -246,12 +248,12 @@ int MPID_nem_ofi_init(MPIDI_PG_t * pg_p, int pg_rank, char **bc_val_p, int *val_
     /* from KVS and store them in local  */
     /* table                             */
     /* --------------------------------- */
-    MPIR_CHKLMEM_MALLOC(addrs, char *, pg_p->size * gl_data.bound_addrlen, mpi_errno, "addrs");
+    MPIR_CHKLMEM_MALLOC(addrs, char *, pg_p->size * gl_data.bound_addrlen, mpi_errno, "addrs", MPL_MEM_ADDRESS);
 
     for (i = 0; i < pg_p->size; ++i) {
-        sprintf(key, "OFI-%d", i);
+        MPL_snprintf(key, sizeof(key), "OFI-%d", i);
 
-        PMI_RC(PMI_KVS_Get(kvsname, key, bc, OFI_KVSAPPSTRLEN), pmi);
+        PMI_RC(PMI_KVS_Get(kvsname, key, bc, MPIDI_OFI_KVSAPPSTRLEN), pmi);
         ret = MPL_str_get_binary_arg(bc, "OFI",
                                       (char *) &addrs[i * gl_data.bound_addrlen],
                                       gl_data.bound_addrlen, &len);
@@ -265,7 +267,7 @@ int MPID_nem_ofi_init(MPIDI_PG_t * pg_p, int pg_rank, char **bc_val_p, int *val_
     /* The addressing mode is "map", so we must provide     */
     /* storage to store the per destination addresses       */
     /* ---------------------------------------------------- */
-    fi_addrs = MPL_malloc(pg_p->size * sizeof(fi_addr_t));
+    fi_addrs = MPL_malloc(pg_p->size * sizeof(fi_addr_t), MPL_MEM_ADDRESS);
     FI_RC(fi_av_insert(gl_data.av, addrs, pg_p->size, fi_addrs, 0ULL, NULL), avmap);
 
     /* --------------------------------- */
@@ -298,7 +300,7 @@ int MPID_nem_ofi_init(MPIDI_PG_t * pg_p, int pg_rank, char **bc_val_p, int *val_
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_finalize)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_finalize)
 int MPID_nem_ofi_finalize(void)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -324,7 +326,7 @@ int MPID_nem_ofi_finalize(void)
 }
 
 #undef FCNAME
-#define FCNAME DECL_FUNC(MPID_nem_ofi_get_ordering)
+#define FCNAME MPL_QUOTE(MPID_nem_ofi_get_ordering)
 int MPID_nem_ofi_get_ordering(int *ordering)
 {
     (*ordering) = 1;
@@ -333,9 +335,9 @@ int MPID_nem_ofi_get_ordering(int *ordering)
 
 static inline int compile_time_checking()
 {
-    OFI_COMPILE_TIME_ASSERT(sizeof(MPID_nem_ofi_vc_t) <= MPIDI_NEM_VC_NETMOD_AREA_LEN);
-    OFI_COMPILE_TIME_ASSERT(sizeof(MPID_nem_ofi_req_t) <= MPIDI_NEM_REQ_NETMOD_AREA_LEN);
-    OFI_COMPILE_TIME_ASSERT(sizeof(iovec_t) == sizeof(MPL_IOV));
+    MPL_COMPILE_TIME_ASSERT(sizeof(MPID_nem_ofi_vc_t) <= MPIDI_NEM_VC_NETMOD_AREA_LEN);
+    MPL_COMPILE_TIME_ASSERT(sizeof(MPID_nem_ofi_req_t) <= MPIDI_NEM_REQ_NETMOD_AREA_LEN);
+    MPL_COMPILE_TIME_ASSERT(sizeof(iovec_t) == sizeof(MPL_IOV));
     MPIR_Assert(((void *) &(((iovec_t *) 0)->iov_base)) ==
                 ((void *) &(((MPL_IOV *) 0)->MPL_IOV_BUF)));
     MPIR_Assert(((void *) &(((iovec_t *) 0)->iov_len)) ==

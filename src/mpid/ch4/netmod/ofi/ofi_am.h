@@ -8,13 +8,13 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_OFI_AM_H_INCLUDED
-#define NETMOD_OFI_AM_H_INCLUDED
+#ifndef OFI_AM_H_INCLUDED
+#define OFI_AM_H_INCLUDED
 #include "ofi_impl.h"
 #include "ofi_am_impl.h"
 #include "ofi_am_events.h"
 
-static inline int MPIDI_OFI_progress_do_queue(void *netmod_context);
+static inline int MPIDI_OFI_progress_do_queue(int vni_idx);
 
 static inline void MPIDI_NM_am_request_init(MPIR_Request * req)
 {
@@ -27,32 +27,6 @@ static inline void MPIDI_NM_am_request_finalize(MPIR_Request * req)
 }
 
 #undef FUNCNAME
-#define FUNCNAME MPIDI_NM_am_reg_handler
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline int MPIDI_NM_am_reg_handler(int handler_id,
-                                          MPIDI_NM_am_origin_handler_fn origin_handler_fn,
-                                          MPIDI_NM_am_target_handler_fn target_handler_fn)
-{
-    int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_NETMOD_REG_HDR_HANDLER);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_REG_HDR_HANDLER);
-
-    if (handler_id > MPIDI_OFI_MAX_AM_HANDLERS) {
-        mpi_errno = MPI_ERR_OTHER;
-        goto fn_fail;
-    }
-
-    MPIDI_Global.am_handlers[handler_id] = target_handler_fn;
-    MPIDI_Global.am_isend_cmpl_handlers[handler_id] = origin_handler_fn;
-  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_NETMOD_REG_HDR_HANDLER);
-    return mpi_errno;
-  fn_fail:
-    goto fn_exit;
-}
-
-#undef FUNCNAME
 #define FUNCNAME MPIDI_NM_am_isend
 #undef FCNAME
 #define FCNAME MPL_QUOTE(FUNCNAME)
@@ -62,9 +36,7 @@ static inline int MPIDI_NM_am_isend(int rank,
                                     const void *am_hdr,
                                     size_t am_hdr_sz,
                                     const void *data,
-                                    MPI_Count count,
-                                    MPI_Datatype datatype, MPIR_Request * sreq,
-                                    void *netmod_context)
+                                    MPI_Count count, MPI_Datatype datatype, MPIR_Request * sreq)
 {
     int mpi_errno = MPI_SUCCESS;
     MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_NETMOD_SEND_AM);
@@ -90,9 +62,7 @@ static inline int MPIDI_NM_am_isendv(int rank,
                                      struct iovec *am_hdr,
                                      size_t iov_len,
                                      const void *data,
-                                     MPI_Count count,
-                                     MPI_Datatype datatype,
-                                     MPIR_Request * sreq, void *netmod_context)
+                                     MPI_Count count, MPI_Datatype datatype, MPIR_Request * sreq)
 {
     int mpi_errno = MPI_SUCCESS, is_allocated;
     size_t am_hdr_sz = 0, i;
@@ -106,10 +76,9 @@ static inline int MPIDI_NM_am_isendv(int rank,
     }
 
     if (am_hdr_sz > MPIDI_OFI_BUF_POOL_SIZE) {
-        am_hdr_buf = (char *) MPL_malloc(am_hdr_sz);
+        am_hdr_buf = (char *) MPL_malloc(am_hdr_sz, MPL_MEM_BUFFER);
         is_allocated = 1;
-    }
-    else {
+    } else {
         am_hdr_buf = (char *) MPIDI_CH4R_get_buf(MPIDI_Global.am_buf_pool);
         is_allocated = 0;
     }
@@ -123,7 +92,7 @@ static inline int MPIDI_NM_am_isendv(int rank,
     }
 
     mpi_errno = MPIDI_NM_am_isend(rank, comm, handler_id, am_hdr_buf, am_hdr_sz,
-                                  data, count, datatype, sreq, netmod_context);
+                                  data, count, datatype, sreq);
 
     if (is_allocated)
         MPL_free(am_hdr_buf);
@@ -176,15 +145,12 @@ static inline size_t MPIDI_NM_am_hdr_max_sz(void)
 
 static inline int MPIDI_NM_am_send_hdr(int rank,
                                        MPIR_Comm * comm,
-                                       int handler_id,
-                                       const void *am_hdr, size_t am_hdr_sz, void *netmod_context)
+                                       int handler_id, const void *am_hdr, size_t am_hdr_sz)
 {
     int mpi_errno = MPI_SUCCESS;
     MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_NETMOD_OFI_INJECT_AM_HDR);
     MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_OFI_INJECT_AM_HDR);
-    mpi_errno = MPIDI_OFI_do_inject(rank, comm,
-                                    handler_id, am_hdr, am_hdr_sz,
-                                    netmod_context, FALSE, TRUE, TRUE);
+    mpi_errno = MPIDI_OFI_do_inject(rank, comm, handler_id, am_hdr, am_hdr_sz, FALSE, TRUE, TRUE);
 
     if (mpi_errno != MPI_SUCCESS)
         MPIR_ERR_POP(mpi_errno);
@@ -206,7 +172,7 @@ static inline int MPIDI_NM_am_send_hdr_reply(MPIR_Context_id_t context_id,
     MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_NETMOD_OFI_INJECT_AM_HDR_REPLY);
 
     mpi_errno = MPIDI_OFI_do_inject(src_rank, MPIDI_CH4U_context_id_to_comm(context_id),
-                                    handler_id, am_hdr, am_hdr_sz, NULL, TRUE, TRUE, FALSE);
+                                    handler_id, am_hdr, am_hdr_sz, TRUE, TRUE, FALSE);
 
     if (mpi_errno != MPI_SUCCESS)
         MPIR_ERR_POP(mpi_errno);
@@ -229,9 +195,10 @@ static inline int MPIDI_NM_am_recv(MPIR_Request * req)
     msg.sreq_ptr = (MPIDI_CH4U_REQUEST(req, req->rreq.peer_req_ptr));
     msg.rreq_ptr = (uint64_t) req;
     MPIR_Assert((void *) msg.sreq_ptr != NULL);
-    mpi_errno = MPIDI_NM_am_send_hdr_reply(MPIDI_CH4U_get_context(MPIDI_CH4U_REQUEST(req, tag)),
-                                           MPIDI_CH4U_REQUEST(req, src_rank),
-                                           MPIDI_CH4U_SEND_LONG_ACK, &msg, sizeof(msg));
+    mpi_errno =
+        MPIDI_NM_am_send_hdr_reply(MPIDI_CH4U_REQUEST(req, context_id),
+                                   MPIDI_CH4U_REQUEST(req, rank), MPIDI_CH4U_SEND_LONG_ACK, &msg,
+                                   sizeof(msg));
     if (mpi_errno)
         MPIR_ERR_POP(mpi_errno);
 
@@ -242,4 +209,4 @@ static inline int MPIDI_NM_am_recv(MPIR_Request * req)
     goto fn_exit;
 }
 
-#endif /* NETMOD_OFI_AM_H_INCLUDED */
+#endif /* OFI_AM_H_INCLUDED */

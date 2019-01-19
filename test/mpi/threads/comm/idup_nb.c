@@ -172,13 +172,11 @@ MTEST_THREAD_RETURN_TYPE test_intercomm(void *arg)
             if (rank == 0) {
                 root = MPI_ROOT;
                 ans[2] = 199;
-            }
-            else {
+            } else {
                 root = MPI_PROC_NULL;
                 ans[2] = 199;   /* not needed, just to make correctness checking easier */
             }
-        }
-        else {
+        } else {
             root = 0;
             ans[2] = 111;       /* garbage value */
         }
@@ -223,7 +221,7 @@ int main(int argc, char **argv)
     MPI_Comm newcomm;
     int toterrs = 0;
 
-    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+    MTest_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 
     check(provided == MPI_THREAD_MULTIPLE);
     check(NUM_IDUPS1 >= 1 && NUM_IDUPS2 >= 1);
@@ -282,6 +280,5 @@ int main(int argc, char **argv)
         MTestFreeComm(&newcomm);
     }
     MTest_Finalize(toterrs);
-    MPI_Finalize();
-    return 0;
+    return MTestReturnValue(toterrs);
 }

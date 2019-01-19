@@ -8,14 +8,15 @@
  *  to Argonne National Laboratory subject to Software Grant and Corporate
  *  Contributor License Agreement dated February 8, 2012.
  */
-#ifndef NETMOD_PTL_SPAWN_H_INCLUDED
-#define NETMOD_PTL_SPAWN_H_INCLUDED
+#ifndef PTL_SPAWN_H_INCLUDED
+#define PTL_SPAWN_H_INCLUDED
 
 #include "ptl_impl.h"
 
 static inline int MPIDI_NM_mpi_comm_connect(const char *port_name,
                                             MPIR_Info * info,
-                                            int root, MPIR_Comm * comm, MPIR_Comm ** newcomm_ptr)
+                                            int root, int timeout,
+                                            MPIR_Comm * comm, MPIR_Comm ** newcomm_ptr)
 {
     MPIR_Assert(0);
     return MPI_SUCCESS;
@@ -47,4 +48,4 @@ static inline int MPIDI_NM_mpi_comm_accept(const char *port_name,
     return MPI_SUCCESS;
 }
 
-#endif /* NETMOD_PTL_SPAWN_H_INCLUDED */
+#endif /* PTL_SPAWN_H_INCLUDED */

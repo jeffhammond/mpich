@@ -62,15 +62,12 @@ noinst_HEADERS +=                   \
     src/include/mpir_nbc.h          \
     src/include/mpir_op.h           \
     src/include/mpir_process.h      \
-    src/include/mpir_utarray.h      \
     src/include/mpir_misc.h         \
     src/include/mpir_tags.h         \
     src/include/mpir_datatype.h     \
     src/include/mpir_win.h          \
     src/include/mpir_pt2pt.h        \
     src/include/nopackage.h         \
-    src/include/pmi.h               \
-    src/include/pmi2.h              \
     src/include/rlog.h              \
     src/include/rlog_macros.h       \
     src/include/mpir_op_util.h

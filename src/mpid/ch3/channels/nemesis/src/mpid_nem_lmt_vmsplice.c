@@ -93,7 +93,7 @@ static int populate_iov_from_req(MPIR_Request *req)
     int dt_contig;
     MPI_Aint dt_true_lb;
     intptr_t data_sz;
-    MPIDU_Datatype* dt_ptr;
+    MPIR_Datatype* dt_ptr;
 
     /* find out contig/noncontig, size, and lb for the datatype */
     MPIDI_Datatype_get_info(req->dev.user_count, req->dev.datatype,
@@ -113,12 +113,12 @@ static int populate_iov_from_req(MPIR_Request *req)
         req->dev.iov_offset = 0;
 
         /* XXX DJG FIXME where is this segment freed? */
-        req->dev.segment_ptr = MPIDU_Segment_alloc();
+        req->dev.segment_ptr = MPIR_Segment_alloc();
         MPIR_ERR_CHKANDJUMP1((req->dev.segment_ptr == NULL), mpi_errno,
                              MPI_ERR_OTHER, "**nomem",
-                             "**nomem %s", "MPIDU_Segment_alloc");
-        MPIDU_Segment_init(req->dev.user_buf, req->dev.user_count,
-                          req->dev.datatype, req->dev.segment_ptr, 0);
+                             "**nomem %s", "MPIR_Segment_alloc");
+        MPIR_Segment_init(req->dev.user_buf, req->dev.user_count,
+                          req->dev.datatype, req->dev.segment_ptr);
         req->dev.segment_first = 0;
         req->dev.segment_size = data_sz;
 
@@ -288,7 +288,7 @@ int MPID_nem_lmt_vmsplice_start_recv(MPIDI_VC_t *vc, MPIR_Request *rreq, MPL_IOV
 
     /* push request if not complete for progress checks later */
     if (!complete) {
-        node = MPL_malloc(sizeof(struct lmt_vmsplice_node));
+        node = MPL_malloc(sizeof(struct lmt_vmsplice_node), MPL_MEM_OTHER);
         node->pipe_fd = pipe_fd;
         node->req = rreq;
         node->next = outstanding_head;
@@ -408,7 +408,7 @@ int MPID_nem_lmt_vmsplice_start_send(MPIDI_VC_t *vc, MPIR_Request *sreq, MPL_IOV
 
     if (!complete) {
         /* push for later progress */
-        node = MPL_malloc(sizeof(struct lmt_vmsplice_node));
+        node = MPL_malloc(sizeof(struct lmt_vmsplice_node), MPL_MEM_OTHER);
         node->pipe_fd = pipe_fd;
         node->req = sreq;
         node->next = outstanding_head;

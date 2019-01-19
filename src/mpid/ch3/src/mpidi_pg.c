@@ -184,9 +184,9 @@ int MPIDI_PG_Create(int vct_sz, void * pg_id, MPIDI_PG_t ** pg_ptr)
 
     MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_PG_CREATE);
     
-    MPIR_CHKPMEM_MALLOC(pg,MPIDI_PG_t*,sizeof(MPIDI_PG_t),mpi_errno,"pg");
+    MPIR_CHKPMEM_MALLOC(pg,MPIDI_PG_t*,sizeof(MPIDI_PG_t),mpi_errno,"pg", MPL_MEM_GROUP);
     MPIR_CHKPMEM_MALLOC(pg->vct,MPIDI_VC_t *,sizeof(MPIDI_VC_t)*vct_sz,
-			mpi_errno,"pg->vct");
+			mpi_errno,"pg->vct", MPL_MEM_GROUP);
 
     if (verbose) {
 	fprintf( stdout, "Creating a process group of size %d\n", vct_sz );
@@ -506,7 +506,8 @@ int MPIDI_PG_Create_from_string(const char * str, MPIDI_PG_t ** pg_pptr,
 
     /* Get the size from the string */
     p = str;
-    while (*p) p++; p++;
+    while (*p) p++;
+    p++;
     vct_sz = atoi(p);
 
     mpi_errno = MPIDI_PG_Create(vct_sz, (void *)str, pg_pptr);
@@ -545,7 +546,7 @@ fn_fail:
 void MPIDI_PG_IdToNum( MPIDI_PG_t *pg, int *id )
 {
     const char *p = (const char *)pg->id;
-    int pgid = 0;
+    unsigned int pgid = 0;
 
     while (*p) {
         pgid += *p++;
@@ -739,7 +740,7 @@ static int connToStringKVS( char **buf_p, int *slen, MPIDI_PG_t *pg )
        needed space */
     len = 0;
     curSlen = 10 + pg->size * 128;
-    string = (char *)MPL_malloc( curSlen );
+    string = (char *)MPL_malloc( curSlen, MPL_MEM_STRINGS );
 
     /* Start with the id of the pg */
     while (*pg_idStr && len < curSlen) 
@@ -783,7 +784,7 @@ static int connToStringKVS( char **buf_p, int *slen, MPIDI_PG_t *pg )
 	if (len + vallen + 1 >= curSlen) {
 	    char *nstring = 0;
             curSlen += (pg->size - i) * (vallen + 1 );
-	    nstring = MPL_realloc( string, curSlen );
+	    nstring = MPL_realloc( string, curSlen, MPL_MEM_STRINGS );
 	    if (!nstring) {
 		MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**nomem");
 	    }
@@ -829,7 +830,7 @@ int MPIDI_PG_InitConnKVS( MPIDI_PG_t *pg )
 #ifdef USE_PMI2_API
     int mpi_errno = MPI_SUCCESS;
     
-    pg->connData = (char *)MPL_malloc(MAX_JOBID_LEN);
+    pg->connData = (char *)MPL_malloc(MAX_JOBID_LEN, MPL_MEM_STRINGS);
     if (pg->connData == NULL) {
 	MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**nomem");
     }
@@ -847,7 +848,7 @@ int MPIDI_PG_InitConnKVS( MPIDI_PG_t *pg )
 			     "**pmi_kvs_get_name_length_max %d", pmi_errno);
     }
     
-    pg->connData = (char *)MPL_malloc(kvs_name_sz + 1);
+    pg->connData = (char *)MPL_malloc(kvs_name_sz + 1, MPL_MEM_STRINGS);
     if (pg->connData == NULL) {
 	MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**nomem");
     }
@@ -922,7 +923,7 @@ static int connToString( char **buf_p, int *slen, MPIDI_PG_t *pg )
     MPIDI_ConnInfo *connInfo = (MPIDI_ConnInfo *)pg->connData;
 
     /* Create this from the string array */
-    MPIR_CHKPMEM_MALLOC(str, char *, connInfo->toStringLen, mpi_errno, "str");
+    MPIR_CHKPMEM_MALLOC(str, char *, connInfo->toStringLen, mpi_errno, "str", MPL_MEM_STRINGS);
 
 #if defined(MPICH_DEBUG_MEMINIT)
     memset(str, 0, connInfo->toStringLen);
@@ -983,14 +984,16 @@ static int connFromString( const char *buf, MPIDI_PG_t *pg )
     /* printf( "Starting with buf = %s\n", buf );fflush(stdout); */
 
     /* Skip the pg id */
-    while (*buf) buf++; buf++;
+    while (*buf) buf++;
+    buf++;
 
     /* Determine the size of the pg */
     pg->size = atoi( buf );
-    while (*buf) buf++; buf++;
+    while (*buf) buf++;
+    buf++;
 
-    conninfo = (MPIDI_ConnInfo *)MPL_malloc( sizeof(MPIDI_ConnInfo) );
-    conninfo->connStrings = (char **)MPL_malloc( pg->size * sizeof(char *));
+    conninfo = (MPIDI_ConnInfo *)MPL_malloc( sizeof(MPIDI_ConnInfo), MPL_MEM_OTHER );
+    conninfo->connStrings = (char **)MPL_malloc( pg->size * sizeof(char *), MPL_MEM_STRINGS);
 
     /* For now, make a copy of each item */
     for (i=0; i<pg->size; i++) {
@@ -1034,11 +1037,13 @@ int MPIDI_PrintConnStr( const char *file, int line,
     MPL_dbg_outevent( file, line, MPIDI_CH3_DBG_CONNECT, 0, "%s", str );
     
     /* Skip the pg id */
-    while (*str) str++; str++;
+    while (*str) str++;
+    str++;
 
     /* Determine the size of the pg */
     pg_size = atoi( str );
-    while (*str) str++; str++;
+    while (*str) str++;
+    str++;
 
     for (i=0; i<pg_size; i++) {
 	MPL_dbg_outevent( file, line, MPIDI_CH3_DBG_CONNECT, 0, "%s", str );
@@ -1055,12 +1060,14 @@ int MPIDI_PrintConnStrToFile( FILE *fd, const char *file, int line,
     fprintf( fd, "ConnStr from %s(%d); %s\n\t%s\n", file, line, label, str );
     
     /* Skip the pg id */
-    while (*str) str++; str++;
+    while (*str) str++;
+    str++;
 
     fprintf( fd, "\t%s\n", str );
     /* Determine the size of the pg */
     pg_size = atoi( str );
-    while (*str) str++; str++;
+    while (*str) str++;
+    str++;
 
     for (i=0; i<pg_size; i++) {
 	fprintf( fd, "\t%s\n", str ); 
