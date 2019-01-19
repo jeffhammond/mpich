@@ -28,6 +28,8 @@ char *MPIDI_DBG_parent_str = "?";
 #include "pmi.h"
 #endif
 
+#include "datatype.h"
+
 int MPIDI_Use_pmi2_api = 0;
 
 static int init_pg( int *argc_p, char ***argv_p,
@@ -35,23 +37,35 @@ static int init_pg( int *argc_p, char ***argv_p,
 		   int *pg_rank_p, MPIDI_PG_t **pg_p );
 static int pg_compare_ids(void * id1, void * id2);
 static int pg_destroy(MPIDI_PG_t * pg );
-static int set_eager_threshold(MPID_Comm *comm_ptr, MPID_Info *info, void *state);
+static int set_eager_threshold(MPIR_Comm *comm_ptr, MPIR_Info *info, void *state);
 
 MPIDI_Process_t MPIDI_Process = { NULL };
 MPIDI_CH3U_SRBuf_element_t * MPIDI_CH3U_SRBuf_pool = NULL;
 MPIDI_CH3U_Win_fns_t MPIDI_CH3U_Win_fns = { NULL };
+MPIDI_CH3U_Win_hooks_t MPIDI_CH3U_Win_hooks = { NULL };
+MPIDI_CH3U_Win_pkt_ordering_t MPIDI_CH3U_Win_pkt_orderings = { 0 };
 
+#if defined(MPL_USE_DBG_LOGGING)
+MPL_dbg_class MPIDI_CH3_DBG_CONNECT;
+MPL_dbg_class MPIDI_CH3_DBG_DISCONNECT;
+MPL_dbg_class MPIDI_CH3_DBG_PROGRESS;
+MPL_dbg_class MPIDI_CH3_DBG_CHANNEL;
+MPL_dbg_class MPIDI_CH3_DBG_OTHER;
+MPL_dbg_class MPIDI_CH3_DBG_MSG;
+MPL_dbg_class MPIDI_CH3_DBG_VC;
+MPL_dbg_class MPIDI_CH3_DBG_REFCOUNT;
+#endif /* MPL_USE_DBG_LOGGING */
 
 #undef FUNCNAME
 #define FUNCNAME finalize_failed_procs_group
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int finalize_failed_procs_group(void *param)
 {
     int mpi_errno = MPI_SUCCESS;
-    if (MPIDI_Failed_procs_group != MPID_Group_empty) {
+    if (MPIDI_Failed_procs_group != MPIR_Group_empty) {
         mpi_errno = MPIR_Group_free_impl(MPIDI_Failed_procs_group);
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
     }
     
  fn_fail:
@@ -61,23 +75,23 @@ static int finalize_failed_procs_group(void *param)
 #undef FUNCNAME
 #define FUNCNAME set_eager_threshold
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
-static int set_eager_threshold(MPID_Comm *comm_ptr, MPID_Info *info, void *state)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+static int set_eager_threshold(MPIR_Comm *comm_ptr, MPIR_Info *info, void *state)
 {
     int mpi_errno = MPI_SUCCESS;
     char *endptr;
-    MPID_MPI_STATE_DECL(MPID_STATE_MPIDI_CH3_SET_EAGER_THRESHOLD);
+    MPIR_FUNC_TERSE_STATE_DECL(MPID_STATE_MPIDI_CH3_SET_EAGER_THRESHOLD);
 
-    MPID_MPI_FUNC_ENTER(MPID_STATE_MPIDI_CH3_SET_EAGER_THRESHOLD);
+    MPIR_FUNC_TERSE_ENTER(MPID_STATE_MPIDI_CH3_SET_EAGER_THRESHOLD);
 
-    comm_ptr->ch.eager_max_msg_sz = strtol(info->value, &endptr, 0);
+    comm_ptr->dev.eager_max_msg_sz = strtol(info->value, &endptr, 0);
 
-    MPIU_ERR_CHKANDJUMP1(*endptr, mpi_errno, MPI_ERR_ARG,
+    MPIR_ERR_CHKANDJUMP1(*endptr, mpi_errno, MPI_ERR_ARG,
                          "**infohintparse", "**infohintparse %s",
                          info->key);
 
  fn_exit:
-    MPID_MPI_FUNC_EXIT(MPID_STATE_MPIDI_CH3_SET_EAGER_THRESHOLD);
+    MPIR_FUNC_TERSE_EXIT(MPID_STATE_MPIDI_CH3_SET_EAGER_THRESHOLD);
     return mpi_errno;
  fn_fail:
     goto fn_exit;
@@ -87,27 +101,34 @@ static int set_eager_threshold(MPID_Comm *comm_ptr, MPID_Info *info, void *state
 #undef FUNCNAME
 #define FUNCNAME MPID_Init
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_Init(int *argc, char ***argv, int requested, int *provided, 
 	      int *has_args, int *has_env)
 {
+    int pmi_errno;
     int mpi_errno = MPI_SUCCESS;
     int has_parent;
     MPIDI_PG_t * pg=NULL;
     int pg_rank=-1;
     int pg_size;
-    MPID_Comm * comm;
+    MPIR_Comm * comm;
     int p;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_INIT);
+    int val;
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_INIT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_INIT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_INIT);
+
+    /* Call any and all MPID_Init type functions */
+    MPIR_Err_init();
+    MPIR_Datatype_init();
+    MPIR_Group_init();
 
     /* initialization routine for ch3u_comm.c */
     mpi_errno = MPIDI_CH3I_Comm_init();
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
     
     /* init group of failed processes, and set finalize callback */
-    MPIDI_Failed_procs_group = MPID_Group_empty;
+    MPIDI_Failed_procs_group = MPIR_Group_empty;
     MPIR_Add_finalize(finalize_failed_procs_group, NULL, MPIR_FINALIZE_CALLBACK_PRIO-1);
 
     /* FIXME: This is a good place to check for environment variables
@@ -117,18 +138,33 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     MPIDI_Use_pmi2_api = TRUE;
 #else
     {
-        int ret, val;
+        int ret;
         ret = MPL_env2bool("MPICH_USE_PMI2_API", &val);
         if (ret == 1 && val)
             MPIDI_Use_pmi2_api = TRUE;
     }
 #endif
-    
+
+    /* Create the string that will cache the last group of failed processes
+     * we received from PMI */
+#ifdef USE_PMI2_API
+    MPIDI_failed_procs_string = MPL_malloc(sizeof(char) * PMI2_MAX_VALLEN, MPL_MEM_STRINGS);
+#else
+    pmi_errno = PMI_KVS_Get_value_length_max(&val);
+    if (pmi_errno != PMI_SUCCESS)
+    {
+        MPIR_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER,
+                             "**pmi_kvs_get_value_length_max",
+                             "**pmi_kvs_get_value_length_max %d", pmi_errno);
+    }
+    MPIDI_failed_procs_string = MPL_malloc(sizeof(char) * (val+1), MPL_MEM_STRINGS);
+#endif
+
     /*
      * Set global process attributes.  These can be overridden by the channel 
      * if necessary.
      */
-    MPIR_Process.attrs.tag_ub = MPIDI_TAG_UB; /* see also mpidpre.h:NOTE-T1 */
+    MPIR_Process.attrs.io = MPI_ANY_SOURCE;
 
     /*
      * Perform channel-independent PMI initialization
@@ -136,7 +172,7 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     mpi_errno = init_pg( argc, argv,
 			has_args, has_env, &has_parent, &pg_rank, &pg );
     if (mpi_errno) {
-	MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**ch3|ch3_init");
+	MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**ch3|ch3_init");
     }
     
     /* FIXME: Why are pg_size and pg_rank handled differently? */
@@ -154,16 +190,28 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     /* Ideally this wouldn't be needed.  Once we have PMIv2 support for node
        information we should probably eliminate this function. */
     mpi_errno = MPIDI_Populate_vc_node_ids(pg, pg_rank);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 
     /* Initialize FTB after PMI init */
     mpi_errno = MPIDU_Ftb_init();
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 
     /* Initialize Window functions table with defaults, then call the channel's
        init function. */
     MPIDI_Win_fns_init(&MPIDI_CH3U_Win_fns);
     MPIDI_CH3_Win_fns_init(&MPIDI_CH3U_Win_fns);
+    MPIDI_CH3_Win_hooks_init(&MPIDI_CH3U_Win_hooks);
+
+#ifdef MPL_USE_DBG_LOGGING
+    MPIDI_CH3_DBG_CONNECT = MPL_dbg_class_alloc("CH3_CONNECT", "ch3_connect");;
+    MPIDI_CH3_DBG_DISCONNECT = MPL_dbg_class_alloc("CH3_DISCONNECT", "ch3_disconnect");
+    MPIDI_CH3_DBG_PROGRESS = MPL_dbg_class_alloc("CH3_PROGRESS", "ch3_progress");
+    MPIDI_CH3_DBG_CHANNEL = MPL_dbg_class_alloc("CH3_CHANNEL", "ch3_channel");
+    MPIDI_CH3_DBG_OTHER = MPL_dbg_class_alloc("CH3_OTHER", "ch3_other");
+    MPIDI_CH3_DBG_MSG = MPL_dbg_class_alloc("CH3_MSG", "ch3_msg");
+    MPIDI_CH3_DBG_VC = MPL_dbg_class_alloc("VC", "vc");
+    MPIDI_CH3_DBG_REFCOUNT = MPL_dbg_class_alloc("REFCOUNT", "refcount");
+#endif /* MPL_USE_DBG_LOGGING */
 
     /*
      * Let the channel perform any necessary initialization
@@ -173,12 +221,15 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
      */
     mpi_errno = MPIDI_CH3_Init(has_parent, pg, pg_rank);
     if (mpi_errno != MPI_SUCCESS) {
-	MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**ch3|ch3_init");
+	MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**ch3|ch3_init");
     }
 
     /* setup receive queue statistics */
     mpi_errno = MPIDI_CH3U_Recvq_init();
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+
+    /* Ask channel to expose Window packet ordering. */
+    MPIDI_CH3_Win_pkt_orderings_init(&MPIDI_CH3U_Win_pkt_orderings);
 
     /*
      * Initialize the MPI_COMM_WORLD object
@@ -188,30 +239,24 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     comm->rank        = pg_rank;
     comm->remote_size = pg_size;
     comm->local_size  = pg_size;
+    comm->pof2        = MPL_pof2(comm->local_size);
     
-    mpi_errno = MPID_VCRT_Create(comm->remote_size, &comm->vcrt);
+    mpi_errno = MPIDI_VCRT_Create(comm->remote_size, &comm->dev.vcrt);
     if (mpi_errno != MPI_SUCCESS)
     {
-	MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**dev|vcrt_create", 
+	MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**dev|vcrt_create", 
 			     "**dev|vcrt_create %s", "MPI_COMM_WORLD");
     }
-    
-    mpi_errno = MPID_VCRT_Get_ptr(comm->vcrt, &comm->vcr);
-    if (mpi_errno != MPI_SUCCESS)
-    {
-	MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**dev|vcrt_get_ptr", 
-			     "dev|vcrt_get_ptr %s", "MPI_COMM_WORLD");
-    }
-    
+
     /* Initialize the connection table on COMM_WORLD from the process group's
        connection table */
     for (p = 0; p < pg_size; p++)
     {
-	MPID_VCR_Dup(&pg->vct[p], &comm->vcr[p]);
+	MPIDI_VCR_Dup(&pg->vct[p], &comm->dev.vcrt->vcr_table[p]);
     }
 
     mpi_errno = MPIR_Comm_commit(comm);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 
     /*
      * Initialize the MPI_COMM_SELF object
@@ -220,25 +265,19 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     comm->rank        = 0;
     comm->remote_size = 1;
     comm->local_size  = 1;
+    comm->pof2        = 0;
     
-    mpi_errno = MPID_VCRT_Create(comm->remote_size, &comm->vcrt);
+    mpi_errno = MPIDI_VCRT_Create(comm->remote_size, &comm->dev.vcrt);
     if (mpi_errno != MPI_SUCCESS)
     {
-	MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**dev|vcrt_create", 
+	MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**dev|vcrt_create", 
 			     "**dev|vcrt_create %s", "MPI_COMM_SELF");
     }
     
-    mpi_errno = MPID_VCRT_Get_ptr(comm->vcrt, &comm->vcr);
-    if (mpi_errno != MPI_SUCCESS)
-    {
-	MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**dev|vcrt_get_ptr", 
-			     "dev|vcrt_get_ptr %s", "MPI_COMM_WORLD");
-    }
-    
-    MPID_VCR_Dup(&pg->vct[pg_rank], &comm->vcr[0]);
+    MPIDI_VCR_Dup(&pg->vct[pg_rank], &comm->dev.vcrt->vcr_table[0]);
 
     mpi_errno = MPIR_Comm_commit(comm);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 
     /* Currently, mpidpre.h always defines MPID_NEEDS_ICOMM_WORLD. */
 #ifdef MPID_NEEDS_ICOMM_WORLD
@@ -251,12 +290,12 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     comm->rank        = pg_rank;
     comm->remote_size = pg_size;
     comm->local_size  = pg_size;
-    MPID_VCRT_Add_ref( MPIR_Process.comm_world->vcrt );
-    comm->vcrt = MPIR_Process.comm_world->vcrt;
-    comm->vcr  = MPIR_Process.comm_world->vcr;
+    comm->pof2        = MPL_pof2(comm->local_size);
+    MPIDI_VCRT_Add_ref( MPIR_Process.comm_world->dev.vcrt );
+    comm->dev.vcrt = MPIR_Process.comm_world->dev.vcrt;
     
     mpi_errno = MPIR_Comm_commit(comm);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 #endif
     
     /*
@@ -273,7 +312,7 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
 	char * parent_port;
 
 	/* FIXME: To allow just the "root" process to 
-	   request the port and then use MPIR_Bcast_intra to 
+	   request the port and then use MPIR_Bcast_intra_auto to
 	   distribute it to the rest of the processes,
 	   we need to perform the Bcast after MPI is
 	   otherwise initialized.  We could do this
@@ -289,22 +328,22 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
 	   for the purposes of initialization. */
 	mpi_errno = MPIDI_CH3_GetParentPort(&parent_port);
 	if (mpi_errno != MPI_SUCCESS) {
-	    MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, 
+	    MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, 
 				"**ch3|get_parent_port");
 	}
-	MPIU_DBG_MSG_S(CH3_CONNECT,VERBOSE,"Parent port is %s", parent_port);
+	MPL_DBG_MSG_S(MPIDI_CH3_DBG_CONNECT,VERBOSE,"Parent port is %s", parent_port);
 	    
 	mpi_errno = MPID_Comm_connect(parent_port, NULL, 0, 
 				      MPIR_Process.comm_world, &comm);
 	if (mpi_errno != MPI_SUCCESS) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,
+	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,
 				 "**ch3|conn_parent", 
 				 "**ch3|conn_parent %s", parent_port);
 	}
 
 	MPIR_Process.comm_parent = comm;
-	MPIU_Assert(MPIR_Process.comm_parent != NULL);
-	MPIU_Strncpy(comm->name, "MPI_COMM_PARENT", MPI_MAX_OBJECT_NAME);
+	MPIR_Assert(MPIR_Process.comm_parent != NULL);
+	MPL_strncpy(comm->name, "MPI_COMM_PARENT", MPI_MAX_OBJECT_NAME);
         
 	/* FIXME: Check that this intercommunicator gets freed in MPI_Finalize
 	   if not already freed.  */
@@ -325,10 +364,13 @@ int MPID_Init(int *argc, char ***argv, int requested, int *provided,
     mpi_errno = MPIR_Comm_register_hint("eager_rendezvous_threshold",
                                         set_eager_threshold,
                                         NULL);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+
+    mpi_errno = MPIDI_RMA_init();
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_INIT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_INIT);
     return mpi_errno;
 
     /* --BEGIN ERROR HANDLING-- */
@@ -395,29 +437,29 @@ static int init_pg( int *argc, char ***argv,
 
 #ifdef USE_PMI2_API
         mpi_errno = PMI2_Init(has_parent, &pg_size, &pg_rank, &appnum);
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 #else
 	pmi_errno = PMI_Init(has_parent);
 	if (pmi_errno != PMI_SUCCESS) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_init",
+	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_init",
 			     "**pmi_init %d", pmi_errno);
 	}
 
 	pmi_errno = PMI_Get_rank(&pg_rank);
 	if (pmi_errno != PMI_SUCCESS) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_get_rank",
+	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_get_rank",
 			     "**pmi_get_rank %d", pmi_errno);
 	}
 
 	pmi_errno = PMI_Get_size(&pg_size);
 	if (pmi_errno != 0) {
-	MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_get_size",
+	MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_get_size",
 			     "**pmi_get_size %d", pmi_errno);
 	}
 	
 	pmi_errno = PMI_Get_appnum(&appnum);
 	if (pmi_errno != PMI_SUCCESS) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_get_appnum",
+	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_get_appnum",
 				 "**pmi_get_appnum %d", pmi_errno);
 	}
 #endif
@@ -430,14 +472,14 @@ static int init_pg( int *argc, char ***argv,
 #ifdef USE_PMI2_API
         
         /* This memory will be freed by the PG_Destroy if there is an error */
-	pg_id = MPIU_Malloc(MAX_JOBID_LEN);
+	pg_id = MPL_malloc(MAX_JOBID_LEN, MPL_MEM_STRINGS);
 	if (pg_id == NULL) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**nomem","**nomem %d",
+	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**nomem","**nomem %d",
 				 MAX_JOBID_LEN);
 	}
 
         mpi_errno = PMI2_Job_GetId(pg_id, MAX_JOBID_LEN);
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
         
 
 #else
@@ -447,15 +489,15 @@ static int init_pg( int *argc, char ***argv,
 	 */
 	pmi_errno = PMI_KVS_Get_name_length_max(&pg_id_sz);
 	if (pmi_errno != PMI_SUCCESS) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,
+	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,
 				 "**pmi_get_id_length_max", 
 				 "**pmi_get_id_length_max %d", pmi_errno);
 	}
 
 	/* This memory will be freed by the PG_Destroy if there is an error */
-	pg_id = MPIU_Malloc(pg_id_sz + 1);
+	pg_id = MPL_malloc(pg_id_sz + 1, MPL_MEM_OTHER);
 	if (pg_id == NULL) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**nomem","**nomem %d",
+	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,"**nomem","**nomem %d",
 				 pg_id_sz+1);
 	}
 
@@ -464,18 +506,18 @@ static int init_pg( int *argc, char ***argv,
 	   Process manager */
 	pmi_errno = PMI_KVS_Get_my_name(pg_id, pg_id_sz);
 	if (pmi_errno != PMI_SUCCESS) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_get_id",
+	    MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**pmi_get_id",
 				 "**pmi_get_id %d", pmi_errno);
 	}
 #endif
     }
     else {
 	/* Create a default pg id */
-	pg_id = MPIU_Malloc(2);
+	pg_id = MPL_malloc(2, MPL_MEM_OTHER);
 	if (pg_id == NULL) {
-	    MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**nomem");
+	    MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**nomem");
 	}
-	MPIU_Strncpy( pg_id, "0", 2 );
+	MPL_strncpy( pg_id, "0", 2 );
     }
 
     /*
@@ -484,7 +526,7 @@ static int init_pg( int *argc, char ***argv,
     mpi_errno = MPIDI_PG_Init(argc, argv, 
 			     pg_compare_ids, pg_destroy);
     if (mpi_errno != MPI_SUCCESS) {
-	MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**dev|pg_init");
+	MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**dev|pg_init");
     }
 
     /*
@@ -492,7 +534,7 @@ static int init_pg( int *argc, char ***argv,
      */
     mpi_errno = MPIDI_PG_Create(pg_size, pg_id, &pg);
     if (mpi_errno != MPI_SUCCESS) {
-	MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**dev|pg_create");
+	MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**dev|pg_create");
     }
 
     /* FIXME: We can allow the channels to tell the PG how to get
@@ -500,7 +542,7 @@ static int init_pg( int *argc, char ***argv,
     if (usePMI) {
 	/* Tell the process group how to get connection information */
         mpi_errno = MPIDI_PG_InitConnKVS( pg );
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
     }
 
     /* FIXME: Who is this for and where does it belong? */
@@ -546,15 +588,15 @@ int MPIDI_CH3I_BCInit( char **bc_val_p, int *val_max_sz_p )
     pmi_errno = PMI_KVS_Get_value_length_max(val_max_sz_p);
     if (pmi_errno != PMI_SUCCESS)
     {
-        MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,
+        MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER,
                              "**pmi_kvs_get_value_length_max",
                              "**pmi_kvs_get_value_length_max %d", pmi_errno);
     }
 #endif
     /* This memroy is returned by this routine */
-    *bc_val_p = MPIU_Malloc(*val_max_sz_p);
+    *bc_val_p = MPL_malloc(*val_max_sz_p, MPL_MEM_ADDRESS);
     if (*bc_val_p == NULL) {
-	MPIU_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**nomem","**nomem %d",
+	MPIR_ERR_SETANDJUMP1(mpi_errno,MPI_ERR_OTHER, "**nomem","**nomem %d",
 			     *val_max_sz_p);
     }
     
@@ -574,7 +616,7 @@ int MPIDI_CH3I_BCFree( char *bc_val )
 {
     /* */
     if (bc_val) {
-	MPIU_Free( bc_val );
+	MPL_free( bc_val );
     }
     
     return 0;
@@ -592,7 +634,7 @@ static int pg_destroy(MPIDI_PG_t * pg)
 {
     if (pg->id != NULL)
     { 
-	MPIU_Free(pg->id);
+	MPL_free(pg->id);
     }
     
     return MPI_SUCCESS;

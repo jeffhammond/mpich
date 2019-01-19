@@ -86,7 +86,7 @@ else
         ccc*)
           wl='-Wl,'
           ;;
-        xl* | bgxl* | bgf* | mpixl*)
+        xl* | bgxl* | bgf* | mpixl* | *bgq-linux-xl* )
           wl='-Wl,'
           ;;
         como)
@@ -94,8 +94,11 @@ else
           ;;
         *)
           case `$CC -V 2>&1 | sed 5q` in
-            *Sun\ F* | *Sun*Fortran*)
+            *Sun\ Ceres\ Fortran* | *Sun*Fortran*\ [[1-7]].* | *Sun*Fortran*\ 8.[[0-4]]*)
               wl=
+              ;;
+            *Sun\ F* | *Sun*Fortran*)
+              wl='-Wl,'
               ;;
             *Sun\ C*)
               wl='-Wl,'
@@ -148,6 +151,8 @@ hardcode_libdir_flag_spec=
 hardcode_libdir_separator=
 hardcode_direct=no
 hardcode_minus_L=no
+enable_dtags_flag=
+disable_dtags_flag=
 
 case "$host_os" in
   cygwin* | mingw* | pw32* | cegcc*)
@@ -217,7 +222,18 @@ if test "$with_gnu_ld" = yes; then
       ;;
     gnu* | linux* | tpf* | k*bsd*-gnu | kopensolaris*-gnu)
       if $LD --help 2>&1 | grep ': supported targets:.* elf' > /dev/null; then
-        :
+        # use --enable-new-dtags for RUNPATH support, which is required for
+        # switching between ABI compatible libraries at runtime.
+        if test "$GCC" = yes; then
+          enable_dtags_flag="${wl}--enable-new-dtags"
+          disable_dtags_flag="${wl}--disable-new-dtags"
+        else
+          case $cc_basename in ifort*)
+            enable_dtags_flag="${wl}--enable-new-dtags"
+            disable_dtags_flag="${wl}--disable-new-dtags"
+            ;;
+          esac
+        fi
       else
         ld_shlibs=no
       fi
@@ -679,6 +695,10 @@ library_names_spec="$escaped_library_names_spec"
 # Flag to hardcode \$libdir into a binary during linking.
 # This must work even if \$libdir does not exist.
 hardcode_libdir_flag_spec="$escaped_hardcode_libdir_flag_spec"
+
+# Flag to add dtags to allow using runpath instead of rpath
+enable_dtags_flag="$enable_dtags_flag"
+disable_dtags_flag="$disable_dtags_flag"
 
 # Whether we need a single -rpath flag with a separated argument.
 hardcode_libdir_separator="$hardcode_libdir_separator"

@@ -10,7 +10,6 @@
 include $(top_srcdir)/src/pm/util/Makefile.mk
 
 include $(top_srcdir)/src/pm/gforker/Makefile.mk
-include $(top_srcdir)/src/pm/smpd/Makefile.mk
 include $(top_srcdir)/src/pm/remshell/Makefile.mk
 
 ## a note about DIST_SUBDIRS:
@@ -29,13 +28,12 @@ include $(top_srcdir)/src/pm/remshell/Makefile.mk
 if BUILD_PM_HYDRA
 SUBDIRS += src/pm/hydra
 DIST_SUBDIRS += src/pm/hydra
+MANDOC_SUBDIRS += src/pm/hydra
 endif BUILD_PM_HYDRA
 
-# uses a separate Makefile.sm, not Makefile.mk
-if BUILD_PM_MPD
-SUBDIRS += src/pm/mpd
-DIST_SUBDIRS += src/pm/mpd
-endif BUILD_PM_MPD
-
-## FIXME TEMPORARY
-EXTRA_DIST += src/pm/smpd/smpd_version.h
+# has its own full automake setup, not Makefile.mk
+if BUILD_PM_HYDRA2
+SUBDIRS += src/pm/hydra2
+DIST_SUBDIRS += src/pm/hydra2
+MANDOC_SUBDIRS += src/pm/hydra2
+endif BUILD_PM_HYDRA2

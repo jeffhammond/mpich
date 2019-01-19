@@ -5,10 +5,8 @@
 ##     See COPYRIGHT in top-level directory.
 ##
 
-lib_lib@MPILIBNAME@_la_SOURCES += \
-    src/util/mem/trmem.c      \
-    src/util/mem/handlemem.c  \
-    src/util/mem/safestr.c    \
-    src/util/mem/argstr.c     \
-    src/util/mem/strerror.c
+AM_CPPFLAGS += -I$(top_srcdir)/src/util/mem
 
+mpi_core_sources += \
+    src/util/mem/handlemem.c  \
+    src/util/mem/strerror.c

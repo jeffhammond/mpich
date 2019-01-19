@@ -1,4 +1,5 @@
 [#] start of __file__
+dnl MPICH_SUBCFG_BEFORE=src/mpid/common/shm
 dnl
 dnl _PREREQ handles the former role of mpichprereq, setup_device, etc
 AC_DEFUN([PAC_SUBCFG_PREREQ_]PAC_SUBCFG_AUTO_SUFFIX,[
@@ -24,6 +25,8 @@ else
 fi
 export nemesis_networks
 
+# the nemesis channel depends on the common shm code
+build_mpid_common_shm=yes
 ])dnl end AM_COND_IF(BUILD_CH3_NEMESIS,...)
 ])dnl
 dnl
@@ -91,10 +94,6 @@ This turns off error checking and timing collection],,enable_fast=no)
 AC_CHECK_HEADERS(signal.h)
 AC_CHECK_FUNCS(signal)
 
-# Check for netmod relevant headers and libraries
-PAC_SET_HEADER_LIB_PATH(mx)
-PAC_SET_HEADER_LIB_PATH(scif)
-
 nemesis_nets_dirs=""
 nemesis_nets_strings=""
 nemesis_nets_array=""   
@@ -150,10 +149,10 @@ for net in $nemesis_networks ; do
 done
 nemesis_nets_array_sz=$net_index
 
-AC_ARG_ENABLE(nemesis-dbg-nolocal, [--enable-nemesis-dbg-nolocal - enables debugging mode where shared-memory communication is disabled],
+AC_ARG_ENABLE(nemesis-dbg-nolocal, AC_HELP_STRING([--enable-nemesis-dbg-nolocal], [alias for --enable-dbg-nolocal]),
     AC_DEFINE(ENABLED_NO_LOCAL, 1, [Define to disable shared-memory communication for debugging]))
 
-AC_ARG_ENABLE(nemesis-dbg-localoddeven, [--enable-nemesis-dbg-localoddeven - enables debugging mode where shared-memory communication is enabled only between even processes or odd processes on a node],
+AC_ARG_ENABLE(nemesis-dbg-localoddeven, AC_HELP_STRING([--enable-nemesis-dbg-localoddeven], [alias for --enable-dbg-localoddeven]),
     AC_DEFINE(ENABLED_ODD_EVEN_CLIQUES, 1, [Define to enable debugging mode where shared-memory communication is done only between even procs or odd procs]))
 
 AC_ARG_WITH(papi, [--with-papi[=path] - specify path where papi include and lib directories can be found],, with_papi=no)
@@ -184,37 +183,11 @@ AC_CHECK_FUNCS(mkstemp)
 AC_CHECK_FUNCS(rand)
 AC_CHECK_FUNCS(srand)
 
-# check how to allocate shared memory
-AC_ARG_WITH(shared-memory, [--with-shared-memory[=auto|sysv|mmap] - create shared memory using sysv or mmap (default is auto)],,
-    with_shared_memory=auto)
-
-if test "$with_shared_memory" = auto -o "$with_shared_memory" = mmap; then
-    found_mmap_funcs=yes
-    AC_CHECK_FUNCS(mmap munmap, , found_mmap_funcs=no)
-    if test "$found_mmap_funcs" = yes ; then
-        with_shared_memory=mmap
-        AC_DEFINE(USE_MMAP_SHM,1,[Define if we have sysv shared memory])
-        AC_MSG_NOTICE([Using a memory-mapped file for shared memory])
-    elif test "$with_shared_memory" = mmap ; then
-        AC_MSG_ERROR([cannot support shared memory:  mmap() or munmap() not found])
-    fi
-fi
-if test "$with_shared_memory" = auto -o "$with_shared_memory" = sysv; then
-    found_sysv_shm_funcs=yes
-    AC_CHECK_FUNCS(shmget shmat shmctl shmdt, , found_sysv_shm_funcs=no)
-    if test "$found_sysv_shm_funcs" = yes ; then
-        AC_DEFINE(USE_SYSV_SHM,1,[Define if we have sysv shared memory])
-        AC_MSG_NOTICE([Using SYSV shared memory])
-    elif test "$with_shared_memory" = sysv ; then
-        AC_MSG_ERROR([cannot support shared memory:  sysv shared memory functions functions not found])
-    else
-        AC_MSG_ERROR([cannot support shared memory:  need either sysv shared memory functions or mmap in order to support shared memory])
-    fi
-fi
-
-if test "$found_sysv_shm_funcs" = yes ; then
-   AC_CHECK_FUNCS(strtoll, , AC_MSG_ERROR([cannot find strtoll function needed by sysv shared memory implementation]))
-fi
+# Check for available shared memory functions
+#PAC_ARG_SHARED_MEMORY
+#if test "$with_shared_memory" != "mmap" -a "$with_shared_memory" != "sysv"; then
+#    AC_MSG_ERROR([cannot support shared memory:  need either sysv shared memory functions or mmap in order to support shared memory])
+#fi
 
 AC_ARG_ENABLE(nemesis-shm-collectives, [--enable-nemesis-shm-collectives - enables use of shared memory for collective comunication within a node],
     AC_DEFINE(ENABLED_SHM_COLLECTIVES, 1, [Define to enable shared-memory collectives]))
@@ -318,6 +291,7 @@ AC_ARG_ENABLE(nemesis-lock-free-queues,
 if test "$enable_nemesis_lock_free_queues" = "yes" ; then
     AC_DEFINE(MPID_NEM_USE_LOCK_FREE_QUEUES, 1, [Define to enable lock-free communication queues])
 fi
+
 
 AC_SUBST(device_name)
 AC_SUBST(channel_name)

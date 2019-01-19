@@ -9,7 +9,7 @@
 if BUILD_LOGGING_RLOG
 
 lib_LTLIBRARIES += lib/librlogutil.la
-lib_lib@MPILIBNAME@_la_LIBADD += lib/librlogutil.la
+pmpi_convenience_libs += lib/librlogutil.la
 lib_librlogutil_la_SOURCES =          \
     src/util/logging/rlog/rlog.c      \
     src/util/logging/rlog/rlogutil.c  \
@@ -32,4 +32,3 @@ src_util_logging_rlog_printrlog_LDADD      = lib/librlogutil.la
 #src_util_logging_rlog_minalignrlog_SOURCES = src/util/logging/rlog/minalignrlog.c $(irlog_sources)
 
 endif BUILD_LOGGING_RLOG
-

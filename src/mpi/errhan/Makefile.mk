@@ -28,7 +28,7 @@ mpi_sources +=                                            \
     src/mpi/errhan/win_get_errhandler.c     \
     src/mpi/errhan/win_set_errhandler.c
 
-lib_lib@MPILIBNAME@_la_SOURCES +=                 \
+mpi_core_sources +=             \
     src/mpi/errhan/errutil.c    \
     src/mpi/errhan/dynerrutil.c
 
@@ -66,5 +66,3 @@ $(top_srcdir)/src/mpi/errhan/defmsg.h: $(top_srcdir)/maint/errmsgdirs $(errnames
 	( cd $(top_srcdir) && test -s .tmp && mv .tmp src/mpi/errhan/defmsg.h )
 
 endif MAINTAINER_MODE
-
-

@@ -49,24 +49,10 @@
   Argonne National Laboratory}
 
 \author{
-Pavan Balaji\\
-Wesley Bland\\
-William Gropp\\
-Rob Latham\\
-Antonio Pe$\tilde{n}$a\\
-Rajeev Thakur\\[2.0ex]
-\textbf{Past Contributors:}\\
-David Ashton\\
-Darius Buntinas\\
-Ralph Butler\\
-Anthony Chan\\
-James Dinan\\
-David Goodell\\
-Jayesh Krishna\\
-Ewing Lusk\\
-Guillaume Mercier\\
-Rob Ross\\
-Brian Toonen
+Abdelhalim Amer \and Pavan Balaji \and Wesley Bland \and William Gropp \and
+Yanfei Guo \and Rob Latham \and Huiwei Lu \and Lena Oden \and Antonio J. Pe\~na
+\and Ken Raffenetti \and Sangmin Seo \and Min Si \and Rajeev Thakur \and
+Junchao Zhang \and Xin Zhao
 }
 
 \maketitle
@@ -113,7 +99,7 @@ run MPI applications.  Some particular features are different
 if you have system administration privileges (can become ``root'' on a
 Unix system), and these are explained here.  It is not necessary to have
 such privileges to build and install MPICH.  In the event of problems,
-send mail to \texttt{mpich-discuss@mcs.anl.gov}.  Once MPICH is
+send mail to \texttt{discuss@mpich.org}.  Once MPICH is
 installed, details on how to run MPI jobs are covered in the \emph{MPICH
 User's Guide}, found in this same \texttt{doc} subdirectory.
 
@@ -211,7 +197,7 @@ where the \texttt{$\backslash$} means that this is really one line.  (On
 instead of \verb+|& tee c.txt+).  Other configure options are
 described below.  Check the \texttt{c.txt} file to make sure
 everything went well.  Problems should be self-explanatory, but if not,
-send \texttt{c.txt} to \texttt{mpich-discuss@mcs.anl.gov}.
+send \texttt{c.txt} to \texttt{discuss@mpich.org}.
 The file \texttt{config.log} is created by \texttt{configure} and
 contains a record of the tests that \texttt{configure} performed.  It
 is normal for some tests recorded in \texttt{config.log} to fail.  
@@ -232,7 +218,7 @@ do a \texttt{make clean} and then run make again with \texttt{VERBOSE=1}
     make VERBOSE=1 2>&1 | tee m.txt   (for bash and sh)
 \end{verbatim}
 and then send \texttt{m.txt} and \texttt{c.txt} to 
-\texttt{mpich-discuss@mcs.anl.gov}.
+\texttt{discuss@mpich.org}.
 
 \item
 Install the MPICH commands:
@@ -439,22 +425,6 @@ or
 This will cause the MPICH libraries to be built with \texttt{-O3},
 and \texttt{-O3} will
 not be included in the \texttt{mpicc} and other MPI wrapper script.
-
-There are certain compiler flags that should not be used with MPICH's
-configure, e.g. gcc's \texttt{-Werror} which would confuse configure and cause
-certain configure tests to fail to detect the correct system features.
-To use \texttt{-Werror} in building MPICH libraries, you can pass the compiler
-flags during the make step through the Makefile variable,
-\texttt{MPICH\_MAKE\_CFLAGS} as follows:
-
-\begin{verbatim}
-  make VERBOSE=1 MPICH_MAKE_CFLAGS="-Wall -Werror"
-\end{verbatim}
-
-(assume CC is set to gcc).  The content of \texttt{MPICH\_MAKE\_CFLAGS}
-is appended to the \texttt{CFLAGS} in almost all Makefiles.
-
-
 
 \subsection{Common Non-Default Configuration Options}
 \label{sec:non-default}
@@ -664,8 +634,6 @@ Currently three process managers are distributed with MPICH
 \begin{description}
 \item[hydra] This is the default process manager tha natively uses the
 existing daemons on the system such as ssh, slurm, pbs.
-\item[smpd] This one can be used for both Linux and Windows.  It is the
-  only process manager that supports the Windows version of MPICH.
 \item[gforker] This is a simple process manager that creates all
   processes on a single machine.  It is useful both for debugging and
   for running on shared memory multiprocessors.
@@ -680,86 +648,6 @@ the \texttt{hydra} process manager, use
     configure --with-pm=hydra ...
 \end{verbatim}
 
-
-\subsection{SMPD}
-\label{sec:smpd}
-
-\subsubsection{Configuration}
-\label{sec:smpd_configure}
-
-You may add the following configure options, 
-\texttt{--with-pm=smpd}, 
-to build and install the smpd process manager. The process manager, smpd, 
-will be installed to the bin sub-directory of the installation directory 
-of your choice specified by the \texttt{--prefix} option.
-
-smpd process managers run on each node as stand-alone daemons and need to
-be running on all nodes that will participate in MPI jobs.  smpd process 
-managers are not connected to each other and rely on a known port to 
-communicate with each other.  Note: If you want multiple users to use the 
-same nodes they must each configure their smpds to use a unique port per 
-user. 
-
-smpd uses a configuration file to store settings.  The default location is 
-\verb+~/.smpd+.  This file must not be readable by anyone other than 
-the owner and contains at least one required option - the access passphrase.
-This is stored in the configuration file as \texttt{phrase=<phrase>}. Access 
-to running smpds is authenticated using this passphrase and it must 
-not be your user password.
-
-\subsubsection{Usage and administration}
-\label{sec:smpd_usage}
-
-Users will start the smpd daemons before launching mpi jobs.  To get an 
-smpd running on a node, execute 
-\begin{verbatim}
-    smpd -s
-\end{verbatim}
-Executing this for the first time will prompt the user to create a 
-\verb+~/.smpd+ configuration file and passphrase if one does not 
-already exist.
-
-Then users can use \texttt{mpiexec} to launch MPI jobs.
-
-All options to \texttt{smpd}:
-
-\begin{description}
-\item[\texttt{smpd -s}]\mbox{}\\
-Start the smpd service/daemon for the current user.  You can add 
-\texttt{-p <port>} to specify the port to listen on.  All smpds must use
-the same port and if you don't use the default then you will have to
-add \texttt{-p <port>} to mpiexec or add the \texttt{port=<port>} to the 
-\texttt{.smpd} configuration file.
-
-\item[\texttt{smpd -r}]\mbox{}\\
-Start the smpd service/daemon in root/multi-user mode.  This is not yet
-implemented.
-
-\item[\texttt{smpd -shutdown [host]}]\mbox{}\\
-Shutdown the smpd on the local host or specified host.  Warning: this will
-cause the smpd to exit and no mpiexec or smpd commands can be issued to the
-host until smpd is started again.
-
-%\item[\texttt{smpd -start}]\mbox{}\\
-%Start the Windows smpd service on the local host.
-%
-%\item[\texttt{smpd -stop}]\mbox{}\\
-%Stop the Windows smpd on the local host.
-%
-%\item[\texttt{smpd -console [host]}]\mbox{}\\
-%Connect to a specific smpd to issue console commands.  The currently 
-%supported commands are: %get, set, delete, stat, status, shutdown and validate.
-%\begin{enumerate}
-%\item[\texttt{get <var>}]\mbox{}
-%\item[\texttt{set <var>=<value>}]\mbox{}
-%\item[\texttt{delete <var>}]\mbox{}
-%\item[\texttt{status}]\mbox{}
-%\item[\texttt{stat <var>}]\mbox{}
-%\item[\texttt{shutdown}]\mbox{}
-%\item[\texttt{validate}]\mbox{}
-%\end{enumerate}
-
-\end{description}
 
 \subsection{gforker}
 \label{sec:forker}
@@ -806,16 +694,14 @@ Other tests are run on an occasional basis.
 
 % 3) cd into that testing directory
 
-% 4) make sure the process manager (e.g., mpd) is running
-
-% 5) run "<ITS_SRC_DIR>/configure --with-mpich=<MPICH_INSTALL_DIR>", where
+% 4) run "<ITS_SRC_DIR>/configure --with-mpich=<MPICH_INSTALL_DIR>", where
 % <ITS_SRC_DIR> is the path to the directory Intel test suite source (e.g.,
 % /home/toonen/Projects/MPI-Tests/IntelMPITEST) and <MPICH_INSTALL_DIR> is
 % the directory containing your MPICH installation
 
-% 6) mkdir Test; cd Test
+% 5) mkdir Test; cd Test
 
-% 7) find tests in <ITS_SRC_DIR>/{c,fortran} that you are interested in
+% 6) find tests in <ITS_SRC_DIR>/{c,fortran} that you are interested in
 % running and place the test names in a file.  For example:
 
 % % ( cd /home/toonen/Projects/MPI-Tests/IntelMPITEST/Test ; \
@@ -841,14 +727,14 @@ Other tests are run on an occasional basis.
 % Test/fortran/probe_cancel/functional/MPI_Test_cancelled_false
 % %
 
-% 8) run the tests using ../bin/mtest:
+% 7) run the tests using ../bin/mtest:
 
 % % ../bin/mtest -testlist testlist -np 6 |& tee mtest.log
 % %
 
 % NOTE: some programs hang if less they are run with less than 6 processes.
 
-% 9) examine the summary.xml file.  look for '<STATUS>fail</STATUS>' to see if
+% 8) examine the summary.xml file.  look for '<STATUS>fail</STATUS>' to see if
 % any failures occurred.  (search for '>fail<' works as well)
 
 % \end{verbatim}

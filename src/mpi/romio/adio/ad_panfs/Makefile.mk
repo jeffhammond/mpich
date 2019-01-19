@@ -5,21 +5,23 @@
 ##     See COPYRIGHT in top-level directory.
 ##
 
-if BUILD_AD_PANFS
+if BUILD_PANFS_OPEN6
+# override open with one that uses newer features
+panfs_open = adio/ad_panfs/ad_panfs_open6.c
+else
+panfs_open = adio/ad_panfs/ad_panfs_open.c
+endif
 
-# I don't like this hard-coded path to the PANFS headers but I guess that's
-# where they always are?
-AM_CPPFLAGS += -I/opt/panfs/include
+if BUILD_AD_PANFS
 
 noinst_HEADERS += adio/ad_panfs/ad_panfs.h
 
 romio_other_sources +=              \
     adio/ad_panfs/ad_panfs.c        \
-    adio/ad_panfs/ad_panfs_open.c   \
+    $(panfs_open)                   \
     adio/ad_panfs/ad_panfs_hints.c  \
     adio/ad_panfs/ad_panfs_read.c   \
     adio/ad_panfs/ad_panfs_resize.c \
     adio/ad_panfs/ad_panfs_write.c
 
 endif BUILD_AD_PANFS
-

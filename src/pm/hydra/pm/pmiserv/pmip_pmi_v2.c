@@ -1,6 +1,6 @@
 /* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2008 by Argonne National Laboratory.
+ *  (C) 2010 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
 
@@ -19,18 +19,18 @@ static HYD_status send_cmd_upstream(const char *start, int fd, char *args[])
 {
     int i, sent, closed;
     struct HYD_string_stash stash;
-    char *buf;
+    char *buf = NULL;
     struct HYD_pmcd_hdr hdr;
     HYD_status status = HYD_SUCCESS;
 
     HYDU_FUNC_ENTER();
 
     HYD_STRING_STASH_INIT(stash);
-    HYD_STRING_STASH(stash, HYDU_strdup(start), status);
+    HYD_STRING_STASH(stash, MPL_strdup(start), status);
     for (i = 0; args[i]; i++) {
-        HYD_STRING_STASH(stash, HYDU_strdup(args[i]), status);
+        HYD_STRING_STASH(stash, MPL_strdup(args[i]), status);
         if (args[i + 1])
-            HYD_STRING_STASH(stash, HYDU_strdup(";"), status);
+            HYD_STRING_STASH(stash, MPL_strdup(";"), status);
     }
 
     HYD_STRING_SPIT(stash, buf, status);
@@ -56,6 +56,8 @@ static HYD_status send_cmd_upstream(const char *start, int fd, char *args[])
     HYDU_ASSERT(!closed, status);
 
   fn_exit:
+    if (buf)
+        MPL_free(buf);
     HYDU_FUNC_EXIT();
     return status;
 
@@ -71,7 +73,7 @@ static HYD_status send_cmd_downstream(int fd, const char *cmd)
 
     HYDU_FUNC_ENTER();
 
-    HYDU_snprintf(cmdlen, 7, "%6u", (unsigned) strlen(cmd));
+    MPL_snprintf(cmdlen, 7, "%6u", (unsigned) strlen(cmd));
     status = HYDU_sock_write(fd, cmdlen, 6, &sent, &closed, HYDU_SOCK_COMM_MSGWAIT);
     HYDU_ERR_POP(status, "error writing PMI line\n");
     /* FIXME: We cannot abort when we are not able to send data
@@ -112,25 +114,23 @@ static HYD_status poke_progress(char *key)
             req->next = NULL;
         }
 
-        if (key && strcmp(key, req->key)) {
+        if (key && req && strcmp(key, req->key)) {
             /* If the key doesn't match the request, just queue it back */
             if (list_head == NULL) {
                 list_head = req;
                 list_tail = req;
-            }
-            else {
+            } else {
                 list_tail->next = req;
                 req->prev = list_tail;
                 list_tail = req;
             }
-        }
-        else {
+        } else {
             status = fn_info_getnodeattr(req->fd, req->args);
             HYDU_ERR_POP(status, "getnodeattr returned error\n");
 
             /* Free the dequeued request */
             HYDU_free_strlist(req->args);
-            HYDU_FREE(req);
+            MPL_free(req);
         }
     }
 
@@ -178,30 +178,29 @@ static HYD_status fn_fullinit(int fd, char *args[])
 
     HYD_STRING_STASH_INIT(stash);
     HYD_STRING_STASH(stash,
-                     HYDU_strdup("cmd=fullinit-response;pmi-version=2;pmi-subversion=0;rank="),
+                     MPL_strdup("cmd=fullinit-response;pmi-version=2;pmi-subversion=0;rank="),
                      status);
     HYD_STRING_STASH(stash, HYDU_int_to_str(id), status);
 
-    HYD_STRING_STASH(stash, HYDU_strdup(";size="), status);
+    HYD_STRING_STASH(stash, MPL_strdup(";size="), status);
     HYD_STRING_STASH(stash, HYDU_int_to_str(HYD_pmcd_pmip.system_global.global_process_count),
                      status);
-    HYD_STRING_STASH(stash, HYDU_strdup(";appnum=0"), status);
+    HYD_STRING_STASH(stash, MPL_strdup(";appnum=0"), status);
     if (HYD_pmcd_pmip.local.spawner_kvsname) {
-        HYD_STRING_STASH(stash, HYDU_strdup(";spawner-jobid="), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(HYD_pmcd_pmip.local.spawner_kvsname), status);
+        HYD_STRING_STASH(stash, MPL_strdup(";spawner-jobid="), status);
+        HYD_STRING_STASH(stash, MPL_strdup(HYD_pmcd_pmip.local.spawner_kvsname), status);
     }
     if (HYD_pmcd_pmip.user_global.debug) {
-        HYD_STRING_STASH(stash, HYDU_strdup(";debugged=TRUE;pmiverbose=TRUE"), status);
+        HYD_STRING_STASH(stash, MPL_strdup(";debugged=TRUE;pmiverbose=TRUE"), status);
+    } else {
+        HYD_STRING_STASH(stash, MPL_strdup(";debugged=FALSE;pmiverbose=FALSE"), status);
     }
-    else {
-        HYD_STRING_STASH(stash, HYDU_strdup(";debugged=FALSE;pmiverbose=FALSE"), status);
-    }
-    HYD_STRING_STASH(stash, HYDU_strdup(";rc=0;"), status);
+    HYD_STRING_STASH(stash, MPL_strdup(";rc=0;"), status);
 
     HYD_STRING_SPIT(stash, cmd, status);
 
     send_cmd_downstream(fd, cmd);
-    HYDU_FREE(cmd);
+    MPL_free(cmd);
 
   fn_exit:
     HYD_pmcd_pmi_free_tokens(tokens, token_count);
@@ -216,7 +215,7 @@ static HYD_status fn_job_getid(int fd, char *args[])
 {
     struct HYD_string_stash stash;
     char *cmd, *thrid;
-    struct HYD_pmcd_token *tokens;
+    struct HYD_pmcd_token *tokens = NULL;
     int token_count;
     HYD_status status = HYD_SUCCESS;
 
@@ -228,22 +227,24 @@ static HYD_status fn_job_getid(int fd, char *args[])
     thrid = HYD_pmcd_pmi_find_token_keyval(tokens, token_count, "thrid");
 
     HYD_STRING_STASH_INIT(stash);
-    HYD_STRING_STASH(stash, HYDU_strdup("cmd=job-getid-response;"), status);
+    HYD_STRING_STASH(stash, MPL_strdup("cmd=job-getid-response;"), status);
     if (thrid) {
-        HYD_STRING_STASH(stash, HYDU_strdup("thrid="), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(thrid), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(";"), status);
+        HYD_STRING_STASH(stash, MPL_strdup("thrid="), status);
+        HYD_STRING_STASH(stash, MPL_strdup(thrid), status);
+        HYD_STRING_STASH(stash, MPL_strdup(";"), status);
     }
-    HYD_STRING_STASH(stash, HYDU_strdup("jobid="), status);
-    HYD_STRING_STASH(stash, HYDU_strdup(HYD_pmcd_pmip.local.kvs->kvsname), status);
-    HYD_STRING_STASH(stash, HYDU_strdup(";rc=0;"), status);
+    HYD_STRING_STASH(stash, MPL_strdup("jobid="), status);
+    HYD_STRING_STASH(stash, MPL_strdup(HYD_pmcd_pmip.local.kvs->kvsname), status);
+    HYD_STRING_STASH(stash, MPL_strdup(";rc=0;"), status);
 
     HYD_STRING_SPIT(stash, cmd, status);
 
     send_cmd_downstream(fd, cmd);
-    HYDU_FREE(cmd);
+    MPL_free(cmd);
 
   fn_exit:
+    if (tokens)
+        HYD_pmcd_pmi_free_tokens(tokens, token_count);
     HYDU_FUNC_EXIT();
     return status;
 
@@ -255,7 +256,7 @@ static HYD_status fn_info_putnodeattr(int fd, char *args[])
 {
     struct HYD_string_stash stash;
     char *key, *val, *thrid, *cmd;
-    struct HYD_pmcd_token *tokens;
+    struct HYD_pmcd_token *tokens = NULL;
     int token_count, ret;
     struct HYD_pmcd_pmi_v2_reqs *req;
     HYD_status status = HYD_SUCCESS;
@@ -277,20 +278,20 @@ static HYD_status fn_info_putnodeattr(int fd, char *args[])
     HYDU_ERR_POP(status, "unable to put data into kvs\n");
 
     HYD_STRING_STASH_INIT(stash);
-    HYD_STRING_STASH(stash, HYDU_strdup("cmd=info-putnodeattr-response;"), status);
+    HYD_STRING_STASH(stash, MPL_strdup("cmd=info-putnodeattr-response;"), status);
     if (thrid) {
-        HYD_STRING_STASH(stash, HYDU_strdup("thrid="), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(thrid), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(";"), status);
+        HYD_STRING_STASH(stash, MPL_strdup("thrid="), status);
+        HYD_STRING_STASH(stash, MPL_strdup(thrid), status);
+        HYD_STRING_STASH(stash, MPL_strdup(";"), status);
     }
-    HYD_STRING_STASH(stash, HYDU_strdup("rc="), status);
+    HYD_STRING_STASH(stash, MPL_strdup("rc="), status);
     HYD_STRING_STASH(stash, HYDU_int_to_str(ret), status);
-    HYD_STRING_STASH(stash, HYDU_strdup(";"), status);
+    HYD_STRING_STASH(stash, MPL_strdup(";"), status);
 
     HYD_STRING_SPIT(stash, cmd, status);
 
     send_cmd_downstream(fd, cmd);
-    HYDU_FREE(cmd);
+    MPL_free(cmd);
 
     for (req = pending_reqs; req; req = req->next) {
         if (!strcmp(req->key, key)) {
@@ -302,6 +303,8 @@ static HYD_status fn_info_putnodeattr(int fd, char *args[])
     }
 
   fn_exit:
+    if (tokens)
+        HYD_pmcd_pmi_free_tokens(tokens, token_count);
     HYDU_FUNC_EXIT();
     return status;
 
@@ -316,7 +319,7 @@ static HYD_status fn_info_getnodeattr(int fd, char *args[])
     char *key, *waitval, *thrid;
     struct HYD_string_stash stash;
     char *cmd;
-    struct HYD_pmcd_token *tokens;
+    struct HYD_pmcd_token *tokens = NULL;
     int token_count;
     HYD_status status = HYD_SUCCESS;
 
@@ -344,46 +347,46 @@ static HYD_status fn_info_getnodeattr(int fd, char *args[])
 
     if (found) {        /* We found the attribute */
         HYD_STRING_STASH_INIT(stash);
-        HYD_STRING_STASH(stash, HYDU_strdup("cmd=info-getnodeattr-response;"), status);
+        HYD_STRING_STASH(stash, MPL_strdup("cmd=info-getnodeattr-response;"), status);
         if (thrid) {
-            HYD_STRING_STASH(stash, HYDU_strdup("thrid="), status);
-            HYD_STRING_STASH(stash, HYDU_strdup(thrid), status);
-            HYD_STRING_STASH(stash, HYDU_strdup(";"), status);
+            HYD_STRING_STASH(stash, MPL_strdup("thrid="), status);
+            HYD_STRING_STASH(stash, MPL_strdup(thrid), status);
+            HYD_STRING_STASH(stash, MPL_strdup(";"), status);
         }
-        HYD_STRING_STASH(stash, HYDU_strdup("found=TRUE;value="), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(run->val), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(";rc=0;"), status);
+        HYD_STRING_STASH(stash, MPL_strdup("found=TRUE;value="), status);
+        HYD_STRING_STASH(stash, MPL_strdup(run->val), status);
+        HYD_STRING_STASH(stash, MPL_strdup(";rc=0;"), status);
 
         HYD_STRING_SPIT(stash, cmd, status);
 
         send_cmd_downstream(fd, cmd);
-        HYDU_FREE(cmd);
-    }
-    else if (waitval && !strcmp(waitval, "TRUE")) {
+        MPL_free(cmd);
+    } else if (waitval && !strcmp(waitval, "TRUE")) {
         /* The client wants to wait for a response; queue up the request */
         status = HYD_pmcd_pmi_v2_queue_req(fd, -1, -1, args, key, &pending_reqs);
         HYDU_ERR_POP(status, "unable to queue request\n");
 
         goto fn_exit;
-    }
-    else {
+    } else {
         /* Tell the client that we can't find the attribute */
         HYD_STRING_STASH_INIT(stash);
-        HYD_STRING_STASH(stash, HYDU_strdup("cmd=info-getnodeattr-response;"), status);
+        HYD_STRING_STASH(stash, MPL_strdup("cmd=info-getnodeattr-response;"), status);
         if (thrid) {
-            HYD_STRING_STASH(stash, HYDU_strdup("thrid="), status);
-            HYD_STRING_STASH(stash, HYDU_strdup(thrid), status);
-            HYD_STRING_STASH(stash, HYDU_strdup(";"), status);
+            HYD_STRING_STASH(stash, MPL_strdup("thrid="), status);
+            HYD_STRING_STASH(stash, MPL_strdup(thrid), status);
+            HYD_STRING_STASH(stash, MPL_strdup(";"), status);
         }
-        HYD_STRING_STASH(stash, HYDU_strdup("found=FALSE;rc=0;"), status);
+        HYD_STRING_STASH(stash, MPL_strdup("found=FALSE;rc=0;"), status);
 
         HYD_STRING_SPIT(stash, cmd, status);
 
         send_cmd_downstream(fd, cmd);
-        HYDU_FREE(cmd);
+        MPL_free(cmd);
     }
 
   fn_exit:
+    if (tokens)
+        HYD_pmcd_pmi_free_tokens(tokens, token_count);
     HYDU_FUNC_EXIT();
     return status;
 
@@ -411,23 +414,22 @@ static HYD_status fn_info_getjobattr(int fd, char *args[])
 
     if (!strcmp(key, "PMI_process_mapping")) {
         HYD_STRING_STASH_INIT(stash);
-        HYD_STRING_STASH(stash, HYDU_strdup("cmd=info-getjobattr-response;"), status);
+        HYD_STRING_STASH(stash, MPL_strdup("cmd=info-getjobattr-response;"), status);
         if (thrid) {
-            HYD_STRING_STASH(stash, HYDU_strdup("thrid="), status);
-            HYD_STRING_STASH(stash, HYDU_strdup(thrid), status);
-            HYD_STRING_STASH(stash, HYDU_strdup(";"), status);
+            HYD_STRING_STASH(stash, MPL_strdup("thrid="), status);
+            HYD_STRING_STASH(stash, MPL_strdup(thrid), status);
+            HYD_STRING_STASH(stash, MPL_strdup(";"), status);
         }
-        HYD_STRING_STASH(stash, HYDU_strdup("found=TRUE;value="), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(HYD_pmcd_pmip.system_global.pmi_process_mapping),
+        HYD_STRING_STASH(stash, MPL_strdup("found=TRUE;value="), status);
+        HYD_STRING_STASH(stash, MPL_strdup(HYD_pmcd_pmip.system_global.pmi_process_mapping),
                          status);
-        HYD_STRING_STASH(stash, HYDU_strdup(";rc=0;"), status);
+        HYD_STRING_STASH(stash, MPL_strdup(";rc=0;"), status);
 
         HYD_STRING_SPIT(stash, cmd, status);
 
         send_cmd_downstream(fd, cmd);
-        HYDU_FREE(cmd);
-    }
-    else {
+        MPL_free(cmd);
+    } else {
         status = send_cmd_upstream("cmd=info-getjobattr;", fd, args);
         HYDU_ERR_POP(status, "error sending command upstream\n");
     }
@@ -446,7 +448,7 @@ static HYD_status fn_finalize(int fd, char *args[])
     char *thrid;
     struct HYD_string_stash stash;
     char *cmd;
-    struct HYD_pmcd_token *tokens;
+    struct HYD_pmcd_token *tokens = NULL;
     int token_count;
     HYD_status status = HYD_SUCCESS;
 
@@ -458,24 +460,26 @@ static HYD_status fn_finalize(int fd, char *args[])
     thrid = HYD_pmcd_pmi_find_token_keyval(tokens, token_count, "thrid");
 
     HYD_STRING_STASH_INIT(stash);
-    HYD_STRING_STASH(stash, HYDU_strdup("cmd=finalize-response;"), status);
+    HYD_STRING_STASH(stash, MPL_strdup("cmd=finalize-response;"), status);
     if (thrid) {
-        HYD_STRING_STASH(stash, HYDU_strdup("thrid="), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(thrid), status);
-        HYD_STRING_STASH(stash, HYDU_strdup(";"), status);
+        HYD_STRING_STASH(stash, MPL_strdup("thrid="), status);
+        HYD_STRING_STASH(stash, MPL_strdup(thrid), status);
+        HYD_STRING_STASH(stash, MPL_strdup(";"), status);
     }
-    HYD_STRING_STASH(stash, HYDU_strdup("rc=0;"), status);
+    HYD_STRING_STASH(stash, MPL_strdup("rc=0;"), status);
 
     HYD_STRING_SPIT(stash, cmd, status);
 
     send_cmd_downstream(fd, cmd);
-    HYDU_FREE(cmd);
+    MPL_free(cmd);
 
     status = HYDT_dmx_deregister_fd(fd);
     HYDU_ERR_POP(status, "unable to deregister fd\n");
     close(fd);
 
   fn_exit:
+    if (tokens)
+        HYD_pmcd_pmi_free_tokens(tokens, token_count);
     HYDU_FUNC_EXIT();
     return status;
 

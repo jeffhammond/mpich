@@ -2,21 +2,63 @@
                         KNOWN ISSUES
 ----------------------------------------------------------------------
 
-### ABI issues
+### CH4
 
- * The format of MPI_INFO_ENV was changed between v3.0 and v3.0.1 in
-   an ABI incompatible way.  The change was not caught, unfortunately,
-   and the ABI string not updated appropriately.
+ * Build Issues
+   - CH4 will not build with Solaris compilers.
+ * Stability with large buffers
+   - CH4 may suffer from stability issues when operating on large
+     communication buffers (>= 2GB)
 
-   http://trac.mpich.org/projects/mpich/ticket/1719
+ * Dynamic process support
+   - Requires fi_tagged capability in OFI netmod
+   - Not supported in UCX netmod at this time
 
+ * Test failures
+   - CH4 will not currently pass 100% of the testsuite.
+   - Test failures differ based on experimental setup and network
+     support built in.
 
-### Large counts
+### OS/X
 
- * The new MPI-3 "large count" routines (e.g., MPI_Type_size_x) do not
-   work correctly due to 64-bit to 32-bit truncations occurring inside
-   the MPICH library.  We expect to fix this in upcoming releases.
+ * C++ bindings - Exception handling in C++ bindings is broken because
+   of a bug in libc++ (see
+   https://github.com/android-ndk/ndk/issues/289).  You can workaround
+   this issue by explicitly linking your application to libstdc++
+   instead (e.g., mpicxx -o foo foo.cxx -lstdc++).
 
+ * GCC builds - When using Homebrew or Macports gcc (not the default
+   gcc, which is just a symlink to clang), a bug in gcc
+   (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=40838) causes stack
+   alignment issues in some cases causing segmentation faults.  You
+   can workaround this issue by building mpich with clang, or by
+   passing a lower optimization level than the default (-O2).
+   Currently, this bug only seems to show up when the
+   --disable-error-checking flag is passed to configure.
+
+ * Intel Compilers - MPICH will fail to build with ICC 18.0.0 on OS/X.
+
+### Solaris compilers
+
+ * Compilation on solaris will freeze when MPICH is configured with 
+   "--enable-strict". This is due to a solaris compiler bug related
+   to a specific order of assignments to long long and short variables.
+   See the following ticket for more information:
+
+     https://trac.mpich.org/projects/mpich/ticket/2105
+
+### PathScale compilers
+ * Due to bugs in the PathScale compiler suite, some configurations of MPICH
+   do not build correctly.
+    - v5.0.1: When the --disable-shared configure option is passed to MPICH,
+      applications will give a segfault.
+
+    - v5.0.5: Unless you pass the --enable-fast=O0 configure flag to MPICH,
+      applications will hang.
+
+   See the following ticket for more information:
+
+    https://trac.mpich.org/projects/mpich/ticket/2104
 
 ### Fine-grained thread safety
 
@@ -54,16 +96,6 @@
    one.
 
 
-### Build Platforms
-
- * Build fails with Intel compiler suite 13.0, because of weak symbol
-   issues in the compiler.  A workaround is to disable weak symbol
-   support by passing --disable-weak-symbols to configure.  See the
-   following ticket for more information:
-
-     https://trac.mpich.org/projects/mpich/ticket/1659
-
-
 ### Process Managers
 
  * Hydra has a bug related to stdin handling:
@@ -75,8 +107,8 @@
 
  * SMP-aware collectives do not perform as well, in select cases, as
    non-SMP-aware collectives, e.g. MPI_Reduce with message sizes
-   larger than 64KiB. These can be disabled by the configure option
-   "--disable-smpcoll".
+   larger than 64KiB. These can be disabled by setting the environment
+   variable MPIR_CVAR_ENABLE_SMP_COLLECTIVES to 0.
 
  * MPI_Irecv operations that are not explicitly completed before
    MPI_Finalize is called may fail to complete before MPI_Finalize

@@ -6,8 +6,9 @@
 ##
 
 DEVELOPER_SUBDIRS = doc/pmi doc/namepub
-DOC_SUBDIRS += doc/mansrc doc/userguide doc/installguide doc/smpd doc/logging \
-	       doc/windev doc/design
+DOC_SUBDIRS += doc/mansrc doc/userguide doc/installguide doc/logging \
+	       doc/design
+doc3_src_txt += doc/mansrc/mpiconsts.txt
 
 userdocs:
 	for dir in $(DOC_SUBDIRS) ; do \
@@ -26,4 +27,3 @@ install-devdocs:
 	        export DEV_INSTALL_PREFIX ; \
 	        ( cd $$dir && $(MAKE) install-devdocs ) ; \
 	done
-

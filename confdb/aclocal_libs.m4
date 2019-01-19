@@ -8,13 +8,8 @@ dnl characters in it.  Use AS_TR_SH (and possibly AS_VAR_* macros) to handle
 dnl this case if it ever arises.
 AC_DEFUN([PAC_SET_HEADER_LIB_PATH],[
     AC_ARG_WITH([$1],
-                [AC_HELP_STRING([--with-$1=PATH],
-                                [specify path where $1 include directory and lib directory can be found])],
-
-                [AS_CASE(["$withval"],
-                         [yes|no|''],
-                         [AC_MSG_WARN([--with[out]-$1=PATH expects a valid PATH])
-                          with_$1=""])],
+                [AC_HELP_STRING([--with-$1=[[PATH]]],
+                                [specify path where $1 include directory and lib directory can be found])],,
                 [with_$1=$2])
     AC_ARG_WITH([$1-include],
                 [AC_HELP_STRING([--with-$1-include=PATH],
@@ -38,22 +33,20 @@ AC_DEFUN([PAC_SET_HEADER_LIB_PATH],[
     # taking priority
 
     AS_IF([test -n "${with_$1_include}"],
-          [PAC_APPEND_FLAG([-I${with_$1_include}],[CPPFLAGS])
-	   PAC_APPEND_FLAG([-I${with_$1_include}],[WRAPPER_CPPFLAGS])],
+          [PAC_APPEND_FLAG([-I${with_$1_include}],[CPPFLAGS])],
           [AS_IF([test -n "${with_$1}"],
-                 [PAC_APPEND_FLAG([-I${with_$1}/include],[CPPFLAGS])
-		  PAC_APPEND_FLAG([-I${with_$1}/include],[WRAPPER_CPPFLAGS])])])
+                 [PAC_APPEND_FLAG([-I${with_$1}/include],[CPPFLAGS])])])
 
     AS_IF([test -n "${with_$1_lib}"],
-          [PAC_APPEND_FLAG([-L${with_$1_lib}],[LDFLAGS])
-	   PAC_APPEND_FLAG([-L${with_$1_lib}],[WRAPPER_LDFLAGS])],
+          [PAC_APPEND_FLAG([-L${with_$1_lib}],[LDFLAGS])],
           [AS_IF([test -n "${with_$1}"],
                  dnl is adding lib64 by default really the right thing to do?  What if
                  dnl we are on a 32-bit host that happens to have both lib dirs available?
-                 [PAC_APPEND_FLAG([-L${with_$1}/lib64],[LDFLAGS])
-		  PAC_APPEND_FLAG([-L${with_$1}/lib64],[WRAPPER_LDFLAGS])
-                  PAC_APPEND_FLAG([-L${with_$1}/lib],[LDFLAGS])
-		  PAC_APPEND_FLAG([-L${with_$1}/lib],[WRAPPER_LDFLAGS])])])
+                 [PAC_APPEND_FLAG([-L${with_$1}/lib],[LDFLAGS])
+                  AS_IF([test -d "${with_$1}/lib64"],
+		        [PAC_APPEND_FLAG([-L${with_$1}/lib64],[LDFLAGS])])
+                 ])
+          ])
 ])
 
 
@@ -95,6 +88,8 @@ AC_DEFUN([PAC_CHECK_PREFIX],[
             [if test "$withval" = "system" ; then
                  :
              elif test "$withval" = "embedded" ; then
+                 :
+             elif test "$withval" = "no" ; then
                  :
              else
                  PAC_APPEND_FLAG([-I${with_$1_prefix}/include],[CPPFLAGS])

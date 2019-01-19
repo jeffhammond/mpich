@@ -6,25 +6,10 @@
 
 #include "mpidimpl.h"
 
-/* FIXME: Who uses/sets MPIDI_DEV_IMPLEMENTS_ABORT? */
-#ifdef MPIDI_DEV_IMPLEMENTS_ABORT
 #ifdef USE_PMI2_API
 #include "pmi2.h"
 #else
 #include "pmi.h"
-#endif
-static int MPIDI_CH3I_PMI_Abort(int exit_code, const char *error_msg);
-#endif
-
-/* FIXME: We should move this into a header file so that we don't
-   need the ifdef.  Also, don't use exit (add to coding check) since
-   not safe in windows.  To avoid confusion, define a RobustExit? or
-   MPIU_Exit? */
-#ifdef HAVE_WINDOWS_H
-/* exit can hang if libc fflushes output while in/out/err buffers are locked
-   (this must be a bug in exit?).  ExitProcess does not hang (what does this
-   mean about the state of the locked buffers?). */
-#define exit(_e) ExitProcess(_e)
 #endif
 
 /* FIXME: This routine *or* MPI_Abort should provide abort callbacks,
@@ -33,16 +18,16 @@ static int MPIDI_CH3I_PMI_Abort(int exit_code, const char *error_msg);
 #undef FUNCNAME
 #define FUNCNAME MPID_Abort
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_Abort(MPID_Comm * comm, int mpi_errno, int exit_code, 
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_Abort(MPIR_Comm * comm, int mpi_errno, int exit_code,
 	       const char *error_msg)
 {
     int rank;
     char msg[MPI_MAX_ERROR_STRING] = "";
     char error_str[MPI_MAX_ERROR_STRING + 100];
-    MPIDI_STATE_DECL(MPID_STATE_MPID_ABORT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_ABORT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_ABORT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_ABORT);
 
     if (error_msg == NULL) {
 	/* Create a default error message */
@@ -71,12 +56,12 @@ int MPID_Abort(MPID_Comm * comm, int mpi_errno, int exit_code,
 	{
 	    MPIR_Err_get_string(mpi_errno, msg, MPI_MAX_ERROR_STRING, NULL);
 	    /* FIXME: Not internationalized */
-	    MPIU_Snprintf(error_str, sizeof(error_str), "internal ABORT - process %d: %s", rank, msg);
+	    MPL_snprintf(error_str, sizeof(error_str), "internal ABORT - process %d: %s", rank, msg);
 	}
 	else
 	{
 	    /* FIXME: Not internationalized */
-	    MPIU_Snprintf(error_str, sizeof(error_str), "internal ABORT - process %d", rank);
+	    MPL_snprintf(error_str, sizeof(error_str), "internal ABORT - process %d", rank);
 	}
     }
     
@@ -84,38 +69,8 @@ int MPID_Abort(MPID_Comm * comm, int mpi_errno, int exit_code,
     MPIDU_Ftb_finalize();
     
 #ifdef HAVE_DEBUGGER_SUPPORT
-    MPIR_DebuggerSetAborting( error_msg );
+    MPIR_Debugger_set_aborting( error_msg );
 #endif
-
-    /* FIXME: This should not use an ifelse chain. Either define the function
-       by name or set a function pointer */
-#ifdef MPIDI_CH3_IMPLEMENTS_ABORT
-    MPIDI_CH3_Abort(exit_code, error_msg);
-#elif defined(MPIDI_DEV_IMPLEMENTS_ABORT)
-    MPIDI_CH3I_PMI_Abort(exit_code, error_msg);
-#else
-    MPIU_Error_printf("%s\n", error_msg);
-    fflush(stderr);
-#endif
-
-    /* ch3_abort should not return but if it does, exit here.  If it does,
-       add the function exit code before calling the final exit.  */
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_ABORT);
-    MPIU_Exit(exit_code);
-    
-    return MPI_ERR_INTERN;
-}
-
-#ifdef MPIDI_DEV_IMPLEMENTS_ABORT
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_PMI_Abort
-#undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-static int MPIDI_CH3I_PMI_Abort(int exit_code, const char *error_msg)
-{
-    MPIDI_STATE_DECL(MPID_STATE_MPIDI_CH3I_PMI_ABORT);
-    
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDI_CH3I_PMI_ABORT);
 
     /* Dumping the error message in MPICH and passing the same
      * message to the PM as well. This might cause duplicate messages,
@@ -124,7 +79,7 @@ static int MPIDI_CH3I_PMI_Abort(int exit_code, const char *error_msg)
      * where the stdout/stderr pipes from MPICH to the PM are
      * broken), but not all PMs might display respect the message
      * (this problem was noticed with SLURM). */
-    MPIU_Error_printf("%s\n", error_msg);
+    MPL_error_printf("%s\n", error_msg);
     fflush(stderr);
 
     /* FIXME: What is the scope for PMI_Abort?  Shouldn't it be one or more
@@ -138,10 +93,10 @@ static int MPIDI_CH3I_PMI_Abort(int exit_code, const char *error_msg)
     PMI_Abort(exit_code, error_msg);
 #endif
 
-    /* if abort returns for some reason, exit here */
-    exit(exit_code);
+    /* pmi_abort should not return but if it does, exit here.  If it does,
+       add the function exit code before calling the final exit.  */
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_ABORT);
+    MPL_exit(exit_code);
 
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDI_CH3I_PMI_ABORT);
-    return MPI_ERR_INTERN;    
+    return MPI_ERR_INTERN;
 }
-#endif

@@ -1,3 +1,8 @@
+C -*- Mode: Fortran; -*-
+C
+C  (C) 2013 by Argonne National Laboratory.
+C      See COPYRIGHT in top-level directory.
+C
        program main
        include "mpif.h"
        integer ierr
@@ -55,7 +60,6 @@ C     check that we used the profiling versions of the routines
           endif
        endif
 C
-       call mpi_finalize( ierr )
        end
 C
        subroutine mpi_send( smsg, count, dtype, dest, tag, comm, ierr )

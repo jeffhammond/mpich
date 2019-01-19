@@ -37,14 +37,14 @@
 
       errs = 0
 !     Enroll in MPI
-      call mpi_init(ierr)
+      call mtest_init(ierr)
 
 !     get my rank
       call mpi_comm_rank(MPI_COMM_WORLD, me, ierr)
       call mpi_comm_size(MPI_COMM_WORLD, size, ierr )
       if (size .lt. 2) then
          print *, "Must have at least 2 processes"
-         call MPI_Abort( 1, MPI_COMM_WORLD, ierr )
+         call MPI_Abort( MPI_COMM_WORLD, 1, ierr )
       endif
 
       comm = MPI_COMM_WORLD
@@ -98,16 +98,6 @@
       endif
 !
 !     Sum up errs and report the result
-      call mpi_reduce( errs, toterrs, 1, MPI_INTEGER, MPI_SUM, 0,         &
-     &                 MPI_COMM_WORLD, ierr )
-      if (me .eq. 0) then
-         if (toterrs .eq. 0) then
-            print *, " No Errors"
-         else
-            print *, " Found ", toterrs, " errors"
-         endif
-      endif
-
-      call mpi_finalize(ierr)
+      call mtest_finalize(errs)
 
       end

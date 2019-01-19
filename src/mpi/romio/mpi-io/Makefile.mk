@@ -28,10 +28,14 @@ romio_mpi_sources +=          \
     mpi-io/get_size.c         \
     mpi-io/get_view.c         \
     mpi-io/iread.c            \
+    mpi-io/iread_all.c        \
     mpi-io/iread_at.c         \
+    mpi-io/iread_atall.c      \
     mpi-io/iread_sh.c         \
     mpi-io/iwrite.c           \
+    mpi-io/iwrite_all.c       \
     mpi-io/iwrite_at.c        \
+    mpi-io/iwrite_atall.c     \
     mpi-io/iwrite_sh.c        \
     mpi-io/open.c             \
     mpi-io/prealloc.c         \
@@ -73,7 +77,8 @@ romio_other_sources +=       \
     mpi-io/mpich_fileutil.c \
     mpi-io/mpir-mpioinit.c   \
     mpi-io/mpiu_greq.c \
-    mpi-io/mpiu_external32.c
+    mpi-io/mpiu_external32.c \
+    mpi-io/mpir_cst_filesys.c
 
 # helper variables for conditionally compiled sources
 mpio_request_sources=   \
@@ -101,4 +106,3 @@ endif BUILD_MPIO_REQUEST
 if BUILD_MPIO_ERRHAN
 romio_other_sources += $(mpio_request_sources)
 endif BUILD_MPIO_ERRHAN
-

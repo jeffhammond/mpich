@@ -7,6 +7,50 @@
 #include "mpiimpl.h"
 #include "mpi_init.h"
 
+#include <strings.h>
+
+/*
+=== BEGIN_MPI_T_CVAR_INFO_BLOCK ===
+
+categories:
+    - name        : THREADS
+      description : multi-threading cvars
+
+cvars:
+    - name        : MPIR_CVAR_ASYNC_PROGRESS
+      category    : THREADS
+      type        : boolean
+      default     : false
+      class       : device
+      verbosity   : MPI_T_VERBOSITY_USER_BASIC
+      scope       : MPI_T_SCOPE_ALL_EQ
+      description : >-
+        If set to true, MPICH will initiate an additional thread to
+        make asynchronous progress on all communication operations
+        including point-to-point, collective, one-sided operations and
+        I/O.  Setting this variable will automatically increase the
+        thread-safety level to MPI_THREAD_MULTIPLE.  While this
+        improves the progress semantics, it might cause a small amount
+        of performance overhead for regular MPI operations.  The user
+        is encouraged to leave one or more hardware threads vacant in
+        order to prevent contention between the application threads
+        and the progress thread(s).  The impact of oversubscription is
+        highly system dependent but may be substantial in some cases,
+        hence this recommendation.
+
+    - name        : MPIR_CVAR_DEFAULT_THREAD_LEVEL
+      category    : THREADS
+      type        : string
+      default     : "MPI_THREAD_SINGLE"
+      class       : device
+      verbosity   : MPI_T_VERBOSITY_USER_BASIC
+      scope       : MPI_T_SCOPE_ALL_EQ
+      description : >-
+        Sets the default thread level to use when using MPI_INIT. This variable
+        is case-insensitive.
+
+=== END_MPI_T_CVAR_INFO_BLOCK ===
+*/
 
 /* -- Begin Profiling Symbol Block for routine MPI_Init */
 #if defined(HAVE_PRAGMA_WEAK)
@@ -15,6 +59,8 @@
 #pragma _HP_SECONDARY_DEF PMPI_Init  MPI_Init
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_Init as PMPI_Init
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_Init(int *argc, char ***argv) __attribute__ ((weak, alias("PMPI_Init")));
 #endif
 /* -- End Profiling Symbol Block */
 
@@ -25,7 +71,7 @@
 #define MPI_Init PMPI_Init
 
 /* Fortran logical values. extern'd in mpiimpl.h */
-/* MPI_Fint MPIR_F_TRUE, MPIR_F_FALSE; */
+/* MPI_Fint MPII_F_TRUE, MPII_F_FALSE; */
 
 /* Any internal routines can go here.  Make them static if possible */
 
@@ -35,12 +81,13 @@ int MPIR_async_thread_initialized = 0;
 
 #undef FUNCNAME
 #define FUNCNAME MPI_Init
-
+#undef FCNAME
+#define FCNAME MPL_QUOTE(FUNCNAME)
 /*@
    MPI_Init - Initialize the MPI execution environment
 
 Input Parameters:
-+  argc - Pointer to the number of arguments 
++  argc - Pointer to the number of arguments
 -  argv - Pointer to the argument vector
 
 Thread and Signal Safety:
@@ -61,7 +108,7 @@ Notes for C:
 Notes for Fortran:
 The Fortran binding for 'MPI_Init' has only the error return
 .vb
-    subroutine MPI_INIT( ierr )
+    subroutine MPI_INIT(ierr)
     integer ierr
 .ve
 
@@ -71,86 +118,100 @@ The Fortran binding for 'MPI_Init' has only the error return
 
 .seealso: MPI_Init_thread, MPI_Finalize
 @*/
-int MPI_Init( int *argc, char ***argv )
+int MPI_Init(int *argc, char ***argv)
 {
-    static const char FCNAME[] = "MPI_Init";
     int mpi_errno = MPI_SUCCESS;
-    int rc;
+    int rc ATTRIBUTE((unused));
     int threadLevel, provided;
-    MPID_MPI_INIT_STATE_DECL(MPID_STATE_MPI_INIT);
+    MPIR_FUNC_TERSE_INIT_STATE_DECL(MPID_STATE_MPI_INIT);
 
     rc = MPID_Wtime_init();
-#ifdef USE_DBG_LOGGING
-    MPIU_DBG_PreInit( argc, argv, rc );
+#ifdef MPL_USE_DBG_LOGGING
+    MPL_dbg_pre_init(argc, argv, rc);
 #endif
 
-    MPID_MPI_INIT_FUNC_ENTER(MPID_STATE_MPI_INIT);
-#   ifdef HAVE_ERROR_CHECKING
+    MPIR_FUNC_TERSE_INIT_ENTER(MPID_STATE_MPI_INIT);
+#ifdef HAVE_ERROR_CHECKING
     {
         MPID_BEGIN_ERROR_CHECKS;
         {
-            if (MPIR_Process.initialized != MPICH_PRE_INIT) {
-                mpi_errno = MPIR_Err_create_code( MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
-						  "**inittwice", NULL );
-	    }
-            if (mpi_errno) goto fn_fail;
+            if (OPA_load_int(&MPIR_Process.mpich_state) != MPICH_MPI_STATE__PRE_INIT) {
+                mpi_errno =
+                    MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__,
+                                         MPI_ERR_OTHER, "**inittwice", NULL);
+            }
+            if (mpi_errno)
+                goto fn_fail;
         }
         MPID_END_ERROR_CHECKS;
     }
-#   endif /* HAVE_ERROR_CHECKING */
+#endif /* HAVE_ERROR_CHECKING */
 
     /* ... body of routine ... */
 
-    mpi_errno = MPIR_Param_init_params();
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    /* Temporarily disable thread-safety.  This is needed because the
+     * mutexes are not initialized yet, and we don't want to
+     * accidentally use them before they are initialized.  We will
+     * reset this value once it is properly initialized. */
+#if defined MPICH_IS_THREADED
+    MPIR_ThreadInfo.isThreaded = 0;
+#endif /* MPICH_IS_THREADED */
 
-    if (!strcmp(MPIR_PARAM_DEFAULT_THREAD_LEVEL, "MPI_THREAD_MULTIPLE"))
+    MPIR_T_env_init();
+
+    if (!strcasecmp(MPIR_CVAR_DEFAULT_THREAD_LEVEL, "MPI_THREAD_MULTIPLE"))
         threadLevel = MPI_THREAD_MULTIPLE;
-    else if (!strcmp(MPIR_PARAM_DEFAULT_THREAD_LEVEL, "MPI_THREAD_SERIALIZED"))
+    else if (!strcasecmp(MPIR_CVAR_DEFAULT_THREAD_LEVEL, "MPI_THREAD_SERIALIZED"))
         threadLevel = MPI_THREAD_SERIALIZED;
-    else if (!strcmp(MPIR_PARAM_DEFAULT_THREAD_LEVEL, "MPI_THREAD_FUNNELED"))
+    else if (!strcasecmp(MPIR_CVAR_DEFAULT_THREAD_LEVEL, "MPI_THREAD_FUNNELED"))
         threadLevel = MPI_THREAD_FUNNELED;
-    else if (!strcmp(MPIR_PARAM_DEFAULT_THREAD_LEVEL, "MPI_THREAD_SINGLE"))
+    else if (!strcasecmp(MPIR_CVAR_DEFAULT_THREAD_LEVEL, "MPI_THREAD_SINGLE"))
         threadLevel = MPI_THREAD_SINGLE;
     else {
-        MPIU_Error_printf("Unrecognized thread level %s\n", MPIR_PARAM_DEFAULT_THREAD_LEVEL);
+        MPL_error_printf("Unrecognized thread level %s\n", MPIR_CVAR_DEFAULT_THREAD_LEVEL);
         exit(1);
     }
 
     /* If the user requested for asynchronous progress, request for
      * THREAD_MULTIPLE. */
-    if (MPIR_PARAM_ASYNC_PROGRESS)
+    if (MPIR_CVAR_ASYNC_PROGRESS)
         threadLevel = MPI_THREAD_MULTIPLE;
 
-    mpi_errno = MPIR_Init_thread( argc, argv, threadLevel, &provided );
-    if (mpi_errno != MPI_SUCCESS) goto fn_fail;
+    mpi_errno = MPIR_Init_thread(argc, argv, threadLevel, &provided);
+    if (mpi_errno != MPI_SUCCESS)
+        goto fn_fail;
 
-    if (MPIR_PARAM_ASYNC_PROGRESS) {
+    if (MPIR_CVAR_ASYNC_PROGRESS) {
+#if MPL_THREAD_PACKAGE_NAME == MPL_THREAD_PACKAGE_ARGOBOTS
+        printf("WARNING: Asynchronous progress is not supported with Argobots\n");
+        goto fn_fail;
+#else
         if (provided == MPI_THREAD_MULTIPLE) {
-            mpi_errno = MPIR_Init_async_thread();
-            if (mpi_errno) goto fn_fail;
+            mpi_errno = MPID_Init_async_thread();
+            if (mpi_errno)
+                goto fn_fail;
 
             MPIR_async_thread_initialized = 1;
-        }
-        else {
+        } else {
             printf("WARNING: No MPI_THREAD_MULTIPLE support (needed for async progress)\n");
         }
+#endif
     }
 
     /* ... end of body of routine ... */
-    MPID_MPI_INIT_FUNC_EXIT(MPID_STATE_MPI_INIT);
+    MPIR_FUNC_TERSE_INIT_EXIT(MPID_STATE_MPI_INIT);
     return mpi_errno;
 
   fn_fail:
     /* --BEGIN ERROR HANDLING-- */
-#   ifdef HAVE_ERROR_REPORTING
+#ifdef HAVE_ERROR_REPORTING
     {
-	mpi_errno = MPIR_Err_create_code(
-	    mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER, 
-	    "**mpi_init", "**mpi_init %p %p", argc, argv);
+        mpi_errno =
+            MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
+                                 "**mpi_init", "**mpi_init %p %p", argc, argv);
     }
-#   endif
-    mpi_errno = MPIR_Err_return_comm( 0, FCNAME, mpi_errno );
+#endif
+    mpi_errno = MPIR_Err_return_comm(0, FCNAME, mpi_errno);
     return mpi_errno;
     /* --END ERROR HANDLING-- */
 }

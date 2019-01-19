@@ -1,13 +1,15 @@
+# -*- Mode: Makefile; -*-
+# vim: set ft=automake :
+#
+# (C) 2011 by Argonne National Laboratory.
+#     See COPYRIGHT in top-level directory.
+#
 
-AM_CPPFLAGS = -I${srcdir}/../include -I../include
+AM_CPPFLAGS = -I$(srcdir)/../include -I../include -I$(srcdir)/../dtpools/include
 
 mtest.$(OBJEXT): mtest.c
-nbc_pmpi_adapter.$(OBJEXT): nbc_pmpi_adapter.c
-all-local: mtest.$(OBJEXT)  nbc_pmpi_adapter.$(OBJEXT)
+dtypes.$(OBJEXT): dtypes.c
+all-local: mtest.$(OBJEXT) dtypes.$(OBJEXT)
 
-EXTRA_PROGRAMS = mtestcheck
+EXTRA_PROGRAMS = mtestcheck dtypes
 mtestcheck_SOURCES = mtestcheck.c mtest.c
-
-# exploiting the NBC PMPI adapter is still very much a manual process...
-EXTRA_DIST = nbc_pmpi_adapter.c
-

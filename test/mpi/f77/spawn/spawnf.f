@@ -13,11 +13,18 @@ C
         integer parentcomm, intercomm
         integer status(MPI_STATUS_SIZE)
         integer ierr
+        integer can_spawn
 
         errs = 0
         np   = 2
 
         call MTest_Init( ierr )
+
+        call MTestSpawnPossible( can_spawn, errs )
+        if ( can_spawn .eq. 0 ) then
+            call MTest_Finalize( errs )
+            goto 300
+        endif
 
         call MPI_Comm_get_parent( parentcomm, ierr )
 
@@ -85,7 +92,9 @@ C       Note also that both the parent and child will generate "No
 C       Errors" if both call MTest_Finalize 
         if (parentcomm .eq. MPI_COMM_NULL) then
            call MTest_Finalize( errs )
+        else
+           call MPI_Finalize( ierr )
         endif
 
-        call MPI_Finalize( ierr )
+ 300    continue
         end

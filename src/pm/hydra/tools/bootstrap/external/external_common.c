@@ -1,6 +1,6 @@
 /* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2008 by Argonne National Laboratory.
+ *  (C) 2011 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
 
@@ -12,11 +12,7 @@ int HYDTI_bscd_env_is_avail(const char *env_name)
 {
     char *dummy = NULL;
 
-    MPL_env2str(env_name, (const char **) &dummy);
-    if (!dummy)
-        return 0;
-
-    return 1;
+    return MPL_env2str(env_name, (const char **) &dummy);
 }
 
 int HYDTI_bscd_in_env_list(const char *env_name, const char *env_list[])

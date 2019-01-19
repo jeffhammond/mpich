@@ -1,23 +1,8 @@
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  Copyright (c) 2011 by Argonne National Laboratory
  *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to
- *  deal in the Software without restriction, including without limitation the
- *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *  sell copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *  IN THE SOFTWARE.
+ *  (C) 2011 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
  */
 
 /* A simple test of the proposed MPI_T_ interface that assumes the
@@ -92,7 +77,8 @@ int main(int argc, char **argv)
     assert(num != 0xdeadbeef);
     for (i = 0; i < num; ++i) {
         name_len = desc_len = STR_SZ;
-        MPI_T_pvar_get_info(i, name, &name_len, &verb, &varclass, &dtype, &enumtype, desc, &desc_len, &bind, &readonly, &continuous, &atomic);
+        MPI_T_pvar_get_info(i, name, &name_len, &verb, &varclass, &dtype, &enumtype, desc,
+                            &desc_len, &bind, &readonly, &continuous, &atomic);
         printf("index=%d\n", i);
         printf("--> name='%s' name_len=%d desc='%s' desc_len=%d\n", name, name_len, desc, desc_len);
         printf("--> verb=%d varclass=%d dtype=%#x bind=%d readonly=%d continuous=%d atomic=%d\n",
@@ -100,15 +86,12 @@ int main(int argc, char **argv)
 
         if (0 == strcmp(name, "posted_recvq_length")) {
             pq_idx = i;
-        }
-        else if (0 == strcmp(name, "unexpected_recvq_length")) {
+        } else if (0 == strcmp(name, "unexpected_recvq_length")) {
             uq_idx = i;
-        }
-        else if (0 == strcmp(name, "posted_recvq_match_attempts")) {
+        } else if (0 == strcmp(name, "posted_recvq_match_attempts")) {
             pqm_idx = i;
             pqm_writable = !readonly;
-        }
-        else if (0 == strcmp(name, "unexpected_recvq_match_attempts")) {
+        } else if (0 == strcmp(name, "unexpected_recvq_match_attempts")) {
             uqm_idx = i;
             uqm_writable = !readonly;
         }
@@ -155,29 +138,29 @@ int main(int argc, char **argv)
         unexpected_queue_match_attempts = 0x0123abcd;
         print_vars(1);
 
-        MPI_Isend(&buf1, 1, MPI_INT, 0, /*tag=*/11, MPI_COMM_SELF, &r1);
+        MPI_Isend(&buf1, 1, MPI_INT, 0, /*tag= */ 11, MPI_COMM_SELF, &r1);
         print_vars(2);
         printf("expected (posted_qlen,unexpected_qlen) = (0,1)\n");
 
-        MPI_Isend(&buf1, 1, MPI_INT, 0, /*tag=*/22, MPI_COMM_SELF, &r2);
+        MPI_Isend(&buf1, 1, MPI_INT, 0, /*tag= */ 22, MPI_COMM_SELF, &r2);
         print_vars(3);
         printf("expected (posted_qlen,unexpected_qlen) = (0,2)\n");
 
-        MPI_Irecv(&buf2, 1, MPI_INT, 0, /*tag=*/33, MPI_COMM_SELF, &r3);
+        MPI_Irecv(&buf2, 1, MPI_INT, 0, /*tag= */ 33, MPI_COMM_SELF, &r3);
         print_vars(4);
         printf("expected (posted_qlen,unexpected_qlen) = (1,2)\n");
 
-        MPI_Recv(&buf3, 1, MPI_INT, 0, /*tag=*/22, MPI_COMM_SELF, MPI_STATUS_IGNORE);
+        MPI_Recv(&buf3, 1, MPI_INT, 0, /*tag= */ 22, MPI_COMM_SELF, MPI_STATUS_IGNORE);
         MPI_Wait(&r2, MPI_STATUS_IGNORE);
         print_vars(5);
         printf("expected (posted_qlen,unexpected_qlen) = (1,1)\n");
 
-        MPI_Recv(&buf3, 1, MPI_INT, 0, /*tag=*/11, MPI_COMM_SELF, MPI_STATUS_IGNORE);
+        MPI_Recv(&buf3, 1, MPI_INT, 0, /*tag= */ 11, MPI_COMM_SELF, MPI_STATUS_IGNORE);
         MPI_Wait(&r1, MPI_STATUS_IGNORE);
         print_vars(6);
         printf("expected (posted_qlen,unexpected_qlen) = (1,0)\n");
 
-        MPI_Send(&buf3, 1, MPI_INT, 0, /*tag=*/33, MPI_COMM_SELF);
+        MPI_Send(&buf3, 1, MPI_INT, 0, /*tag= */ 33, MPI_COMM_SELF);
         MPI_Wait(&r3, MPI_STATUS_IGNORE);
         print_vars(7);
         printf("expected (posted_qlen,unexpected_qlen) = (0,0)\n");
@@ -206,13 +189,13 @@ int main(int argc, char **argv)
     return 0;
 }
 #else
-/* Simple null program to allow building this file with non-MPICH 
+/* Simple null program to allow building this file with non-MPICH
    implementations */
 int main(int argc, char **argv)
 {
-  MPI_Init( &argc, &argv );
-  printf( " No Errors\n" );
-  MPI_Finalize();
-  return 0;
+    MPI_Init(&argc, &argv);
+    printf(" No Errors\n");
+    MPI_Finalize();
+    return 0;
 }
 #endif

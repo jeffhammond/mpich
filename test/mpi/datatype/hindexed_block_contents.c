@@ -12,6 +12,7 @@
 #include <stdio.h>
 /* USE_STRICT_MPI may be defined in mpitestconf.h */
 #include "mpitestconf.h"
+#include "mpitest.h"
 
 /* assert-like macro that bumps the err count and emits a message */
 #define check(x_)                                                                 \
@@ -31,15 +32,13 @@ int main(int argc, char **argv)
     MPI_Datatype t;
     int count = 4;
     int blocklength = 2;
-    MPI_Aint displacements[] = {0, 8, 16, 24};
+    MPI_Aint displacements[] = { 0, 8, 16, 24 };
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     if (!rank) {
-        MPI_Type_create_hindexed_block(count, blocklength,
-                                        displacements, MPI_INT,
-                                        &t);
+        MPI_Type_create_hindexed_block(count, blocklength, displacements, MPI_INT, &t);
         MPI_Type_commit(&t);
         {
             int ni, na, nd, combiner;
@@ -55,7 +54,7 @@ int main(int argc, char **argv)
             check(i[1] == 2);
 
             check(na == 4);
-            for (k=0; k < na; k++)
+            for (k = 0; k < na; k++)
                 check(a[k] == (k * 8));
 
             check(nd == 1);
@@ -65,14 +64,6 @@ int main(int argc, char **argv)
         MPI_Type_free(&t);
     }
 
-    if (rank == 0) {
-        if (errs) {
-            printf("found %d errors\n", errs);
-        }
-        else {
-            printf(" No errors\n");
-        }
-    }
-    MPI_Finalize();
-    return 0;
+    MTest_Finalize(errs);
+    return MTestReturnValue(errs);
 }

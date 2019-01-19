@@ -7,6 +7,7 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "mpitest.h"
 
 /*
  * This test attempts communication between 2 running processes
@@ -22,8 +23,9 @@ int main(int argc, char **argv)
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
     if (size < 3) {
-        fprintf( stderr, "Must run with at least 3 processes\n" );
+        fprintf(stderr, "Must run with at least 3 processes\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -32,7 +34,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0) {
-        err =  MPI_Isend("No Errors", 10, MPI_CHAR, 2, 0, MPI_COMM_WORLD, &request);
+        err = MPI_Isend("No Errors", 10, MPI_CHAR, 2, 0, MPI_COMM_WORLD, &request);
         err += MPI_Wait(&request, MPI_STATUS_IGNORE);
         if (err) {
             fprintf(stderr, "An error occurred during the send operation\n");
@@ -40,7 +42,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 2) {
-        err =  MPI_Irecv(buf, 10, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &request);
+        err = MPI_Irecv(buf, 10, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &request);
         err += MPI_Wait(&request, MPI_STATUS_IGNORE);
         if (err) {
             fprintf(stderr, "An error occurred during the recv operation\n");
@@ -52,5 +54,5 @@ int main(int argc, char **argv)
 
     MPI_Finalize();
 
-    return 0;
+    return MTestReturnValue(err);
 }

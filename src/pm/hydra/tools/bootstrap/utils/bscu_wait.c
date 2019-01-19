@@ -41,7 +41,7 @@ HYD_status HYDT_bscu_wait_for_completion(int timeout)
                 time_elapsed = (now.tv_sec - start.tv_sec);     /* Ignore microsec granularity */
 
                 time_left = -1;
-                if (timeout > 0) {
+                if (timeout >= 0) {
                     if (time_elapsed > timeout) {
 #if defined(HAVE_GETPGID) && defined(HAVE_SETSID)
                         /* If we are able to get the process group ID,
@@ -52,8 +52,7 @@ HYD_status HYDT_bscu_wait_for_completion(int timeout)
 #else
                         kill(HYD_bscu_pid_list[i], SIGKILL);
 #endif
-                    }
-                    else
+                    } else
                         time_left = timeout - time_elapsed;
                 }
 
@@ -78,8 +77,7 @@ HYD_status HYDT_bscu_wait_for_completion(int timeout)
                 }
 
                 goto restart_wait;
-            }
-            else
+            } else
                 HYD_bscu_fd_list[i] = HYD_FD_CLOSED;
         }
 
@@ -110,13 +108,13 @@ HYD_status HYDT_bscu_wait_for_completion(int timeout)
     }
 
     if (HYD_bscu_pid_list) {
-        HYDU_FREE(HYD_bscu_pid_list);
+        MPL_free(HYD_bscu_pid_list);
         HYD_bscu_pid_list = NULL;
         HYD_bscu_pid_count = 0;
     }
 
     if (HYD_bscu_fd_list) {
-        HYDU_FREE(HYD_bscu_fd_list);
+        MPL_free(HYD_bscu_fd_list);
         HYD_bscu_fd_list = NULL;
         HYD_bscu_fd_count = 0;
     }

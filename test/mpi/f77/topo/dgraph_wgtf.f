@@ -1,6 +1,6 @@
 C -*- Mode: Fortran; -*- 
 C
-C  (C) 2010 by Argonne National Laboratory.
+C  (C) 2011 by Argonne National Laboratory.
 C      See COPYRIGHT in top-level directory.
 C
 C     This program is Fortran version of dgraph_unwgt.c
@@ -197,5 +197,4 @@ C     the nearest neighbors that within a ring.
       call MPI_Comm_free(dgraph_comm, ierr)
 
       call MTEST_Finalize(errs)
-      call MPI_Finalize(ierr)
       end

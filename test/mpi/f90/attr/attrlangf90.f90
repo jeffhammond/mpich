@@ -142,9 +142,10 @@
       implicit none
       integer ierr
       integer errs, tv, rank
+      integer(MPI_ADDRESS_KIND) tmp
 
       errs = 0
-      call MPI_INIT( ierr )
+      call MTEST_INIT( ierr )
       call MPI_COMM_RANK( MPI_COMM_WORLD, rank, ierr )
 !
 !     Let the C routines know about debugging
@@ -193,7 +194,8 @@
            & )
 !
 !     Create a window to use with the attribute tests in Fortran
-      call MPI_WIN_CREATE( MPI_BOTTOM, 0, 1, MPI_INFO_NULL,&
+      tmp = 0
+      call MPI_WIN_CREATE( MPI_BOTTOM, tmp, 1, MPI_INFO_NULL,&
            & MPI_COMM_WORLD, win, ierr )
 !
       if (fverbose) then
@@ -238,17 +240,7 @@
       call cfreekeys()
       call MPI_WIN_FREE( win, ierr )
 
-      call MPI_REDUCE( MPI_IN_PLACE, errs, 1, MPI_INT, MPI_SUM, 0,&
-           & MPI_COMM_WORLD, ierr ) 
-      
-      if (rank .eq. 0) then
-         if (errs .eq. 0) then
-            print *, " No Errors"
-         else
-            print *, " Found ", errs, " errors"
-         endif
-      endif
-      call MPI_FINALIZE( ierr )
+      call MTEST_FINALIZE( errs )
 
       end
 !

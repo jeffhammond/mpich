@@ -1,7 +1,7 @@
 /* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
  *
- *  (C) 2013 by Argonne National Laboratory.
+ *  (C) 2012 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
 
@@ -14,13 +14,14 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
+#include "mpitest.h"
 
 #define TRY(func)                           \
     do {                                    \
         err = (func);                       \
         if (err != MPI_SUCCESS)             \
             MPI_Abort(MPI_COMM_WORLD, err); \
-    } while(0)
+    } while (0)
 
 #define EAGER_SIZE 10
 #define RNDV_SIZE  100000
@@ -49,22 +50,22 @@ void reversed_tags_test()
 
         MPI_Recv(recv_buf, EAGER_SIZE, MPI_INT, 0, 0xD, MPI_COMM_WORLD, &status);
         TRY(MPI_T_pvar_read(session, uqsize_handle, &unexpected_recvq_buffer_size));
-        assert(unexpected_recvq_buffer_size == 3*EAGER_SIZE*sizeof(int));
+        assert(unexpected_recvq_buffer_size == 3 * EAGER_SIZE * sizeof(int));
 
         MPI_Recv(recv_buf, EAGER_SIZE, MPI_INT, 0, 0xC, MPI_COMM_WORLD, &status);
         TRY(MPI_T_pvar_read(session, uqsize_handle, &unexpected_recvq_buffer_size));
-        assert(unexpected_recvq_buffer_size == 2*EAGER_SIZE*sizeof(int));
+        assert(unexpected_recvq_buffer_size == 2 * EAGER_SIZE * sizeof(int));
 
         MPI_Recv(recv_buf, EAGER_SIZE, MPI_INT, 0, 0xB, MPI_COMM_WORLD, &status);
         TRY(MPI_T_pvar_read(session, uqsize_handle, &unexpected_recvq_buffer_size));
-        assert(unexpected_recvq_buffer_size == 1*EAGER_SIZE*sizeof(int));
+        assert(unexpected_recvq_buffer_size == 1 * EAGER_SIZE * sizeof(int));
 
         MPI_Recv(recv_buf, EAGER_SIZE, MPI_INT, 0, 0xA, MPI_COMM_WORLD, &status);
         TRY(MPI_T_pvar_read(session, uqsize_handle, &unexpected_recvq_buffer_size));
-        assert(unexpected_recvq_buffer_size == 0*EAGER_SIZE*sizeof(int));
+        assert(unexpected_recvq_buffer_size == 0 * EAGER_SIZE * sizeof(int));
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);  /* make sure this test is over before going to the next one */
+    MPI_Barrier(MPI_COMM_WORLD);        /* make sure this test is over before going to the next one */
 }
 
 /* Rendezvous-based messages will never be unexpected (except for the initial RTS,
@@ -92,7 +93,7 @@ void rndv_test()
         assert(unexpected_recvq_buffer_size == 0);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);  /* make sure this test is over before going to the next one */
+    MPI_Barrier(MPI_COMM_WORLD);        /* make sure this test is over before going to the next one */
 }
 
 int main(int argc, char *argv[])
@@ -120,6 +121,8 @@ int main(int argc, char *argv[])
     TRY(MPI_T_init_thread(MPI_THREAD_SINGLE, &thread_support));
     TRY(MPI_T_pvar_get_num(&num));
 
+    int found = 0;
+
     /* Locate desired MPIT variable. */
     for (i = 0; i < num; i++) {
         name_len = desc_len = STR_LEN;
@@ -127,24 +130,28 @@ int main(int argc, char *argv[])
                                 &enumtype, desc, &desc_len, &bind, &readonly,
                                 &continuous, &atomic));
 
-        if (strcmp(name, "unexpected_recvq_buffer_size") == 0)
+        if (strcmp(name, "unexpected_recvq_buffer_size") == 0) {
             uqsize_idx = i;
+            found = 1;
+        }
     }
 
-    /* Initialize MPIT session & variable handle. */
-    MPI_T_pvar_session_create(&session);
-    MPI_T_pvar_handle_alloc(session, uqsize_idx, NULL, &uqsize_handle, &count);
+    if (found) {
+        /* Initialize MPIT session & variable handle. */
+        MPI_T_pvar_session_create(&session);
+        MPI_T_pvar_handle_alloc(session, uqsize_idx, NULL, &uqsize_handle, &count);
 
-    /* Ensure the variable is of the correct size. */
-    assert(count == 1);
+        /* Ensure the variable is of the correct size. */
+        assert(count == 1);
 
-    /* Run a batch of tests. */
-    reversed_tags_test();
-    rndv_test();
+        /* Run a batch of tests. */
+        reversed_tags_test();
+        rndv_test();
 
-    /* Cleanup. */
-    MPI_T_pvar_handle_free(session, &uqsize_handle);
-    MPI_T_pvar_session_free(&session);
+        /* Cleanup. */
+        MPI_T_pvar_handle_free(session, &uqsize_handle);
+        MPI_T_pvar_session_free(&session);
+    }
 
     if (rank == 0) {
         printf("finished\n");
@@ -154,5 +161,5 @@ int main(int argc, char *argv[])
     TRY(MPI_T_finalize());
     MPI_Finalize();
 
-    return 0;
+    return MTestReturnValue(found);
 }

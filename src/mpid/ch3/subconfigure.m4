@@ -19,9 +19,6 @@ AM_COND_IF([BUILD_CH3],[
 # Set a value for the maximum processor name.
 MPID_MAX_PROCESSOR_NAME=128
 
-# Set a value for the maximum error string.
-MPID_MAX_ERROR_STRING=1024
-
 # code that formerly lived in setup_device.args
 if test -z "${device_args}" ; then
     device_args="nemesis"
@@ -79,7 +76,10 @@ AC_ARG_ENABLE([ftb],
     [Enable FTB support (default is no)])],
   [AC_DEFINE([ENABLE_FTB], 1, [Define if FTB is enabled])
    PAC_SET_HEADER_LIB_PATH([ftb])
-   PAC_CHECK_HEADER_LIB_FATAL([ftb], [libftb.h], [ftb], [FTB_Connect])]
+   PAC_PUSH_FLAG(LIBS)
+   PAC_CHECK_HEADER_LIB_FATAL([ftb], [libftb.h], [ftb], [FTB_Connect])
+   PAC_APPEND_FLAG([-lftb],[WRAPPER_LIBS])
+   PAC_POP_FLAG(LIBS)]
 )
 
 AC_ARG_WITH(ch3-rank-bits, [--with-ch3-rank-bits=16/32     Number of bits allocated to the rank field (16 or 32)],

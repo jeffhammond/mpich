@@ -1,7 +1,7 @@
 /* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
  *
- *  (C) 2013 by Argonne National Laboratory.
+ *  (C) 2012 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
 
@@ -24,27 +24,33 @@
         err = (func);                       \
         if (err != MPI_SUCCESS)             \
             MPI_Abort(MPI_COMM_WORLD, err); \
-    } while(0)
+    } while (0)
 
 #define STR_LEN   100
 #define BUF_COUNT 10
 
 uint64_t null_fbox[2] = { 0 };
+
 int err, rank;
 MPI_T_pvar_session session;
 MPI_T_pvar_handle fbox_handle;
 
-/* Check that we can successfuly write to the variable. */
+/* Check that we can successfuly write to the variable.
+ * Question: Do we really want to write pvars other than reset?
+ */
 void blank_test()
 {
     uint64_t temp[2] = { -1 };
 
-    temp[0] = 0x1234; temp[1] = 0xABCD;
+    temp[0] = 0x1234;
+    temp[1] = 0xABCD;
     TRY(MPI_T_pvar_write(session, fbox_handle, temp));
 
-    temp[0] = 0xCD34; temp[1] = 0x12AB;
+    temp[0] = 0xCD34;
+    temp[1] = 0x12AB;
     TRY(MPI_T_pvar_read(session, fbox_handle, temp));
-    assert(temp[0] == 0x1234); assert(temp[1] == 0xABCD);
+    assert(temp[0] == 0x1234);
+    assert(temp[1] == 0xABCD);
 }
 
 /* Nemesis' fastbox falls back to regular queues when more than one message
@@ -54,10 +60,10 @@ void blank_test()
  * queue every time. */
 void send_first_test()
 {
-    uint64_t nem_fbox_fall_back_to_queue_count[2] = {-1};
+    uint64_t nem_fbox_fall_back_to_queue_count[2] = { -1 };
 
     /* Reset the fbox variable. */
-    MPI_T_pvar_write(session, fbox_handle, null_fbox);
+    MPI_T_pvar_reset(session, fbox_handle);
 
     if (rank == 0) {
         char send_buf[BUF_COUNT] = { 0x12 };
@@ -93,7 +99,7 @@ void send_first_test()
         char recv_buf[BUF_COUNT];
         MPI_Status status;
 
-        MTestSleep(1);   /* see above */
+        MTestSleep(1);  /* see above */
 
         MPI_Recv(recv_buf, BUF_COUNT, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
         MPI_Recv(recv_buf, BUF_COUNT, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
@@ -101,8 +107,8 @@ void send_first_test()
         MPI_Recv(recv_buf, BUF_COUNT, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);    /* ensure we've finished this test before
-                                     * moving on to the next */
+    MPI_Barrier(MPI_COMM_WORLD);        /* ensure we've finished this test before
+                                         * moving on to the next */
 }
 
 /* By posting receives ahead of time, messages should be taken out of the
@@ -114,10 +120,10 @@ void send_first_test()
  */
 void recv_first_test()
 {
-    uint64_t nem_fbox_fall_back_to_queue_count[2] = {-1};
+    uint64_t nem_fbox_fall_back_to_queue_count[2] = { -1 };
 
     /* Reset the fbox variable. */
-    MPI_T_pvar_write(session, fbox_handle, null_fbox);
+    MPI_T_pvar_reset(session, fbox_handle);
 
     if (rank == 0) {
         char send_buf[BUF_COUNT] = { 0x12 };
@@ -160,8 +166,8 @@ void recv_first_test()
         MPI_Waitall(4, reqs, status);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);    /* ensure we've finished this test before
-                                     * moving on to the next */
+    MPI_Barrier(MPI_COMM_WORLD);        /* ensure we've finished this test before
+                                         * moving on to the next */
 }
 
 int main(int argc, char *argv[])
@@ -211,7 +217,7 @@ int main(int argc, char *argv[])
     assert(count == 2);
 
     /* Run a batch of tests. */
-    blank_test();
+    /* blank_test(); */
     send_first_test();
     /* recv_first_test(); */
 

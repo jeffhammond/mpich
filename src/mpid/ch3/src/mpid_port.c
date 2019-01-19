@@ -9,7 +9,7 @@
 static int setupPortFunctions = 1;
 
 #ifndef MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS
-static int MPIDI_Open_port(MPID_Info *, char *);
+static int MPIDI_Open_port(MPIR_Info *, char *);
 static int MPIDI_Close_port(const char *);
 
 /* Define the functions that are used to implement the port
@@ -40,13 +40,13 @@ static MPIDI_PortFns portFns = { 0, 0, 0, 0 };
 #undef FUNCNAME
 #define FUNCNAME MPID_Open_port
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_Open_port(MPID_Info *info_ptr, char *port_name)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_Open_port(MPIR_Info *info_ptr, char *port_name)
 {
     int mpi_errno=MPI_SUCCESS;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_OPEN_PORT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIR_OPEN_PORT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_OPEN_PORT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIR_OPEN_PORT);
 
     /* Check to see if we need to setup channel-specific functions
        for handling the port operations */
@@ -63,15 +63,15 @@ int MPID_Open_port(MPID_Info *info_ptr, char *port_name)
     if (portFns.OpenPort) {
 	mpi_errno = portFns.OpenPort( info_ptr, port_name );
 	if (mpi_errno != MPI_SUCCESS) {
-	    MPIU_ERR_POP(mpi_errno);
+	    MPIR_ERR_POP(mpi_errno);
 	}
     }
     else {
-	MPIU_ERR_SET(mpi_errno, MPI_ERR_OTHER, "**notimpl" );
+	MPIR_ERR_SET(mpi_errno, MPI_ERR_OTHER, "**notimpl" );
     }
 
  fn_fail:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_OPEN_PORT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIR_OPEN_PORT);
     return mpi_errno;
 }
 
@@ -91,13 +91,13 @@ Input Parameters:
 #undef FUNCNAME
 #define FUNCNAME MPID_Close_port
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_Close_port(const char *port_name)
 {
     int mpi_errno=MPI_SUCCESS;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_CLOSE_PORT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_CLOSE_PORT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_CLOSE_PORT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_CLOSE_PORT);
 
     /* Check to see if we need to setup channel-specific functions
        for handling the port operations */
@@ -112,29 +112,29 @@ int MPID_Close_port(const char *port_name)
     if (portFns.ClosePort) {
 	mpi_errno = portFns.ClosePort( port_name );
 	if (mpi_errno != MPI_SUCCESS) {
-	    MPIU_ERR_POP(mpi_errno);
+	    MPIR_ERR_POP(mpi_errno);
 	}
     }
     else {
-	MPIU_ERR_SET(mpi_errno, MPI_ERR_OTHER, "**notimpl" );
+	MPIR_ERR_SET(mpi_errno, MPI_ERR_OTHER, "**notimpl" );
     }
 
  fn_fail:	
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_CLOSE_PORT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_CLOSE_PORT);
     return mpi_errno;
 }
 
 #undef FUNCNAME
 #define FUNCNAME MPID_Comm_accept
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_Comm_accept(const char * port_name, MPID_Info * info, int root,
-		     MPID_Comm * comm, MPID_Comm ** newcomm_ptr)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_Comm_accept(const char * port_name, MPIR_Info * info, int root,
+		     MPIR_Comm * comm, MPIR_Comm ** newcomm_ptr)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_COMM_ACCEPT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_COMM_ACCEPT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_COMM_ACCEPT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_COMM_ACCEPT);
 
     /* Check to see if we need to setup channel-specific functions
        for handling the port operations */
@@ -150,29 +150,29 @@ int MPID_Comm_accept(const char * port_name, MPID_Info * info, int root,
 	mpi_errno = portFns.CommAccept( port_name, info, root, comm, 
 					newcomm_ptr );
 	if (mpi_errno != MPI_SUCCESS) {
-	    MPIU_ERR_POP(mpi_errno);
+	    MPIR_ERR_POP(mpi_errno);
 	}
     }
     else {
-	MPIU_ERR_SET(mpi_errno, MPI_ERR_OTHER, "**notimpl" );
+	MPIR_ERR_SET(mpi_errno, MPI_ERR_OTHER, "**notimpl" );
     }
 
  fn_fail:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_COMM_ACCEPT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_COMM_ACCEPT);
     return mpi_errno;
 }
 
 #undef FUNCNAME
 #define FUNCNAME MPID_Comm_connect
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_Comm_connect(const char * port_name, MPID_Info * info, int root, 
-		      MPID_Comm * comm, MPID_Comm ** newcomm_ptr)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_Comm_connect(const char * port_name, MPIR_Info * info, int root,
+		      MPIR_Comm * comm, MPIR_Comm ** newcomm_ptr)
 {
     int mpi_errno=MPI_SUCCESS;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_COMM_CONNECT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_COMM_CONNECT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_COMM_CONNECT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_COMM_CONNECT);
 
     /* Check to see if we need to setup channel-specific functions
        for handling the port operations */
@@ -188,15 +188,15 @@ int MPID_Comm_connect(const char * port_name, MPID_Info * info, int root,
 	mpi_errno = portFns.CommConnect( port_name, info, root, comm, 
 					 newcomm_ptr );
 	if (mpi_errno != MPI_SUCCESS) {
-	    MPIU_ERR_POP(mpi_errno);
+	    MPIR_ERR_POP(mpi_errno);
 	}
     }
     else {
-	MPIU_ERR_SET(mpi_errno, MPI_ERR_OTHER, "**notimpl" );
+	MPIR_ERR_SET(mpi_errno, MPI_ERR_OTHER, "**notimpl" );
     }
 
  fn_fail:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_COMM_CONNECT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_COMM_CONNECT);
     return mpi_errno;
 }
 
@@ -280,28 +280,28 @@ static void free_port_name_tag(int tag)
 #undef FUNCNAME
 #define FUNCNAME MPIDI_Open_port
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-static int MPIDI_Open_port(MPID_Info *info_ptr, char *port_name)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+static int MPIDI_Open_port(MPIR_Info *info_ptr, char *port_name)
 {
     int mpi_errno = MPI_SUCCESS;
-    int str_errno = MPIU_STR_SUCCESS;
+    int str_errno = MPL_STR_SUCCESS;
     int len;
     int port_name_tag = 0; /* this tag is added to the business card,
                               which is then returned as the port name */
     int myRank = MPIR_Process.comm_world->rank;
-    MPIDI_STATE_DECL(MPID_STATE_MPIDI_OPEN_PORT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_OPEN_PORT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDI_OPEN_PORT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_OPEN_PORT);
 
     mpi_errno = get_port_name_tag(&port_name_tag);
-    MPIU_ERR_CHKANDJUMP(mpi_errno,mpi_errno,MPI_ERR_OTHER,"**argstr_port_name_tag");
+    MPIR_ERR_CHKANDJUMP(mpi_errno,mpi_errno,MPI_ERR_OTHER,"**argstr_port_name_tag");
 
     len = MPI_MAX_PORT_NAME;
-    str_errno = MPIU_Str_add_int_arg(&port_name, &len,
+    str_errno = MPL_str_add_int_arg(&port_name, &len,
                                      MPIDI_CH3I_PORT_NAME_TAG_KEY, port_name_tag);
-    MPIU_ERR_CHKANDJUMP(str_errno, mpi_errno, MPI_ERR_OTHER, "**argstr_port_name_tag");
+    MPIR_ERR_CHKANDJUMP(str_errno, mpi_errno, MPI_ERR_OTHER, "**argstr_port_name_tag");
 
-    /* This works because Get_business_card uses the same MPIU_Str_xxx 
+    /* This works because Get_business_card uses the same MPL_str_xxx
        functions as above to add the business card to the input string */
     /* FIXME: We should instead ask the mpid_pg routines to give us
        a connection string. There may need to be a separate step to 
@@ -310,10 +310,12 @@ static int MPIDI_Open_port(MPID_Info *info_ptr, char *port_name)
        may not use shared memory).  We may need a channel-specific 
        function to create an exportable connection string.  */
     mpi_errno = MPIDI_CH3_Get_business_card(myRank, port_name, len);
-    MPIU_DBG_MSG_FMT(CH3, VERBOSE, (MPIU_DBG_FDEST, "port_name = %s", port_name));
+    MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER, VERBOSE, (MPL_DBG_FDEST, "port_name = %s", port_name));
+
+    mpi_errno = MPIDI_CH3I_Port_init(port_name_tag);
 
 fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDI_OPEN_PORT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_OPEN_PORT);
     return mpi_errno;
 fn_fail:
     goto fn_exit;
@@ -325,22 +327,24 @@ fn_fail:
 #undef FUNCNAME
 #define FUNCNAME MPIDI_Close_port
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int MPIDI_Close_port(const char *port_name)
 {
     int mpi_errno = MPI_SUCCESS;
     int port_name_tag;
-    MPIDI_STATE_DECL(MPID_STATE_MPIDI_CLOSE_PORT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CLOSE_PORT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDI_CLOSE_PORT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CLOSE_PORT);
 
     mpi_errno = MPIDI_GetTagFromPort(port_name, &port_name_tag);
-    MPIU_ERR_CHKANDJUMP(mpi_errno, mpi_errno, MPI_ERR_OTHER,"**argstr_port_name_tag");
+    MPIR_ERR_CHKANDJUMP(mpi_errno, mpi_errno, MPI_ERR_OTHER,"**argstr_port_name_tag");
 
     free_port_name_tag(port_name_tag);
 
+    mpi_errno = MPIDI_CH3I_Port_destroy(port_name_tag);
+
 fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDI_CLOSE_PORT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CLOSE_PORT);
     return mpi_errno;
 fn_fail:
     goto fn_exit;
@@ -353,11 +357,11 @@ fn_fail:
 int MPIDI_GetTagFromPort( const char *port_name, int *port_name_tag )
 {
     int mpi_errno = MPI_SUCCESS;
-    int str_errno = MPIU_STR_SUCCESS;
+    int str_errno = MPL_STR_SUCCESS;
 
-    str_errno = MPIU_Str_get_int_arg(port_name, MPIDI_CH3I_PORT_NAME_TAG_KEY,
+    str_errno = MPL_str_get_int_arg(port_name, MPIDI_CH3I_PORT_NAME_TAG_KEY,
                                      port_name_tag);
-    MPIU_ERR_CHKANDJUMP(str_errno, mpi_errno, MPI_ERR_OTHER, "**argstr_no_port_name_tag");
+    MPIR_ERR_CHKANDJUMP(str_errno, mpi_errno, MPI_ERR_OTHER, "**argstr_no_port_name_tag");
 
  fn_exit:
     return mpi_errno;

@@ -25,7 +25,7 @@ int size, rank;
 int **layout;
 
 #define MAX_LAYOUT_NAME_LEN 256
-char graph_layout_name[MAX_LAYOUT_NAME_LEN] = {'\0'};
+char graph_layout_name[MAX_LAYOUT_NAME_LEN] = { '\0' };
 
 static void create_graph_layout(int graph_num)
 {
@@ -107,10 +107,9 @@ static int verify_comm(MPI_Comm comm)
     for (use_dup = 0; use_dup <= 1; ++use_dup) {
         if (!use_dup) {
             MPI_Dist_graph_neighbors_count(comm, &indegree, &outdegree, &weighted);
-        }
-        else {
+        } else {
             MPI_Comm_dup(comm, &dupcomm);
-            comm = dupcomm; /* caller retains original comm value */
+            comm = dupcomm;     /* caller retains original comm value */
         }
 
         MPI_Topo_test(comm, &topo_type);
@@ -124,7 +123,8 @@ static int verify_comm(MPI_Comm comm)
             if (layout[i][rank])
                 j++;
         if (j != indegree) {
-            fprintf(stderr, "indegree does not match, expected=%d got=%d, layout='%s'\n", indegree, j, graph_layout_name);
+            fprintf(stderr, "indegree does not match, expected=%d got=%d, layout='%s'\n", indegree,
+                    j, graph_layout_name);
             ++local_errs;
         }
 
@@ -133,7 +133,8 @@ static int verify_comm(MPI_Comm comm)
             if (layout[rank][i])
                 j++;
         if (j != outdegree) {
-            fprintf(stderr, "outdegree does not match, expected=%d got=%d, layout='%s'\n", outdegree, j, graph_layout_name);
+            fprintf(stderr, "outdegree does not match, expected=%d got=%d, layout='%s'\n",
+                    outdegree, j, graph_layout_name);
             ++local_errs;
         }
 
@@ -143,7 +144,8 @@ static int verify_comm(MPI_Comm comm)
         }
 
 
-        MPI_Dist_graph_neighbors(comm, indegree, sources, sweights, outdegree, destinations, dweights);
+        MPI_Dist_graph_neighbors(comm, indegree, sources, sweights, outdegree, destinations,
+                                 dweights);
 
         /* For each incoming and outgoing edge in the matrix, search if
          * the query function listed it in the sources. */
@@ -158,8 +160,7 @@ static int verify_comm(MPI_Comm comm)
                 if (j == indegree) {
                     fprintf(stderr, "no edge from %d to %d specified\n", i, rank);
                     ++local_errs;
-                }
-                else {
+                } else {
                     if (sweights[j] != layout[i][rank]) {
                         fprintf(stderr, "incorrect weight for edge (%d,%d): %d instead of %d\n",
                                 i, rank, sweights[j], layout[i][rank]);
@@ -177,8 +178,7 @@ static int verify_comm(MPI_Comm comm)
                 if (j == outdegree) {
                     fprintf(stderr, "no edge from %d to %d specified\n", rank, i);
                     ++local_errs;
-                }
-                else {
+                } else {
                     if (dweights[j] != layout[rank][i]) {
                         fprintf(stderr, "incorrect weight for edge (%d,%d): %d instead of %d\n",
                                 rank, i, dweights[j], layout[rank][i]);
@@ -204,12 +204,15 @@ static int verify_comm(MPI_Comm comm)
                 ++local_errs;
             }
         }
-
     }
 
     if (dupcomm != MPI_COMM_NULL)
         MPI_Comm_free(&dupcomm);
 
+    free(sources);
+    free(sweights);
+    free(destinations);
+    free(dweights);
     return local_errs;
 }
 
@@ -246,12 +249,12 @@ int main(int argc, char *argv[])
     for (i = 0; i < NUM_GRAPHS; i++) {
         create_graph_layout(i);
         if (rank == 0) {
-            MTestPrintfMsg( 1, "using graph layout '%s'\n", graph_layout_name );
+            MTestPrintfMsg(1, "using graph layout '%s'\n", graph_layout_name);
         }
 
         /* MPI_Dist_graph_create_adjacent */
         if (rank == 0) {
-            MTestPrintfMsg( 1, "testing MPI_Dist_graph_create_adjacent\n" );
+            MTestPrintfMsg(1, "testing MPI_Dist_graph_create_adjacent\n");
         }
         indegree = 0;
         k = 0;
@@ -295,8 +298,7 @@ int main(int argc, char *argv[])
         /* MPI_Dist_graph_create() where each process specifies its
          * outgoing edges */
         if (rank == 0) {
-            MTestPrintfMsg( 1, 
-                          "testing MPI_Dist_graph_create w/ outgoing only\n" );
+            MTestPrintfMsg(1, "testing MPI_Dist_graph_create w/ outgoing only\n");
         }
         sources[0] = rank;
         k = 0;
@@ -319,8 +321,7 @@ int main(int argc, char *argv[])
         /* MPI_Dist_graph_create() where each process specifies its
          * incoming edges */
         if (rank == 0) {
-            MTestPrintfMsg( 1, 
-                         "testing MPI_Dist_graph_create w/ incoming only\n" );
+            MTestPrintfMsg(1, "testing MPI_Dist_graph_create w/ incoming only\n");
         }
         k = 0;
         for (j = 0; j < size; j++) {
@@ -343,8 +344,7 @@ int main(int argc, char *argv[])
         /* MPI_Dist_graph_create() where rank 0 specifies the entire
          * graph */
         if (rank == 0) {
-            MTestPrintfMsg( 1, 
-               "testing MPI_Dist_graph_create w/ rank 0 specifies only\n" );
+            MTestPrintfMsg(1, "testing MPI_Dist_graph_create w/ rank 0 specifies only\n");
         }
         p = 0;
         for (j = 0; j < size; j++) {
@@ -369,8 +369,7 @@ int main(int argc, char *argv[])
          * graph and all other ranks pass NULL.  Can catch implementation
          * problems when MPI_UNWEIGHTED==NULL. */
         if (rank == 0) {
-            MTestPrintfMsg( 1, 
-           "testing MPI_Dist_graph_create w/ rank 0 specifies only -- NULLs\n");
+            MTestPrintfMsg(1, "testing MPI_Dist_graph_create w/ rank 0 specifies only -- NULLs\n");
         }
         p = 0;
         for (j = 0; j < size; j++) {
@@ -387,8 +386,7 @@ int main(int argc, char *argv[])
             if (rank == 0) {
                 MPI_Dist_graph_create(MPI_COMM_WORLD, p, sources, degrees,
                                       destinations, sweights, MPI_INFO_NULL, reorder, &comm);
-            }
-            else {
+            } else {
                 MPI_Dist_graph_create(MPI_COMM_WORLD, 0, NULL, NULL,
                                       NULL, NULL, MPI_INFO_NULL, reorder, &comm);
             }
@@ -396,7 +394,6 @@ int main(int argc, char *argv[])
             errs += verify_comm(comm);
             MPI_Comm_free(&comm);
         }
-
     }
 
     /* now tests that don't depend on the layout[][] array */
@@ -412,7 +409,7 @@ int main(int argc, char *argv[])
 
     /* MPI_Dist_graph_create() with no graph */
     if (rank == 0) {
-        MTestPrintfMsg( 1, "testing MPI_Dist_graph_create w/ no graph\n" );
+        MTestPrintfMsg(1, "testing MPI_Dist_graph_create w/ no graph\n");
     }
     for (reorder = 0; reorder <= 1; reorder++) {
         MPI_Dist_graph_create(MPI_COMM_WORLD, 0, sources, degrees,
@@ -425,21 +422,22 @@ int main(int argc, char *argv[])
         MPI_Comm_free(&comm);
     }
 
-    /* MPI_Dist_graph_create() with no graph -- passing MPI_WEIGHTS_EMPTY 
-       instead */
-    /* NOTE that MPI_WEIGHTS_EMPTY was added in MPI-3 and does not 
-       appear before then.  This part of the test thus requires a check
-       on the MPI major version */
+    /* MPI_Dist_graph_create() with no graph -- passing MPI_WEIGHTS_EMPTY
+     * instead */
+    /* NOTE that MPI_WEIGHTS_EMPTY was added in MPI-3 and does not
+     * appear before then.  This part of the test thus requires a check
+     * on the MPI major version */
 #if MPI_VERSION >= 3
     if (rank == 0) {
-        MTestPrintfMsg( 1, "testing MPI_Dist_graph_create w/ no graph\n" );
+        MTestPrintfMsg(1, "testing MPI_Dist_graph_create w/ no graph\n");
     }
     for (reorder = 0; reorder <= 1; reorder++) {
         MPI_Dist_graph_create(MPI_COMM_WORLD, 0, sources, degrees,
                               destinations, MPI_WEIGHTS_EMPTY, MPI_INFO_NULL, reorder, &comm);
         MPI_Dist_graph_neighbors_count(comm, &check_indegree, &check_outdegree, &check_weighted);
         if (!check_weighted) {
-            fprintf(stderr, "expected weighted == TRUE for the \"no graph -- MPI_WEIGHTS_EMPTY\" case\n");
+            fprintf(stderr,
+                    "expected weighted == TRUE for the \"no graph -- MPI_WEIGHTS_EMPTY\" case\n");
             ++errs;
         }
         MPI_Comm_free(&comm);
@@ -448,8 +446,7 @@ int main(int argc, char *argv[])
 
     /* MPI_Dist_graph_create() with no graph -- passing NULLs instead */
     if (rank == 0) {
-        MTestPrintfMsg( 1, 
-                      "testing MPI_Dist_graph_create w/ no graph -- NULLs\n" );
+        MTestPrintfMsg(1, "testing MPI_Dist_graph_create w/ no graph -- NULLs\n");
     }
     for (reorder = 0; reorder <= 1; reorder++) {
         MPI_Dist_graph_create(MPI_COMM_WORLD, 0, NULL, NULL,
@@ -467,8 +464,7 @@ int main(int argc, char *argv[])
 
     /* MPI_Dist_graph_create() with no graph -- passing NULLs+MPI_UNWEIGHTED instead */
     if (rank == 0) {
-        MTestPrintfMsg( 1, 
-        "testing MPI_Dist_graph_create w/ no graph -- NULLs+MPI_UNWEIGHTED\n" );
+        MTestPrintfMsg(1, "testing MPI_Dist_graph_create w/ no graph -- NULLs+MPI_UNWEIGHTED\n");
     }
     for (reorder = 0; reorder <= 1; reorder++) {
         MPI_Dist_graph_create(MPI_COMM_WORLD, 0, NULL, NULL,
@@ -477,7 +473,8 @@ int main(int argc, char *argv[])
         /* ambiguous if they are equal, only check when they are distinct values. */
         if (MPI_UNWEIGHTED != NULL) {
             if (check_weighted) {
-                fprintf(stderr, "expected weighted == FALSE for the \"no graph -- NULLs+MPI_UNWEIGHTED\" case\n");
+                fprintf(stderr,
+                        "expected weighted == FALSE for the \"no graph -- NULLs+MPI_UNWEIGHTED\" case\n");
                 ++errs;
             }
         }
@@ -486,12 +483,11 @@ int main(int argc, char *argv[])
 
     /* MPI_Dist_graph_create_adjacent() with no graph */
     if (rank == 0) {
-        MTestPrintfMsg( 1, 
-                     "testing MPI_Dist_graph_create_adjacent w/ no graph\n" );
+        MTestPrintfMsg(1, "testing MPI_Dist_graph_create_adjacent w/ no graph\n");
     }
     for (reorder = 0; reorder <= 1; reorder++) {
         MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, 0, sources, sweights,
-                              0, destinations, dweights, MPI_INFO_NULL, reorder, &comm);
+                                       0, destinations, dweights, MPI_INFO_NULL, reorder, &comm);
         MPI_Dist_graph_neighbors_count(comm, &check_indegree, &check_outdegree, &check_weighted);
         if (!check_weighted) {
             fprintf(stderr, "expected weighted == TRUE for the \"no graph\" case\n");
@@ -501,20 +497,22 @@ int main(int argc, char *argv[])
     }
 
     /* MPI_Dist_graph_create_adjacent() with no graph -- passing MPI_WEIGHTS_EMPTY instead */
-    /* NOTE that MPI_WEIGHTS_EMPTY was added in MPI-3 and does not 
-       appear before then.  This part of the test thus requires a check
-       on the MPI major version */
+    /* NOTE that MPI_WEIGHTS_EMPTY was added in MPI-3 and does not
+     * appear before then.  This part of the test thus requires a check
+     * on the MPI major version */
 #if MPI_VERSION >= 3
     if (rank == 0) {
-        MTestPrintfMsg( 1, 
-  "testing MPI_Dist_graph_create_adjacent w/ no graph -- MPI_WEIGHTS_EMPTY\n" );
+        MTestPrintfMsg(1,
+                       "testing MPI_Dist_graph_create_adjacent w/ no graph -- MPI_WEIGHTS_EMPTY\n");
     }
     for (reorder = 0; reorder <= 1; reorder++) {
         MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, 0, sources, MPI_WEIGHTS_EMPTY,
-                              0, destinations, MPI_WEIGHTS_EMPTY, MPI_INFO_NULL, reorder, &comm);
+                                       0, destinations, MPI_WEIGHTS_EMPTY, MPI_INFO_NULL, reorder,
+                                       &comm);
         MPI_Dist_graph_neighbors_count(comm, &check_indegree, &check_outdegree, &check_weighted);
         if (!check_weighted) {
-            fprintf(stderr, "expected weighted == TRUE for the \"no graph -- MPI_WEIGHTS_EMPTY\" case\n");
+            fprintf(stderr,
+                    "expected weighted == TRUE for the \"no graph -- MPI_WEIGHTS_EMPTY\" case\n");
             ++errs;
         }
         MPI_Comm_free(&comm);
@@ -523,12 +521,11 @@ int main(int argc, char *argv[])
 
     /* MPI_Dist_graph_create_adjacent() with no graph -- passing NULLs instead */
     if (rank == 0) {
-        MTestPrintfMsg( 1, 
-              "testing MPI_Dist_graph_create_adjacent w/ no graph -- NULLs\n" );
+        MTestPrintfMsg(1, "testing MPI_Dist_graph_create_adjacent w/ no graph -- NULLs\n");
     }
     for (reorder = 0; reorder <= 1; reorder++) {
         MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, 0, NULL, NULL,
-                              0, NULL, NULL, MPI_INFO_NULL, reorder, &comm);
+                                       0, NULL, NULL, MPI_INFO_NULL, reorder, &comm);
         MPI_Dist_graph_neighbors_count(comm, &check_indegree, &check_outdegree, &check_weighted);
         /* ambiguous if they are equal, only check when they are distinct values. */
         if (MPI_UNWEIGHTED != NULL) {
@@ -542,17 +539,18 @@ int main(int argc, char *argv[])
 
     /* MPI_Dist_graph_create_adjacent() with no graph -- passing NULLs+MPI_UNWEIGHTED instead */
     if (rank == 0) {
-        MTestPrintfMsg( 1, 
-"testing MPI_Dist_graph_create_adjacent w/ no graph -- NULLs+MPI_UNWEIGHTED\n");
+        MTestPrintfMsg(1,
+                       "testing MPI_Dist_graph_create_adjacent w/ no graph -- NULLs+MPI_UNWEIGHTED\n");
     }
     for (reorder = 0; reorder <= 1; reorder++) {
         MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, 0, NULL, MPI_UNWEIGHTED,
-                              0, NULL, MPI_UNWEIGHTED, MPI_INFO_NULL, reorder, &comm);
+                                       0, NULL, MPI_UNWEIGHTED, MPI_INFO_NULL, reorder, &comm);
         MPI_Dist_graph_neighbors_count(comm, &check_indegree, &check_outdegree, &check_weighted);
         /* ambiguous if they are equal, only check when they are distinct values. */
         if (MPI_UNWEIGHTED != NULL) {
             if (check_weighted) {
-                fprintf(stderr, "expected weighted == FALSE for the \"no graph -- NULLs+MPI_UNWEIGHTED\" case\n");
+                fprintf(stderr,
+                        "expected weighted == FALSE for the \"no graph -- NULLs+MPI_UNWEIGHTED\" case\n");
                 ++errs;
             }
         }
@@ -563,10 +561,14 @@ int main(int argc, char *argv[])
     for (i = 0; i < size; i++)
         free(layout[i]);
     free(layout);
+    free(sources);
+    free(sweights);
+    free(destinations);
+    free(dweights);
+    free(degrees);
 #endif
 
     MTest_Finalize(errs);
-    MPI_Finalize();
 
-    return 0;
+    return MTestReturnValue(errs);
 }

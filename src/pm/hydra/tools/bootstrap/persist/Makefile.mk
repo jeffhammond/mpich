@@ -1,6 +1,6 @@
 ## -*- Mode: Makefile; -*-
 ##
-## (C) 2008 by Argonne National Laboratory.
+## (C) 2009 by Argonne National Laboratory.
 ##     See COPYRIGHT in top-level directory.
 ##
 
@@ -18,5 +18,7 @@ noinst_HEADERS +=                            \
     tools/bootstrap/persist/persist_server.h
 
 libhydra_la_SOURCES += tools/bootstrap/persist/persist_init.c \
-	tools/bootstrap/persist/persist_launch.c \
-	tools/bootstrap/persist/persist_wait.c
+    tools/bootstrap/persist/persist_launch.c \
+    tools/bootstrap/persist/persist_wait.c
+
+doc1_src_txt += tools/bootstrap/persist/hydra_persist.txt

@@ -7,7 +7,7 @@
 
 include $(top_srcdir)/Makefile_f77.mtest
 
-EXTRA_DIST = testlist
+EXTRA_DIST = testlist.in
 
 # avoid having to write many "foo_SOURCES = foo.f" lines
 AM_DEFAULT_SOURCE_EXT = .f
@@ -34,10 +34,17 @@ noinst_PROGRAMS = \
     c2fmultio \
     c2f2ciof
 
+if BUILD_MPIX_TESTS
+noinst_PROGRAMS += \
+    i_setviewcurf  \
+    iwriteatallf
+endif
+
 
 # We don't want to distribute these source files because they are created by
 # "testmerge", hence "nodist_foo_SOURCES"
 nodist_iwriteatf_SOURCES     = iwriteatf.f
+nodist_iwriteatallf_SOURCES  = iwriteatallf.f
 nodist_iwritef_SOURCES       = iwritef.f
 nodist_iwriteshf_SOURCES     = iwriteshf.f
 nodist_writeallbef_SOURCES   = writeallbef.f
@@ -55,7 +62,7 @@ c2fmultio_SOURCES     = c2fmultio.c
 # A) prevent the makefile-wide "LDADD=mtestf.o" from affecting this program, or
 # B) link with the fortran compiler, otherwise we'll get link failures from
 # compilers with runtime support libs, such as PGI
-c2fmultio_LDADD =
+c2fmultio_LDADD = $(top_builddir)/util/mtest.o
 
 c2f2ciof_SOURCES      = c2f2cio.c c2f2ciof.f
 
@@ -82,6 +89,7 @@ writeordf.$(OBJEXT): iooffset.h
 # these files are genereated using testmerge (see below)
 generated_io_sources = \
     iwriteatf.f        \
+    iwriteatallf.f     \
     iwritef.f          \
     iwriteshf.f        \
     writeallbef.f      \
@@ -139,4 +147,3 @@ clean-local:
 	-rm -f .iotest.txt.*
 
 DISTCLEANFILES = $(generated_io_sources)
-

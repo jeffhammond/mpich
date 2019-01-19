@@ -1,8 +1,16 @@
+/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
+/*
+ *
+ *  (C) 2012 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 
 #include <mpi.h>
+#include <mpitest.h>
 
 /* test broadcast behavior with non-zero counts but zero-sized types */
 
@@ -13,13 +21,13 @@ int main(int argc, char *argv[])
     char *buf = NULL;
     int wrank, wsize;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &wrank);
     MPI_Comm_size(MPI_COMM_WORLD, &wsize);
 
     /* a random non-zero sized buffer */
 #define NELEM (10)
-    buf = malloc(NELEM*sizeof(int));
+    buf = malloc(NELEM * sizeof(int));
     assert(buf);
 
     for (i = 0; i < NELEM; i++) {
@@ -40,12 +48,10 @@ int main(int argc, char *argv[])
         assert(buf[i] == wrank * NELEM + i);
     }
 
-    MPI_Type_free(&type);
-    MPI_Finalize();
+    free(buf);
 
-    if (wrank == 0) {
-        printf(" No errors\n");
-    }
+    MPI_Type_free(&type);
+    MTest_Finalize(0);
 
     return 0;
 }

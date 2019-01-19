@@ -14,13 +14,13 @@
 #undef FUNCNAME
 #define FUNCNAME MPID_Finalize
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_Finalize(void)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_FINALIZE);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_FINALIZE);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_FINALIZE);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_FINALIZE);
 
     /*
      * Wait for all posted receives to complete.  For now we are not doing 
@@ -93,42 +93,46 @@ int MPID_Finalize(void)
       *    cancel it, in which case an error shouldn't be generated.
       */
     
-#ifdef MPID_NEEDS_ICOMM_WORLD
-    mpi_errno = MPIR_Comm_release_always(MPIR_Process.icomm_world, 0);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
-#endif
-
-    mpi_errno = MPIR_Comm_release_always(MPIR_Process.comm_self, 0);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
-
-    mpi_errno = MPIR_Comm_release_always(MPIR_Process.comm_world, 0);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
-
     /* Re-enabling the close step because many tests are failing
      * without it, particularly under gforker */
+
+    mpi_errno = MPIDI_Port_finalize();
+    if (mpi_errno) { MPIR_ERR_POP(mpi_errno); }
+
 #if 1
     /* FIXME: The close actions should use the same code as the other
        connection close code */
     mpi_errno = MPIDI_PG_Close_VCs();
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
     /*
      * Wait for all VCs to finish the close protocol
      */
     mpi_errno = MPIDI_CH3U_VC_WaitForClose();
-    if (mpi_errno) { MPIU_ERR_POP(mpi_errno); }
+    if (mpi_errno) { MPIR_ERR_POP(mpi_errno); }
 #endif
+
+#ifdef MPID_NEEDS_ICOMM_WORLD
+    mpi_errno = MPIR_Comm_release_always(MPIR_Process.icomm_world);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+#endif
+
+    mpi_errno = MPIR_Comm_release_always(MPIR_Process.comm_self);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+
+    mpi_errno = MPIR_Comm_release_always(MPIR_Process.comm_world);
+    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 
     /* Note that the CH3I_Progress_finalize call has been removed; the
        CH3_Finalize routine should call it */
     mpi_errno = MPIDI_CH3_Finalize();
-    if (mpi_errno) { MPIU_ERR_POP(mpi_errno); }
+    if (mpi_errno) { MPIR_ERR_POP(mpi_errno); }
 
     /* Tell the process group code that we're done with the process groups.
        This will notify PMI (with PMI_Finalize) if necessary.  It
        also frees all PG structures, including the PG for COMM_WORLD, whose 
        pointer is also saved in MPIDI_Process.my_pg */
     mpi_errno = MPIDI_PG_Finalize();
-    if (mpi_errno) { MPIU_ERR_POP(mpi_errno); }
+    if (mpi_errno) { MPIR_ERR_POP(mpi_errno); }
 
 #ifndef MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS
     MPIDI_CH3_FreeParentPort();
@@ -140,15 +144,19 @@ int MPID_Finalize(void)
 	p = MPIDI_CH3U_SRBuf_pool;
 	while (p) {
 	    pNext = p->next;
-	    MPIU_Free(p);
+	    MPL_free(p);
 	    p = pNext;
 	}
     }
+
+    MPIDI_RMA_finalize();
     
+    MPL_free(MPIDI_failed_procs_string);
+
     MPIDU_Ftb_finalize();
 
  fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_FINALIZE);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_FINALIZE);
     return mpi_errno;
  fn_fail:
     goto fn_exit;

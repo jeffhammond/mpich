@@ -5,7 +5,7 @@
  */
 
 #include "mpiimpl.h"
-#include "mpl_utlist.h"
+#include "utlist.h"
 
 /* -- Begin Profiling Symbol Block for routine MPI_T_pvar_session_free */
 #if defined(HAVE_PRAGMA_WEAK)
@@ -14,6 +14,9 @@
 #pragma _HP_SECONDARY_DEF PMPI_T_pvar_session_free  MPI_T_pvar_session_free
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_T_pvar_session_free as PMPI_T_pvar_session_free
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_T_pvar_session_free(MPI_T_pvar_session * session)
+    __attribute__ ((weak, alias("PMPI_T_pvar_session_free")));
 #endif
 /* -- End Profiling Symbol Block */
 
@@ -28,11 +31,11 @@
 #undef FUNCNAME
 #define FUNCNAME MPIR_T_pvar_session_free_impl
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
-int MPIR_T_pvar_session_free_impl(MPI_T_pvar_session *session)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPIR_T_pvar_session_free_impl(MPI_T_pvar_session * session)
 {
     int mpi_errno = MPI_SUCCESS;
-    struct MPIR_T_pvar_handle *hnd, *tmp;
+    MPIR_T_pvar_handle_t *hnd, *tmp;
 
     /* The draft standard is a bit unclear about the behavior of this function
      * w.r.t. outstanding pvar handles.  A conservative (from the implementors
@@ -40,17 +43,14 @@ int MPIR_T_pvar_session_free_impl(MPI_T_pvar_session *session)
      * outstanding handles attached to this session.  A more relaxed
      * interpretation puts that burden on the user.  We choose the conservative
      * view.*/
-    MPL_DL_FOREACH_SAFE((*session)->hlist, hnd, tmp) {
-        MPL_DL_DELETE((*session)->hlist, hnd);
-        MPIU_Free(hnd);
+    DL_FOREACH_SAFE((*session)->hlist, hnd, tmp) {
+        DL_DELETE((*session)->hlist, hnd);
+        MPL_free(hnd);
     }
-    MPIU_Free(*session);
+    MPL_free(*session);
     *session = MPI_T_PVAR_SESSION_NULL;
 
-fn_exit:
     return mpi_errno;
-fn_fail:
-    goto fn_exit;
 }
 
 #endif /* MPICH_MPI_FROM_PMPI */
@@ -58,75 +58,68 @@ fn_fail:
 #undef FUNCNAME
 #define FUNCNAME MPI_T_pvar_session_free
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 /*@
-MPI_T_pvar_session_free - XXX description here
+MPI_T_pvar_session_free - Free an existing performance variable session
 
 Input/Output Parameters:
 . session - identifier of performance experiment session (handle)
 
+Notes:
+Calls to the MPI tool information interface can no longer be made
+within the context of a session after it is freed. On a successful
+return, MPI sets the session identifier to MPI_T_PVAR_SESSION_NULL.
+
 .N ThreadSafe
 
-.N Fortran
-
 .N Errors
+.N MPI_SUCCESS
+.N MPI_T_ERR_NOT_INITIALIZED
+.N MPI_T_ERR_INVALID_SESSION
 @*/
-int MPI_T_pvar_session_free(MPI_T_pvar_session *session)
+int MPI_T_pvar_session_free(MPI_T_pvar_session * session)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPID_MPI_STATE_DECL(MPID_STATE_MPI_T_PVAR_SESSION_FREE);
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
-    MPID_MPI_FUNC_ENTER(MPID_STATE_MPI_T_PVAR_SESSION_FREE);
+    MPIR_FUNC_TERSE_STATE_DECL(MPID_STATE_MPI_T_PVAR_SESSION_FREE);
+    MPIR_ERRTEST_MPIT_INITIALIZED(mpi_errno);
+    MPIR_T_THREAD_CS_ENTER();
+    MPIR_FUNC_TERSE_ENTER(MPID_STATE_MPI_T_PVAR_SESSION_FREE);
 
     /* Validate parameters, especially handles needing to be converted */
-#   ifdef HAVE_ERROR_CHECKING
+#ifdef HAVE_ERROR_CHECKING
     {
-        MPID_BEGIN_ERROR_CHECKS
+        MPID_BEGIN_ERROR_CHECKS;
         {
-
-            /* TODO more checks may be appropriate */
-            if (mpi_errno != MPI_SUCCESS) goto fn_fail;
+            MPIR_ERRTEST_ARGNULL(session, "session", mpi_errno);
         }
-        MPID_END_ERROR_CHECKS
+        MPID_END_ERROR_CHECKS;
     }
-#   endif /* HAVE_ERROR_CHECKING */
-
-    /* Convert MPI object handles to object pointers */
-
-    /* Validate parameters and objects (post conversion) */
-#   ifdef HAVE_ERROR_CHECKING
-    {
-        MPID_BEGIN_ERROR_CHECKS
-        {
-            /* TODO more checks may be appropriate (counts, in_place, buffer aliasing, etc) */
-            if (mpi_errno != MPI_SUCCESS) goto fn_fail;
-        }
-        MPID_END_ERROR_CHECKS
-    }
-#   endif /* HAVE_ERROR_CHECKING */
+#endif /* HAVE_ERROR_CHECKING */
 
     /* ... body of routine ...  */
 
     mpi_errno = MPIR_T_pvar_session_free_impl(session);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno != MPI_SUCCESS)
+        goto fn_fail;
 
     /* ... end of body of routine ... */
 
-fn_exit:
-    MPID_MPI_FUNC_EXIT(MPID_STATE_MPI_T_PVAR_SESSION_FREE);
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+  fn_exit:
+    MPIR_FUNC_TERSE_EXIT(MPID_STATE_MPI_T_PVAR_SESSION_FREE);
+    MPIR_T_THREAD_CS_EXIT();
     return mpi_errno;
 
-fn_fail:
+  fn_fail:
     /* --BEGIN ERROR HANDLING-- */
-#   ifdef HAVE_ERROR_CHECKING
+#ifdef HAVE_ERROR_CHECKING
     {
-        mpi_errno = MPIR_Err_create_code(
-            mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
-            "**mpi_t_pvar_session_free", "**mpi_t_pvar_session_free %p", session);
+        mpi_errno =
+            MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
+                                 "**mpi_t_pvar_session_free", "**mpi_t_pvar_session_free %p",
+                                 session);
     }
-#   endif
+#endif
     mpi_errno = MPIR_Err_return_comm(NULL, FCNAME, mpi_errno);
     goto fn_exit;
     /* --END ERROR HANDLING-- */

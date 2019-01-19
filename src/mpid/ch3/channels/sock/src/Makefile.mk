@@ -11,7 +11,8 @@ errnames_txt_files += src/mpid/ch3/channels/sock/src/errnames.txt
 
 if BUILD_CH3_SOCK
 
-lib_lib@MPILIBNAME@_la_SOURCES +=   \
+mpi_core_sources +=   \
+    src/mpid/ch3/channels/sock/src/sock.c \
     src/mpid/ch3/channels/sock/src/ch3_finalize.c    \
     src/mpid/ch3/channels/sock/src/ch3_init.c     \
     src/mpid/ch3/channels/sock/src/ch3_isend.c     \
@@ -21,5 +22,8 @@ lib_lib@MPILIBNAME@_la_SOURCES +=   \
     src/mpid/ch3/channels/sock/src/ch3_progress.c       \
     src/mpid/ch3/channels/sock/src/ch3_win_fns.c
 
-endif BUILD_CH3_SOCK
+noinst_HEADERS += \
+    src/mpid/ch3/channels/sock/include/mpidu_sock.h \
+    src/mpid/ch3/channels/sock/include/mpidu_socki.h
 
+endif BUILD_CH3_SOCK

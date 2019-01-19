@@ -4,8 +4,8 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#if !defined(MPICH_MPIDI_CH3_PRE_H_INCLUDED)
-#define MPICH_MPIDI_CH3_PRE_H_INCLUDED
+#ifndef MPIDI_CH3_PRE_H_INCLUDED
+#define MPIDI_CH3_PRE_H_INCLUDED
 
 /* These macros unlock shared code */
 #define MPIDI_CH3_USES_SOCK
@@ -18,7 +18,6 @@
 
 /* FIXME: These should be removed */
 #define MPIDI_DEV_IMPLEMENTS_KVS
-#define MPIDI_DEV_IMPLEMENTS_ABORT
 
 /* FIXME: Are the following packet extensions?  Can the socket connect/accept
    packets be made part of the util/sock support? */
@@ -27,6 +26,10 @@ MPIDI_CH3I_PKT_SC_OPEN_REQ,			\
 MPIDI_CH3I_PKT_SC_CONN_ACCEPT,		        \
 MPIDI_CH3I_PKT_SC_OPEN_RESP,			\
 MPIDI_CH3I_PKT_SC_CLOSE
+
+typedef struct {
+    int dummy;  /* dummy variable to ensure we don't have an empty structure */
+} MPIDI_CH3I_CH_comm_t;
 
 /* This channel has no special channel data for the process group structure */
 
@@ -43,10 +46,10 @@ MPIDI_CH3I_VC_state_t;
 /* channel-specific fields for the VC structure */
 typedef struct MPIDI_CH3I_VC
 {
-    struct MPID_Request * sendq_head;
-    struct MPID_Request * sendq_tail;
+    struct MPIR_Request * sendq_head;
+    struct MPIR_Request * sendq_tail;
     MPIDI_CH3I_VC_state_t state;
-    struct MPIDU_Sock *sock;
+    struct MPIDI_CH3I_Sock *sock;
     struct MPIDI_CH3I_Connection * conn;
 }
 MPIDI_CH3I_VC;
@@ -54,12 +57,12 @@ MPIDI_CH3I_VC;
 #define MPIDI_CH3_VC_DECL struct MPIDI_CH3I_VC ch;
 
 /*
- * MPIDI_CH3_REQUEST_DECL (additions to MPID_Request)
+ * MPIDI_CH3_REQUEST_DECL (additions to MPIR_Request)
  * The socket channel makes no additions
  */
 
 /*
- * MPID_Progress_state - device/channel dependent state to be passed between 
+ * MPID_Progress_state - device/channel dependent state to be passed between
  * MPID_Progress_{start,wait,end}
  *
  */
@@ -75,8 +78,7 @@ MPIDI_CH3I_Progress_state;
    and must be available to the routines in src/mpi */
 extern volatile unsigned int MPIDI_CH3I_progress_completion_count;
 
-
-/* MPICH_IS_THREADED isn't defined yet (handled by mpiimplthread.h) */
+/* MPICH_IS_THREADED isn't defined yet */
 #if (MPICH_THREAD_LEVEL == MPI_THREAD_MULTIPLE)
 #define MPIDI_CH3I_PROGRESS_WAKEUP                                                                \
     do {                                                                                          \
@@ -88,4 +90,4 @@ extern volatile unsigned int MPIDI_CH3I_progress_completion_count;
     } while (0)
 #endif
 
-#endif /* !defined(MPICH_MPIDI_CH3_PRE_H_INCLUDED) */
+#endif /* MPIDI_CH3_PRE_H_INCLUDED */

@@ -15,6 +15,9 @@
 #pragma _HP_SECONDARY_DEF PMPI_Comm_dup_with_info  MPI_Comm_dup_with_info
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_Comm_dup_with_info as PMPI_Comm_dup_with_info
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm * newcomm)
+    __attribute__ ((weak, alias("PMPI_Comm_dup_with_info")));
 #endif
 /* -- End Profiling Symbol Block */
 
@@ -27,9 +30,9 @@
 #undef FUNCNAME
 #define FUNCNAME MPIR_Comm_dup_with_info_impl
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
-int MPIR_Comm_dup_with_info_impl(MPID_Comm * comm_ptr, MPID_Info * info_ptr,
-                                 MPID_Comm ** newcomm_p_p)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPIR_Comm_dup_with_info_impl(MPIR_Comm * comm_ptr, MPIR_Info * info_ptr,
+                                 MPIR_Comm ** newcomm_p_p)
 {
     int mpi_errno = MPI_SUCCESS;
 
@@ -37,7 +40,7 @@ int MPIR_Comm_dup_with_info_impl(MPID_Comm * comm_ptr, MPID_Info * info_ptr,
      * Comm_dup */
     mpi_errno = MPIR_Comm_dup_impl(comm_ptr, newcomm_p_p);
     if (mpi_errno)
-        MPIU_ERR_POP(mpi_errno);
+        MPIR_ERR_POP(mpi_errno);
 
   fn_exit:
     return mpi_errno;
@@ -51,7 +54,7 @@ int MPIR_Comm_dup_with_info_impl(MPID_Comm * comm_ptr, MPID_Info * info_ptr,
 #undef FUNCNAME
 #define FUNCNAME MPI_Comm_dup_with_info
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 /*@
 
 MPI_Comm_dup_with_info - Duplicates an existing communicator with all its cached
@@ -86,14 +89,14 @@ Notes:
 int MPI_Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm * newcomm)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPID_Comm *comm_ptr = NULL, *newcomm_ptr;
-    MPID_Info *info_ptr = NULL;
-    MPID_MPI_STATE_DECL(MPID_STATE_MPI_COMM_DUP_WITH_INFO);
+    MPIR_Comm *comm_ptr = NULL, *newcomm_ptr;
+    MPIR_Info *info_ptr = NULL;
+    MPIR_FUNC_TERSE_STATE_DECL(MPID_STATE_MPI_COMM_DUP_WITH_INFO);
 
     MPIR_ERRTEST_INITIALIZED_ORDIE();
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
-    MPID_MPI_FUNC_ENTER(MPID_STATE_MPI_COMM_DUP_WITH_INFO);
+    MPID_THREAD_CS_ENTER(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
+    MPIR_FUNC_TERSE_ENTER(MPID_STATE_MPI_COMM_DUP_WITH_INFO);
 
     /* Validate parameters, especially handles needing to be converted */
 #ifdef HAVE_ERROR_CHECKING
@@ -107,8 +110,8 @@ int MPI_Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm * newcomm)
 #endif /* HAVE_ERROR_CHECKING */
 
     /* Convert MPI object handles to object pointers */
-    MPID_Comm_get_ptr(comm, comm_ptr);
-    MPID_Info_get_ptr(info, info_ptr);
+    MPIR_Comm_get_ptr(comm, comm_ptr);
+    MPIR_Info_get_ptr(info, info_ptr);
 
     /* Validate parameters and objects (post conversion) */
 #ifdef HAVE_ERROR_CHECKING
@@ -116,7 +119,7 @@ int MPI_Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm * newcomm)
         MPID_BEGIN_ERROR_CHECKS;
         {
             /* Validate comm_ptr */
-            MPID_Comm_valid_ptr(comm_ptr, mpi_errno);
+            MPIR_Comm_valid_ptr(comm_ptr, mpi_errno, FALSE);
             if (mpi_errno)
                 goto fn_fail;
             /* If comm_ptr is not valid, it will be reset to null */
@@ -129,14 +132,14 @@ int MPI_Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm * newcomm)
     /* ... body of routine ...  */
     mpi_errno = MPIR_Comm_dup_with_info_impl(comm_ptr, info_ptr, &newcomm_ptr);
     if (mpi_errno)
-        MPIU_ERR_POP(mpi_errno);
+        MPIR_ERR_POP(mpi_errno);
 
-    MPIU_OBJ_PUBLISH_HANDLE(*newcomm, newcomm_ptr->handle);
+    MPIR_OBJ_PUBLISH_HANDLE(*newcomm, newcomm_ptr->handle);
     /* ... end of body of routine ... */
 
   fn_exit:
-    MPID_MPI_FUNC_EXIT(MPID_STATE_MPI_COMM_DUP_WITH_INFO);
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+    MPIR_FUNC_TERSE_EXIT(MPID_STATE_MPI_COMM_DUP_WITH_INFO);
+    MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
     return mpi_errno;
 
   fn_fail:

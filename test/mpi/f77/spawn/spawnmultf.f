@@ -24,6 +24,7 @@ C       implicit none
        character*(80) argv(64)
        integer argc
        integer ierr
+       integer can_spawn
 C
 C       Arguments are stored by rows, not columns in the vector.
 C       We write the data in a way that looks like the transpose,
@@ -44,6 +45,12 @@ C       since Fortran stores by column
        errs = 0
 
        call MTest_Init( ierr )
+
+       call MTestSpawnPossible( can_spawn, errs )
+        if ( can_spawn .eq. 0 ) then
+            call MTest_Finalize( errs )
+            goto 300
+        endif
 
        call MPI_Comm_get_parent( parentcomm, ierr )
 
@@ -141,7 +148,9 @@ C       It isn't necessary to free the intercomm, but it should not hurt
 C       Note that the MTest_Finalize get errs only over COMM_WORLD 
         if (parentcomm .eq. MPI_COMM_NULL) then
             call MTest_Finalize( errs )
+        else
+            call MPI_Finalize( ierr )
         endif
 
-        call MPI_Finalize( ierr )
+ 300    continue
         end

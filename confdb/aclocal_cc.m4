@@ -45,7 +45,11 @@ CFLAGS_orig="$CFLAGS"
 CFLAGS_opt="$pac_opt $CFLAGS"
 pac_result="unknown"
 
-AC_LANG_CONFTEST([AC_LANG_PROGRAM()])
+AC_LANG_CONFTEST([
+	AC_LANG_PROGRAM([[#include <stdio.h>
+                          const char hw[] = "Hello, World\n";]],
+		[[fputs (hw, stdout);]])
+])
 CFLAGS="$CFLAGS_orig"
 rm -f pac_test1.log
 PAC_LINK_IFELSE_LOG([pac_test1.log], [], [
@@ -361,8 +365,13 @@ pac_cv_attr_weak_import=yes,pac_cv_attr_weak_import=no)])
 # Check if the alias option for weak attributes is allowed
 AC_CACHE_CHECK([whether __attribute__((weak,alias(...))) allowed],
 pac_cv_attr_weak_alias,[
-AC_TRY_COMPILE([int foo(int) __attribute__((weak,alias("__foo")));],[int a;],
-pac_cv_attr_weak_alias=yes,pac_cv_attr_weak_alias=no)])
+PAC_PUSH_FLAG([CFLAGS])
+# force an error exit if the weak attribute isn't understood
+CFLAGS=-Werror
+AC_TRY_COMPILE([int __foo(int a){return 0;} int foo(int) __attribute__((weak,alias("__foo")));],[int a;],
+pac_cv_attr_weak_alias=yes,pac_cv_attr_weak_alias=no)
+# Restore original CFLAGS
+PAC_POP_FLAG([CFLAGS])])
 if test "$pac_cv_attr_weak_alias" = "yes" ; then
     AC_DEFINE(HAVE_WEAK_ATTRIBUTE,1,[Attribute style weak pragma])
 fi
@@ -452,6 +461,13 @@ export enable_strict_done
 if test "$enable_strict_done" != "yes" ; then
 
     # Some comments on strict warning options.
+    # These were added to improve portability
+    #   -Wstack-usage=262144 -- 32 bit FreeBSD did not like the mprobe test
+    #       allocating a big variable on the stack. (See tt#2160).  The "right"
+    #       value requires further investigation; 1 MiB would have at least
+    #       caught #2160 at compile-time, and only two other tests show a
+    #       warning at 256k.
+    #
     # These were added to reduce warnings:
     #   -Wno-missing-field-initializers  -- We want to allow a struct to be 
     #       initialized to zero using "struct x y = {0};" and not require 
@@ -467,13 +483,6 @@ if test "$enable_strict_done" != "yes" ; then
     #	    msg_sz_t) variables.
     #   -Wno-format-zero-length -- this warning is irritating and useless, since
     #                              a zero-length format string is very well defined
-    #   -Wno-type-limits -- There are places where we compare an unsigned to 
-    #	    a constant that happens to be zero e.g., if x is unsigned and 
-    #	    MIN_VAL is zero, we'd like to do "MPIU_Assert(x >= MIN_VAL);".
-    #       Note this option is not supported by gcc 4.2.  This needs to be added 
-    #	    after most other warning flags, so that we catch a gcc bug on 32-bit 
-    #	    that doesn't give a warning that this is unsupported, unless another
-    #	    warning is triggered, and then if gives an error.
     # These were removed to reduce warnings:
     #   -Wcast-qual -- Sometimes we need to cast "volatile char*" to 
     #	    "char*", e.g., for memcpy.
@@ -505,6 +514,18 @@ if test "$enable_strict_done" != "yes" ; then
     #       important check, but is temporarily disabled, since it is
     #       throwing too many (correct) warnings currently, causing us
     #       to miss other warnings.
+    #
+    # This was removed because it masks important failures (see ticket #2094).
+    # However, since Intel compiler currently does not include -Wtype-limits
+    # in -Wextra, -Wtype-limits was added to handle warnings with the Intel
+    # compiler.
+    #   -Wno-type-limits -- There are places where we compare an unsigned to 
+    #	    a constant that happens to be zero e.g., if x is unsigned and 
+    #	    MIN_VAL is zero, we'd like to do "MPIR_Assert(x >= MIN_VAL);".
+    #       Note this option is not supported by gcc 4.2.  This needs to be added 
+    #	    after most other warning flags, so that we catch a gcc bug on 32-bit 
+    #	    that doesn't give a warning that this is unsupported, unless another
+    #	    warning is triggered, and then if gives an error.
     # the embedded newlines in this string are safe because we evaluate each
     # argument in the for-loop below and append them to the CFLAGS with a space
     # as the separator instead
@@ -535,8 +556,9 @@ if test "$enable_strict_done" != "yes" ; then
         -Wno-pointer-sign
         -Wvariadic-macros
         -Wno-format-zero-length
-	-Wno-type-limits
+        -Wtype-limits
         -Werror-implicit-function-declaration
+        -Wstack-usage=262144
     "
 
     enable_c89=no
@@ -604,6 +626,21 @@ if test "$enable_strict_done" != "yes" ; then
        	  pac_cc_strict_flags="-O2"
        fi
        pac_cc_strict_flags="$pac_cc_strict_flags $pac_common_strict_flags"
+       # We only allow one of strict-C99 or strict-C89 to be
+       # enabled. If C99 is enabled, we automatically disable C89.
+       if test "${enable_c99}" = "yes" ; then
+       	  PAC_APPEND_FLAG([-std=c99],[pac_cc_strict_flags])
+          # Use -D_STDC_C99= for Solaris compilers. See
+          # http://lists.gnu.org/archive/html/autoconf/2010-12/msg00059.html
+          # for discussion on why not to use -xc99
+          PAC_APPEND_FLAG([-D_STDC_C99=],[pac_cc_strict_flags])
+       elif test "${enable_c89}" = "yes" ; then
+       	  PAC_APPEND_FLAG([-std=c89],[pac_cc_strict_flags])
+       	  PAC_APPEND_FLAG([-Wdeclaration-after-statement],[pac_cc_strict_flags])
+       fi
+       # POSIX 2001 should be used with C99. But the default standard for some
+       # compilers are not C99. We must test the support of POSIX 2001 after
+       # testing C99.
        case "$enable_posix" in
             no)   : ;;
             1995) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=199506L],[pac_cc_strict_flags]) ;;
@@ -611,13 +648,8 @@ if test "$enable_strict_done" != "yes" ; then
             2008) PAC_APPEND_FLAG([-D_POSIX_C_SOURCE=200809L],[pac_cc_strict_flags]) ;;
             *)    AC_MSG_ERROR([internal error, unexpected POSIX version: '$enable_posix']) ;;
        esac
-       # We only allow one of strict-C99 or strict-C89 to be
-       # enabled. If C99 is enabled, we automatically disable C89.
-       if test "${enable_c99}" = "yes" ; then
-       	  PAC_APPEND_FLAG([-std=c99],[pac_cc_strict_flags])
-       elif test "${enable_c89}" = "yes" ; then
-       	  PAC_APPEND_FLAG([-std=c89],[pac_cc_strict_flags])
-       	  PAC_APPEND_FLAG([-Wdeclaration-after-statement],[pac_cc_strict_flags])
+       if test "$enable_posix" != "no" ; then
+           AS_CASE([$host],[*-*-darwin*], [PAC_APPEND_FLAG([-D_DARWIN_C_SOURCE],[pac_cc_strict_flags])])
        fi
     fi
 
@@ -1630,31 +1662,21 @@ AC_DEFUN([PAC_STRUCT_ALIGNMENT],[
 	   pac_cv_struct_alignment="eight"
 	fi
 ])
-
+dnl
 dnl PAC_C_MACRO_VA_ARGS
 dnl
 dnl will AC_DEFINE([HAVE_MACRO_VA_ARGS]) if the compiler supports C99 variable
 dnl length argument lists in macros (#define foo(...) bar(__VA_ARGS__))
 AC_DEFUN([PAC_C_MACRO_VA_ARGS],[
     AC_MSG_CHECKING([for variable argument list macro functionality])
-
-    # check if the program links correctly
-    rm -f pac_test.log
-    PAC_LINK_IFELSE_LOG([pac_test.log],[AC_LANG_PROGRAM([
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([
         #include <stdio.h>
         #define conftest_va_arg_macro(...) printf(__VA_ARGS__)
     ],
     [conftest_va_arg_macro("a test %d", 3);])],
-    prog_links=yes,prog_links=no)
-
-    # If the program linked OK, make sure there were no warnings
-    if test "$prog_links" = "yes" -a "`cat pac_test.log`" = "" ; then
-       AC_DEFINE([HAVE_MACRO_VA_ARGS],[1],[Define if C99-style variable argument list macro functionality])
-       AC_MSG_RESULT([yes])
-    else
-       AC_MSG_RESULT([no])
-    fi
-    rm -f pac_test.log
+    [AC_DEFINE([HAVE_MACRO_VA_ARGS],[1],[Define if C99-style variable argument list macro functionality])
+     AC_MSG_RESULT([yes])],
+    [AC_MSG_RESULT([no])])
 ])dnl
 
 # Will AC_DEFINE([HAVE_BUILTIN_EXPECT]) if the compiler supports __builtin_expect.
@@ -1673,4 +1695,24 @@ AC_TRY_LINK(, [
 if test x$have_builtin_expect = xyes ; then
     AC_DEFINE([HAVE_BUILTIN_EXPECT], [1], [Define to 1 if the compiler supports __builtin_expect.])
 fi
+])
+
+dnl
+dnl PAC_C_STATIC_ASSERT - Test whether C11 _Static_assert is supported
+dnl
+dnl will AC_DEFINE([HAVE_C11__STATIC_ASSERT]) if C11 _Static_assert is supported.
+dnl
+AC_DEFUN([PAC_C_STATIC_ASSERT], [
+    AC_MSG_CHECKING([for C11 _Static_assert functionality])
+    AC_LINK_IFELSE([AC_LANG_SOURCE([
+    int main(){
+        _Static_assert(1, "The impossible happened!");
+        return 0;
+    }
+    ])],[
+    AC_DEFINE([HAVE_C11__STATIC_ASSERT],[1],[Define if C11 _Static_assert is supported.])
+    AC_MSG_RESULT([yes])
+    ],[
+    AC_MSG_RESULT([no])
+    ])
 ])

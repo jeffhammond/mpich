@@ -1,15 +1,15 @@
 # -*- Mode: Makefile; -*-
 # vim: set ft=automake :
 #
-# (C) 2011 by Argonne National Laboratory.
+# (C) 2010 by Argonne National Laboratory.
 #     See COPYRIGHT in top-level directory.
 #
 
 include $(top_srcdir)/Makefile_cxx.mtest
 
-EXTRA_DIST = testlist
+EXTRA_DIST = testlist.in
 
-noinst_PROGRAMS = attrtx attricx baseattrcommx fkeyvalcommx fkeyvaltypex
+noinst_PROGRAMS = attrtx attricx baseattrcommx fkeyvalcommx
 ## the following entries were disabled in the simplemake version:
 ##noinst_PROGRAMS += attrerrx attrerrcommx attrerrtypex attrorderx attrordercommx \
 ##                   attrordertypex attrorderwinx baseattr2x baseattrwinx
@@ -27,5 +27,5 @@ attricx_SOURCES = attricx.cxx
 baseattrcommx_SOURCES = baseattrcommx.cxx
 #baseattrwinx_SOURCES = baseattrwinx.cxx
 fkeyvalcommx_SOURCES = fkeyvalcommx.cxx
-fkeyvaltypex_SOURCES = fkeyvaltypex.cxx
 
+include Makefile.dtp

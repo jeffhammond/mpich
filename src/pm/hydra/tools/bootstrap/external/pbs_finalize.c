@@ -1,6 +1,6 @@
 /* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2008 by Argonne National Laboratory.
+ *  (C) 2011 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
 
@@ -22,10 +22,10 @@ HYD_status HYDT_bscd_pbs_launcher_finalize(void)
 
     if (HYDT_bscd_pbs_sys) {
         if (HYDT_bscd_pbs_sys->task_id)
-            HYDU_FREE(HYDT_bscd_pbs_sys->task_id);
+            MPL_free(HYDT_bscd_pbs_sys->task_id);
         if (HYDT_bscd_pbs_sys->spawn_events)
-            HYDU_FREE(HYDT_bscd_pbs_sys->spawn_events);
-        HYDU_FREE(HYDT_bscd_pbs_sys);
+            MPL_free(HYDT_bscd_pbs_sys->spawn_events);
+        MPL_free(HYDT_bscd_pbs_sys);
     }
 
   fn_exit:

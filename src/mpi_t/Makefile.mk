@@ -11,7 +11,7 @@ mpi_sources +=                \
         src/mpi_t/cat_get_cvars.c       \
         src/mpi_t/cat_get_info.c        \
         src/mpi_t/cat_get_num.c         \
-        src/mpi_t/cat_get_pv.c          \
+        src/mpi_t/cat_get_pvars.c       \
         src/mpi_t/cvar_get_info.c       \
         src/mpi_t/cvar_get_num.c        \
         src/mpi_t/cvar_handle_alloc.c   \
@@ -21,7 +21,7 @@ mpi_sources +=                \
         src/mpi_t/enum_get_info.c       \
         src/mpi_t/enum_get_item.c       \
         src/mpi_t/mpit_finalize.c       \
-        src/mpi_t/mpit_init_thread.c    \
+        src/mpi_t/mpit_initthread.c     \
         src/mpi_t/pvar_get_info.c       \
         src/mpi_t/pvar_get_num.c        \
         src/mpi_t/pvar_handle_alloc.c   \
@@ -33,8 +33,10 @@ mpi_sources +=                \
         src/mpi_t/pvar_session_free.c   \
         src/mpi_t/pvar_start.c          \
         src/mpi_t/pvar_stop.c           \
-        src/mpi_t/pvar_write.c
+        src/mpi_t/pvar_write.c          \
+        src/mpi_t/cat_get_index.c       \
+        src/mpi_t/cvar_get_index.c      \
+        src/mpi_t/pvar_get_index.c
 
 
-lib_lib@MPILIBNAME@_la_SOURCES += src/mpi_t/mpi_t_util.c
-
+mpi_core_sources += src/mpi_t/mpit.c

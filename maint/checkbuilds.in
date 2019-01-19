@@ -1,4 +1,4 @@
-#! @PERL@
+#! /usr/bin/env perl
 # -*- Mode: perl; -*-
 # @configure_input@
 #
@@ -50,7 +50,7 @@ $hasDemon   = 0;
 @enable_array = ( 
 		  'error-checking;no;runtime;all', 
 		  'error-messages;all;generic;class;none',
-		  'timer-type;linux86_cycle;gethrtime;clock_gettime;gettimeofday;linuxalpha_cycle',
+		  'timer-type;linux86_cycle;gethrtime;clock_gettime;gettimeofday',
 		  'timing;none;all;runtime;log;log_detailed',
 		  'g;none;all;handle;dbg;log;meminit;handlealloc;instr;mem;mutex;mutexnesting;memarena',
 		  'fast;nochkmsg;notiming;ndebug;all',
@@ -68,9 +68,7 @@ $hasDemon   = 0;
                   'thread-cs;global;per-object;lock-free',
                   'refcount;lock;lock-free;none',
                   'mutex-timing',
-                  'handle-allocation;tls;mutex',
                   'multi-aliases',
-                  'wrapper-rpath',
                   'predefined-refcount',
                   'alloca',
                   'yield;sched_yield;yield;select;usleep;sleep',
@@ -80,10 +78,11 @@ $hasDemon   = 0;
 %chosenEnable = ();
 @with_array = (
 	       'logging;none;rlog',
-	       'pmi;simple;smpd',    #; uni no longer supported
-	       'pm;gforker;mpd', #;remshell
-	       'namepublisher;no;file;mpd', #;ldap:ldapserver',
+	       'pmi;simple',    #; uni no longer supported
+	       'pm;gforker', #;remshell
+	       'namepublisher;no;file', #;ldap:ldapserver',
 	       'device;ch3;ch3:sock',
+	       'wrapper-dl-type;runpath;rpath;none',
 );
 %chosenWith = ();
 @env_array = (
@@ -285,14 +284,14 @@ sub RunTest {
     # but we should only do that if explicitly requested (we could
     # *require* an empty directory for the tests instead)
     if (-d "$instdir/lib") {
-	system "rm -f $instdir/lib/libmpich*.* $instdir/lib/libfmpich*.*";
+	system "rm -f $instdir/lib/libmpi*.* $instdir/lib/libmpifort*.*";
 	system "rm -f $instdir/lib/libmpe*.a";
     }
     if (-d "$instdir/bin") {
-	system "rm -f $instdir/bin/mpi* $instdir/bin/mpd*";
+	system "rm -f $instdir/bin/mpi*";
     }
     if (-d "$builddir/lib") {
-	system "rm -f $builddir/lib/libmpich*.* $builddir/lib/libfmpich*.*";
+	system "rm -f $builddir/lib/libmpi*.* $builddir/lib/libmpifort*.*";
 	system "rm -f $builddir/lib/libmpe*.a";
     }
     # 
@@ -410,9 +409,6 @@ sub RunTest {
 	# print "rc = $rc\n";
 	if ($rc == 0) {
 	    print $OUTFD $MakeStart;
-	    # Remove mpd and smpd just in case (see below)
-	    unlink "bin/mpd";
-	    unlink "bin/smpd";
 	    $rc = &RunProgram( "$makepgm $parallelBuild" );
 	    print $OUTFD $MakeEnd;
 	    $make_status = $rc;
@@ -439,19 +435,6 @@ sub RunTest {
 		}
 		print $OUTFD $MakeInstEnd;
 		if ($install_status == 0) {
-		    # FIXME: Get mpd status from the with args ...
-		    if (-x "$instdir/bin/mpd") {
-			$hasDemon   = 1;
-			$StartDemon = "RunMPD";
-			$StopDemon  = "StopMPD";
-		    }
-		    elsif (-x "$instdir/bin/smpd") {
-			$hasDemon   = 1;
-			$StartDemon = "RunSMPD";
-			$StopDemon  = "StopSMPD";
-			# FIXME: Remaining problem: smpd needs to be told what
-			# port to use on the mpiexec line
-		    }
 		    # Try the install check target
 		    print $OUTFD $MakeInstcheckStart;
 		    $installcheck_status = &RunProgram( "$makepgm installcheck" );
@@ -678,8 +661,8 @@ sub RunMpichTestSuite {
     else {
 	$config[$nargs++] = "-cc=$ccname -I$instdir/include -L$instdir/lib";
     }
-    if (-x "$instdir/bin/mpif77" ) {
-	$config[$nargs++] = "-fc=$instdir/bin/mpif77";
+    if (-x "$instdir/bin/mpifort" ) {
+	$config[$nargs++] = "-fc=$instdir/bin/mpifort";
     }
     else {
 	$config[$nargs++] = "-fc=$fcname -I$instdir/include -L$instdir/lib";
@@ -1077,73 +1060,6 @@ sub RunProgram {
     }
     return $rc;
 }
-# ---------------------------------------------------------------------------
-#
-# We need a variation of this that will start MPDs on mulitple hosts.
-# 
-sub RunMPD {
-    # We need to background the mpd.
-    # If there is already an mpd running (for us), we want to stop it
-    my $mpdlocalsock = "/tmp/mpd2.console_". $ENV{"LOGNAME"};
-    my $rc = 0;
-    if (-S $mpdlocalsock) {
-	system "$instdir/bin/mpdallexit";
-        $rc = $? >> 8;
-        if ($rc != 0) {
-            print $OUTFD "Error running $instdir/bin/mpdallexit before starting MPD ($mpdlocalsock exists)\n";
-        }
-    }
-    #system "$instdir/bin/mpd -d";
-    # Try to background mpd
-    system "$instdir/bin/mpd &";
-    $rc = $? >> 8;
-    if ($rc != 0) {
-	print $OUTFD "Error running $instdir/bin/mpd -d\n";
-    }
-    else {
-	print $OUTFD "Started mpd in demon mode\n";
-    }
-    # Wait for the mpd to start
-    sleep 1;
-    return;
-}
-sub StopMPD {
-    my $mpdlocalsock = "/tmp/mpd2.console_". $ENV{"LOGNAME"};
-    if (-S $mpdlocalsock) {
-	system "$instdir/bin/mpdallexit";
-        my $rc = $? >> 8;
-        if ($rc != 0) {
-            print $OUTFD "Error running $instdir/bin/mpdallexit in StopMPD ($mpdlocalsock exists)\n";
-        }
-    }
-}
-# ---------------------------------------------------------------------------
-#
-# We need a variation of this that will start SMPDs on mulitple hosts.
-# 
-sub RunSMPD {
-    system "$instdir/bin/smpd -port 10101 -s";
-    # FIXME: Placeholder for correct environment variable for providing
-    # mpiexec with the smpd port that should be used.
-    $ENV{"MPIEXEC_SMPD_PORT"} = 10101;
-    # print errors instead of prompting for input
-    $ENV{"MPIEXEC_NOPROMPT"} = 1;
-    # use only the local host
-    $ENV{"SMPD_OPTION_NO_DYNAMIC_HOSTS"} = 1;
-    $rc = $? >> 8;
-    if ($rc != 0) {
-	print $OUTFD "Error running $instdir/bin/smpd -port 10101 -s\n";
-    }
-    else {
-	print $OUTFD "Started mpd in demon mode\n";
-    }
-    sleep 1;
-    return;
-}
-sub StopSMPD {
-    `$instdir/bin/smpd -port 10101 -shutdown`;
-}
-# ---------------------------------------------------------------------------
 #
 # Change output style
 sub XMLStyle {

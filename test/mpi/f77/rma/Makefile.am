@@ -7,7 +7,7 @@
 
 include $(top_srcdir)/Makefile_f77.mtest
 
-EXTRA_DIST = testlist
+EXTRA_DIST = testlist.in
 
 # avoid having to write many "foo_SOURCES = foo.f" lines
 AM_DEFAULT_SOURCE_EXT = .f
@@ -26,6 +26,11 @@ noinst_PROGRAMS = \
     baseattrwinf  \
     winattrf      \
     winattr2f
+
+if BUILD_MPIX_TESTS
+noinst_PROGRAMS += aintf
+endif
+
 ## this test was commented out in the simplemake version...
 ##    allocmem
 
@@ -52,4 +57,3 @@ winscale2f.$(OBJEXT): addsize.h
 ## not sure how accurate it is.
 # bindir may be used in MPIEXEC, so make sure it is defined
 BINDIR=${bindir}
-

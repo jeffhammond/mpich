@@ -13,6 +13,9 @@
 #pragma _HP_SECONDARY_DEF PMPI_T_category_get_cvars  MPI_T_category_get_cvars
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_T_category_get_cvars as PMPI_T_category_get_cvars
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_T_category_get_cvars(int cat_index, int len, int indices[])
+    __attribute__ ((weak, alias("PMPI_T_category_get_cvars")));
 #endif
 /* -- End Profiling Symbol Block */
 
@@ -27,17 +30,22 @@
 #undef FUNCNAME
 #define FUNCNAME MPIR_T_category_get_cvars_impl
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_T_category_get_cvars_impl(int cat_index, int len, int indices[])
 {
-    int mpi_errno = MPI_ERR_INTERN;
+    int mpi_errno = MPI_SUCCESS;
+    cat_table_entry_t *cat;
+    int i, num_cvars, count;
 
-    /* TODO implement this function */
+    cat = (cat_table_entry_t *) utarray_eltptr(cat_table, cat_index);
+    num_cvars = utarray_len(cat->cvar_indices);
+    count = len < num_cvars ? len : num_cvars;
 
-fn_exit:
+    for (i = 0; i < count; i++) {
+        indices[i] = *(int *) utarray_eltptr(cat->cvar_indices, i);
+    }
+
     return mpi_errno;
-fn_fail:
-    goto fn_exit;
 }
 
 #endif /* MPICH_MPI_FROM_PMPI */
@@ -45,9 +53,9 @@ fn_fail:
 #undef FUNCNAME
 #define FUNCNAME MPI_T_category_get_cvars
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 /*@
-MPI_T_category_get_cvars - XXX description here
+MPI_T_category_get_cvars - Get control variables in a category
 
 Input Parameters:
 + cat_index - index of the category to be queried, in the range [0,N-1] (integer)
@@ -58,66 +66,59 @@ Output Parameters:
 
 .N ThreadSafe
 
-.N Fortran
-
 .N Errors
+.N MPI_SUCCESS
+.N MPI_T_ERR_NOT_INITIALIZED
+.N MPI_T_ERR_INVALID_INDEX
 @*/
 int MPI_T_category_get_cvars(int cat_index, int len, int indices[])
 {
     int mpi_errno = MPI_SUCCESS;
-    MPID_MPI_STATE_DECL(MPID_STATE_MPI_T_CATEGORY_GET_CVARS);
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
-    MPID_MPI_FUNC_ENTER(MPID_STATE_MPI_T_CATEGORY_GET_CVARS);
+    MPIR_FUNC_TERSE_STATE_DECL(MPID_STATE_MPI_T_CATEGORY_GET_CVARS);
+    MPIR_ERRTEST_MPIT_INITIALIZED(mpi_errno);
+    MPIR_T_THREAD_CS_ENTER();
+    MPIR_FUNC_TERSE_ENTER(MPID_STATE_MPI_T_CATEGORY_GET_CVARS);
 
-    /* Validate parameters, especially handles needing to be converted */
-#   ifdef HAVE_ERROR_CHECKING
+    /* Validate parameters */
+#ifdef HAVE_ERROR_CHECKING
     {
-        MPID_BEGIN_ERROR_CHECKS
+        MPID_BEGIN_ERROR_CHECKS;
         {
-
-            /* TODO more checks may be appropriate */
-            if (mpi_errno != MPI_SUCCESS) goto fn_fail;
+            MPIR_ERRTEST_CAT_INDEX(cat_index, mpi_errno);
+            if (len != 0)
+                MPIR_ERRTEST_ARGNULL(indices, "indices", mpi_errno);
         }
-        MPID_END_ERROR_CHECKS
+        MPID_END_ERROR_CHECKS;
     }
-#   endif /* HAVE_ERROR_CHECKING */
-
-    /* Convert MPI object handles to object pointers */
-
-    /* Validate parameters and objects (post conversion) */
-#   ifdef HAVE_ERROR_CHECKING
-    {
-        MPID_BEGIN_ERROR_CHECKS
-        {
-            /* TODO more checks may be appropriate (counts, in_place, buffer aliasing, etc) */
-            if (mpi_errno != MPI_SUCCESS) goto fn_fail;
-        }
-        MPID_END_ERROR_CHECKS
-    }
-#   endif /* HAVE_ERROR_CHECKING */
+#endif /* HAVE_ERROR_CHECKING */
 
     /* ... body of routine ...  */
 
+    if (len == 0)
+        goto fn_exit;
+
     mpi_errno = MPIR_T_category_get_cvars_impl(cat_index, len, indices);
-    if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+    if (mpi_errno)
+        MPIR_ERR_POP(mpi_errno);
 
     /* ... end of body of routine ... */
 
-fn_exit:
-    MPID_MPI_FUNC_EXIT(MPID_STATE_MPI_T_CATEGORY_GET_CVARS);
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+  fn_exit:
+    MPIR_FUNC_TERSE_EXIT(MPID_STATE_MPI_T_CATEGORY_GET_CVARS);
+    MPIR_T_THREAD_CS_EXIT();
     return mpi_errno;
 
-fn_fail:
+  fn_fail:
     /* --BEGIN ERROR HANDLING-- */
-#   ifdef HAVE_ERROR_CHECKING
+#ifdef HAVE_ERROR_CHECKING
     {
-        mpi_errno = MPIR_Err_create_code(
-            mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
-            "**mpi_t_category_get_cvars", "**mpi_t_category_get_cvars %d %d %p", cat_index, len, indices);
+        mpi_errno =
+            MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
+                                 "**mpi_t_category_get_cvars",
+                                 "**mpi_t_category_get_cvars %d %d %p", cat_index, len, indices);
     }
-#   endif
+#endif
     mpi_errno = MPIR_Err_return_comm(NULL, FCNAME, mpi_errno);
     goto fn_exit;
     /* --END ERROR HANDLING-- */

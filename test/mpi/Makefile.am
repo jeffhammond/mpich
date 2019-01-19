@@ -11,8 +11,8 @@ include $(top_srcdir)/Makefile.mtest
 ACLOCAL_AMFLAGS = -I confdb
 
 static_subdirs = util attr basic datatype coll comm errhan group info init \
-                 pt2pt rma topo errors manual perf mpi_t
-all_lang_subdirs = f77 cxx f90
+                 pt2pt rma topo errors manual perf mpi_t impls ckpoint ft dtpools
+all_lang_subdirs = f77 cxx f90 f08
 
 # DIST_SUBDIRS must be a superset of SUBDIRS, and automake must be able to
 # *statically* compute its contents.  The good news is that we can mostly avoid
@@ -21,12 +21,12 @@ all_lang_subdirs = f77 cxx f90
 DIST_SUBDIRS = $(static_subdirs) io $(all_lang_subdirs) threads spawn .
 SUBDIRS      = $(static_subdirs) $(iodir) $(otherlangs) $(threadsdir) $(spawndir) $(ckpointdir) $(ftdir) .
 
-EXTRA_DIST = maint/common.defn maint/f77tof90.in maint/testmerge.in maint/updatefiles testlist.in
+EXTRA_DIST = maint/common.defn maint/f77tof90 maint/testmerge.in maint/updatefiles testlist.in
 
 DISTCLEANFILES = config.system
 
 ## here are automakefile entries for the test/mpi/include dir
-noinst_HEADERS = include/mpitest.h include/mpitestcxx.h include/mpithreadtest.h
+noinst_HEADERS = include/mpitest.h include/mpitestcxx.h include/mpithreadtest.h include/dtypes.h rma/squelch.h errors/rma/win_sync.h
 nodist_noinst_HEADERS = include/mpitestconf.h
 
 # Need to patch some things up:

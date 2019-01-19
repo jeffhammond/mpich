@@ -1,7 +1,7 @@
 /* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
-/* 
+/*
  *
- *   Copyright (C) 1997 University of Chicago. 
+ *   Copyright (C) 1997 University of Chicago.
  *   See COPYRIGHT notice in top-level directory.
  *
  */
@@ -17,6 +17,10 @@
 #elif defined(HAVE_PRAGMA_CRI_DUP)
 #pragma _CRI duplicate MPI_File_write_ordered as PMPI_File_write_ordered
 /* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_write_ordered(MPI_File fh, const void *buf, int count, MPI_Datatype datatype,
+                           MPI_Status * status)
+    __attribute__ ((weak, alias("PMPI_File_write_ordered")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -40,18 +44,20 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPI_File_write_ordered(MPI_File fh, const void *buf, int count,
-			   MPI_Datatype datatype, MPI_Status *status)
+int MPI_File_write_ordered(MPI_File fh, ROMIO_CONST void *buf, int count,
+                           MPI_Datatype datatype, MPI_Status * status)
 {
-    int error_code, datatype_size, nprocs, myrank, incr;
+    int error_code, nprocs, myrank;
+    ADIO_Offset incr;
+    MPI_Count datatype_size;
     int source, dest;
     static char myname[] = "MPI_FILE_WRITE_ORDERED";
     ADIO_Offset shared_fp;
     ADIO_File adio_fh;
-    void *e32buf=NULL;
+    void *e32buf = NULL;
     const void *xbuf;
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
     adio_fh = MPIO_File_resolve(fh);
 
@@ -61,7 +67,7 @@ int MPI_File_write_ordered(MPI_File fh, const void *buf, int count,
     MPIO_CHECK_DATATYPE(adio_fh, datatype, myname, error_code);
     /* --END ERROR HANDLING-- */
 
-    MPI_Type_size(datatype, &datatype_size);
+    MPI_Type_size_x(datatype, &datatype_size);
 
     /* --BEGIN ERROR HANDLING-- */
     MPIO_CHECK_INTEGRAL_ETYPE(adio_fh, count, datatype_size, myname, error_code);
@@ -74,23 +80,24 @@ int MPI_File_write_ordered(MPI_File fh, const void *buf, int count,
     MPI_Comm_size(adio_fh->comm, &nprocs);
     MPI_Comm_rank(adio_fh->comm, &myrank);
 
-    incr = (count*datatype_size)/adio_fh->etype_size;
+    incr = (count * datatype_size) / adio_fh->etype_size;
     /* Use a message as a 'token' to order the operations */
     source = myrank - 1;
-    dest   = myrank + 1;
-    if (source < 0) source = MPI_PROC_NULL;
-    if (dest >= nprocs) dest = MPI_PROC_NULL;
+    dest = myrank + 1;
+    if (source < 0)
+        source = MPI_PROC_NULL;
+    if (dest >= nprocs)
+        dest = MPI_PROC_NULL;
     MPI_Recv(NULL, 0, MPI_BYTE, source, 0, adio_fh->comm, MPI_STATUS_IGNORE);
 
     ADIO_Get_shared_fp(adio_fh, incr, &shared_fp, &error_code);
 
     /* --BEGIN ERROR HANDLING-- */
     if (error_code != MPI_SUCCESS) {
-	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_FATAL,
-					  myname, __LINE__, MPI_ERR_INTERN, 
-					  "**iosharedfailed", 0);
-	error_code = MPIO_Err_return_file(adio_fh, error_code);
-	goto fn_exit;
+        error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_FATAL,
+                                          myname, __LINE__, MPI_ERR_INTERN, "**iosharedfailed", 0);
+        error_code = MPIO_Err_return_file(adio_fh, error_code);
+        goto fn_exit;
     }
     /* --END ERROR HANDLING-- */
 
@@ -98,11 +105,11 @@ int MPI_File_write_ordered(MPI_File fh, const void *buf, int count,
 
     xbuf = buf;
     if (adio_fh->is_external32) {
-	error_code = MPIU_external32_buffer_setup(buf, count, datatype, &e32buf);
-	if (error_code != MPI_SUCCESS) 
-	    goto fn_exit;
+        error_code = MPIU_external32_buffer_setup(buf, count, datatype, &e32buf);
+        if (error_code != MPI_SUCCESS)
+            goto fn_exit;
 
-	xbuf = e32buf;
+        xbuf = e32buf;
     }
 
     ADIO_WriteStridedColl(adio_fh, xbuf, count, datatype, ADIO_EXPLICIT_OFFSET,
@@ -110,14 +117,14 @@ int MPI_File_write_ordered(MPI_File fh, const void *buf, int count,
 
     /* --BEGIN ERROR HANDLING-- */
     if (error_code != MPI_SUCCESS)
-	error_code = MPIO_Err_return_file(adio_fh, error_code);
+        error_code = MPIO_Err_return_file(adio_fh, error_code);
     /* --END ERROR HANDLING-- */
 
-fn_exit:
-    if (e32buf != NULL) ADIOI_Free(e32buf);
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+  fn_exit:
+    if (e32buf != NULL)
+        ADIOI_Free(e32buf);
+    ROMIO_THREAD_CS_EXIT();
 
     /* FIXME: Check for error code from WriteStridedColl? */
     return error_code;
 }
-

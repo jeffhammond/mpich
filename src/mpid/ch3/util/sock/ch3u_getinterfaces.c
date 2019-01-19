@@ -36,7 +36,7 @@
  */
 static int dbg_ifname = -1;
 
-static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *, int * );
+static int MPIDI_CH3U_GetIPInterface( MPIDI_CH3I_Sock_ifaddr_t *, int * );
 
 /*
  * Get a description of the network interface to use for socket communication
@@ -62,9 +62,9 @@ static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *, int * );
 #undef FUNCNAME
 #define FUNCNAME MPIDU_CH3U_GetSockInterfaceAddr
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDU_CH3U_GetSockInterfaceAddr( int myRank, char *ifname, int maxIfname,
-				     MPIDU_Sock_ifaddr_t *ifaddr )
+				     MPIDI_CH3I_Sock_ifaddr_t *ifaddr )
 {
     char *ifname_string;
     int mpi_errno = MPI_SUCCESS;
@@ -87,7 +87,7 @@ int MPIDU_CH3U_GetSockInterfaceAddr( int myRank, char *ifname, int maxIfname,
 	   the process manager only delievers the same values for the 
 	   environment to each process */
 	char namebuf[1024];
-	MPIU_Snprintf( namebuf, sizeof(namebuf), 
+	MPL_snprintf( namebuf, sizeof(namebuf), 
 		       "MPICH_INTERFACE_HOSTNAME_R%d", myRank );
 	ifname_string = getenv( namebuf );
 	if (dbg_ifname && ifname_string) {
@@ -108,7 +108,7 @@ int MPIDU_CH3U_GetSockInterfaceAddr( int myRank, char *ifname, int maxIfname,
 
 	/* If we have nothing, then use the host name */
 	mpi_errno = MPID_Get_processor_name(ifname, maxIfname, &len );
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 	ifname_string = ifname;
 
 	/* If we didn't find a specific name, then try to get an IP address
@@ -116,11 +116,11 @@ int MPIDU_CH3U_GetSockInterfaceAddr( int myRank, char *ifname, int maxIfname,
 	   this platform.  Otherwise, we'll drop into the next step that uses 
 	   the ifname */
 	mpi_errno = MPIDI_CH3U_GetIPInterface( ifaddr, &ifaddrFound );
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
     }
     else {
 	/* Copy this name into the output name */
-	MPIU_Strncpy( ifname, ifname_string, maxIfname );
+	MPL_strncpy( ifname, ifname_string, maxIfname );
     }
 
     /* If we don't have an IP address, try to get it from the name */
@@ -139,7 +139,7 @@ int MPIDU_CH3U_GetSockInterfaceAddr( int myRank, char *ifname, int maxIfname,
 		ifaddr->type = -1;
 	    }
 	    else {
-		MPIU_Memcpy( ifaddr->ifaddr, info->h_addr_list[0], ifaddr->len );
+		MPIR_Memcpy( ifaddr->ifaddr, info->h_addr_list[0], ifaddr->len );
 	    }
 	}
     }
@@ -181,12 +181,12 @@ fn_fail:
 
 #define NUM_IFREQS 10
 
-static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *ifaddr, int *found )
+static int MPIDI_CH3U_GetIPInterface( MPIDI_CH3I_Sock_ifaddr_t *ifaddr, int *found )
 {
     char *buf_ptr, *ptr;
     int buf_len, buf_len_prev;
     int fd;
-    MPIDU_Sock_ifaddr_t myifaddr;
+    MPIDI_CH3I_Sock_ifaddr_t myifaddr;
     int nfound = 0, foundLocalhost = 0;
     /* We predefine the LSB and MSB localhost addresses */
     unsigned int localhost = 0x0100007f;
@@ -227,7 +227,7 @@ static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *ifaddr, int *found )
 	struct ifconf			ifconf;
 	int				rc;
 
-	buf_ptr = (char *) MPIU_Malloc(buf_len);
+	buf_ptr = (char *) MPL_malloc(buf_len, MPL_MEM_BUFFER);
 	if (buf_ptr == NULL) {
 	    fprintf( stderr, "Unable to allocate %d bytes\n", buf_len );
 	    return 1;
@@ -253,7 +253,7 @@ static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *ifaddr, int *found )
 	    buf_len_prev = ifconf.ifc_len;
 	}
 	
-	MPIU_Free(buf_ptr);
+	MPL_free(buf_ptr);
 	buf_len += NUM_IFREQS * sizeof(struct ifreq);
     }
 	
@@ -295,14 +295,14 @@ static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *ifaddr, int *found )
 		if (nfound == 0) {
 		    myifaddr.type = AF_INET;
 		    myifaddr.len  = 4;
-		    MPIU_Memcpy( myifaddr.ifaddr, &addr.s_addr, 4 );
+		    MPIR_Memcpy( myifaddr.ifaddr, &addr.s_addr, 4 );
 		}
 	    }
 	    else {
 		nfound++;
 		myifaddr.type = AF_INET;
 		myifaddr.len  = 4;
-		MPIU_Memcpy( myifaddr.ifaddr, &addr.s_addr, 4 );
+		MPIR_Memcpy( myifaddr.ifaddr, &addr.s_addr, 4 );
 	    }
 	}
 	else {
@@ -332,7 +332,7 @@ static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *ifaddr, int *found )
 #endif
     }
 
-    MPIU_Free(buf_ptr);
+    MPL_free(buf_ptr);
     close(fd);
     
     /* If we found a unique address, use that */
@@ -350,7 +350,7 @@ static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *ifaddr, int *found )
 #else /* things needed to find the interfaces */
 
 /* In this case, just return false for interfaces found */
-static int MPIDI_CH3U_GetIPInterface( MPIDU_Sock_ifaddr_t *ifaddr, int *found )
+static int MPIDI_CH3U_GetIPInterface( MPIDI_CH3I_Sock_ifaddr_t *ifaddr, int *found )
 {
     *found = 0;
     return 0;

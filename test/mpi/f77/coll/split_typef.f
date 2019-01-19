@@ -1,6 +1,6 @@
 C -*- Mode: Fortran; -*-
 C
-C  (C) 2011 by Argonne National Laboratory.
+C  (C) 2012 by Argonne National Laboratory.
 C      See COPYRIGHT in top-level directory.
 C
       program main
@@ -19,6 +19,7 @@ C
       call mtest_init( ierr )
 
       call mpi_comm_dup( MPI_COMM_WORLD, comm, ierr )
+      call mpi_comm_rank( comm, rank , ierr )
 
       call mpi_comm_split_type( comm, MPI_COMM_TYPE_SHARED, rank,
      &     MPI_INFO_NULL, newcomm, ierr )
@@ -42,5 +43,4 @@ C
       call mpi_comm_free( comm, ierr )
 
       call mtest_finalize( errs )
-      call mpi_finalize( ierr )
       end

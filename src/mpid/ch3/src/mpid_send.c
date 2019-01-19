@@ -6,39 +6,44 @@
 
 #include "mpidimpl.h"
 
-/* FIXME - HOMOGENEOUS SYSTEMS ONLY -- no data conversion is performed */
-
 /*
  * MPID_Send()
  */
 #undef FUNCNAME
 #define FUNCNAME MPID_Send
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_Send(const void * buf, int count, MPI_Datatype datatype, int rank, 
-	      int tag, MPID_Comm * comm, int context_offset,
-	      MPID_Request ** request)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_Send(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank,
+	      int tag, MPIR_Comm * comm, int context_offset,
+	      MPIR_Request ** request)
 {
-    MPIDI_msg_sz_t data_sz;
+    intptr_t data_sz;
     int dt_contig;
     MPI_Aint dt_true_lb;
-    MPID_Datatype * dt_ptr;
-    MPID_Request * sreq = NULL;
+    MPIR_Datatype* dt_ptr;
+    MPIR_Request * sreq = NULL;
     MPIDI_VC_t * vc;
 #if defined(MPID_USE_SEQUENCE_NUMBERS)
     MPID_Seqnum_t seqnum;
 #endif    
     int eager_threshold = -1;
     int mpi_errno = MPI_SUCCESS;    
-    MPIDI_STATE_DECL(MPID_STATE_MPID_SEND);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_SEND);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_SEND);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_SEND);
 
-    MPIU_DBG_MSG_FMT(CH3_OTHER,VERBOSE,(MPIU_DBG_FDEST,
+    MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER,VERBOSE,(MPL_DBG_FDEST,
                 "rank=%d, tag=%d, context=%d", 
 		rank, tag, comm->context_id + context_offset));
 
-    if (rank == comm->rank && comm->comm_kind != MPID_INTERCOMM)
+    /* Check to make sure the communicator hasn't already been revoked */
+    if (comm->revoked &&
+            MPIR_AGREE_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_TAG_COLL_BIT) &&
+            MPIR_SHRINK_TAG != MPIR_TAG_MASK_ERROR_BITS(tag & ~MPIR_TAG_COLL_BIT)) {
+        MPIR_ERR_SETANDJUMP(mpi_errno,MPIX_ERR_REVOKED,"**revoked");
+    }
+
+    if (rank == comm->rank && comm->comm_kind != MPIR_COMM_KIND__INTERCOMM)
     {
 	mpi_errno = MPIDI_Isend_self(buf, count, datatype, rank, tag, comm, 
 				     context_offset, MPIDI_REQUEST_TYPE_SEND, 
@@ -49,13 +54,13 @@ int MPID_Send(const void * buf, int count, MPI_Datatype datatype, int rank,
 	   will not be made (long-term FIXME) */
 #       ifndef MPICH_IS_THREADED
 	{
-	    if (sreq != NULL && sreq->cc != 0) {
-		MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,
+	    if (sreq != NULL && MPIR_cc_get(sreq->cc) != 0) {
+		MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,
 				    "**dev|selfsenddeadlock");
 	    }
 	}
 #	endif
-	if (mpi_errno != MPI_SUCCESS) { MPIU_ERR_POP(mpi_errno); }
+	if (mpi_errno != MPI_SUCCESS) { MPIR_ERR_POP(mpi_errno); }
 	goto fn_exit;
     }
 
@@ -65,6 +70,7 @@ int MPID_Send(const void * buf, int count, MPI_Datatype datatype, int rank,
     }
 
     MPIDI_Comm_get_vc_set_active(comm, rank, &vc);
+    MPIR_ERR_CHKANDJUMP1(vc->state == MPIDI_VC_STATE_MORIBUND, mpi_errno, MPIX_ERR_PROC_FAILED, "**comm_fail", "**comm_fail %d", rank);
 
 #ifdef ENABLE_COMM_OVERRIDES
     if (vc->comm_ops && vc->comm_ops->send)
@@ -83,7 +89,7 @@ int MPID_Send(const void * buf, int count, MPI_Datatype datatype, int rank,
 	MPIDI_CH3_Pkt_t upkt;
 	MPIDI_CH3_Pkt_eager_send_t * const eager_pkt = &upkt.eager_send;
 
-	MPIU_DBG_MSG(CH3_OTHER,VERBOSE,"sending zero length message");
+	MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"sending zero length message");
 	MPIDI_Pkt_init(eager_pkt, MPIDI_CH3_PKT_EAGER_SEND);
 	eager_pkt->match.parts.rank = comm->rank;
 	eager_pkt->match.parts.tag = tag;
@@ -94,13 +100,13 @@ int MPID_Send(const void * buf, int count, MPI_Datatype datatype, int rank,
 	MPIDI_VC_FAI_send_seqnum(vc, seqnum);
 	MPIDI_Pkt_set_seqnum(eager_pkt, seqnum);
 	
-	MPIU_THREAD_CS_ENTER(CH3COMM,vc);
+	MPID_THREAD_CS_ENTER(POBJ, vc->pobj_mutex);
 	mpi_errno = MPIDI_CH3_iStartMsg(vc, eager_pkt, sizeof(*eager_pkt), &sreq);
-	MPIU_THREAD_CS_EXIT(CH3COMM,vc);
+	MPID_THREAD_CS_EXIT(POBJ, vc->pobj_mutex);
 	/* --BEGIN ERROR HANDLING-- */
 	if (mpi_errno != MPI_SUCCESS)
 	{
-	    MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**ch3|eagermsg");
+	    MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**ch3|eagermsg");
 	}
 	/* --END ERROR HANDLING-- */
 	if (sreq != NULL)
@@ -166,22 +172,22 @@ int MPID_Send(const void * buf, int count, MPI_Datatype datatype, int rank,
  fn_exit:
     *request = sreq;
 
-    MPIU_DBG_STMT(CH3_OTHER,VERBOSE,
+    MPL_DBG_STMT(MPIDI_CH3_DBG_OTHER,VERBOSE,
     {
 	if (mpi_errno == MPI_SUCCESS) {
 	    if (sreq) {
-		MPIU_DBG_MSG_P(CH3_OTHER,VERBOSE,
+		MPL_DBG_MSG_P(MPIDI_CH3_DBG_OTHER,VERBOSE,
 			 "request allocated, handle=0x%08x", sreq->handle);
 	    }
 	    else
 	    {
-		MPIU_DBG_MSG(CH3_OTHER,VERBOSE,
+		MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,
 			     "operation complete, no requests allocated");
 	    }
 	}
     }
 		  );
     
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_SEND);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_SEND);
     return mpi_errno;
 }
