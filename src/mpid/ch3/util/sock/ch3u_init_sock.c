@@ -32,7 +32,7 @@
 #undef FUNCNAME
 #define FUNCNAME MPIDI_CH3U_Init_sock
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3U_Init_sock(int has_parent, MPIDI_PG_t *pg_p, int pg_rank,
 			 char **bc_val_p, int *val_max_sz_p)
 {
@@ -41,8 +41,8 @@ int MPIDI_CH3U_Init_sock(int has_parent, MPIDI_PG_t *pg_p, int pg_rank,
     int p;
 
     /* FIXME: Why are these unused? */
-    MPIU_UNREFERENCED_ARG(has_parent);
-    MPIU_UNREFERENCED_ARG(pg_rank);
+    MPL_UNREFERENCED_ARG(has_parent);
+    MPL_UNREFERENCED_ARG(pg_rank);
 
     /*
      * Initialize the VCs associated with this process group (and thus 
@@ -65,14 +65,14 @@ int MPIDI_CH3U_Init_sock(int has_parent, MPIDI_PG_t *pg_p, int pg_rank,
 	vcch->sendq_head = NULL;
 	vcch->sendq_tail = NULL;
 	vcch->state      = MPIDI_CH3I_VC_STATE_UNCONNECTED;
-	vcch->sock       = MPIDU_SOCK_INVALID_SOCK;
+	vcch->sock       = MPIDI_CH3I_SOCK_INVALID_SOCK;
 	vcch->conn       = NULL;
     }    
 
     mpi_errno = MPIDI_CH3U_Get_business_card_sock(pg_rank, 
 						  bc_val_p, val_max_sz_p);
     if (mpi_errno != MPI_SUCCESS) {
-	MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**init_buscard");
+	MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER, "**init_buscard");
     }
 
  fn_exit:
@@ -96,12 +96,12 @@ int MPIDI_CH3U_Init_sock(int has_parent, MPIDI_PG_t *pg_p, int pg_rank,
 int MPIDI_VC_InitSock( MPIDI_VC_t *vc ) 
 {
     MPIDI_CH3I_VC *vcch = &vc->ch;
-    vcch->sock               = MPIDU_SOCK_INVALID_SOCK;
+    vcch->sock               = MPIDI_CH3I_SOCK_INVALID_SOCK;
     vcch->conn               = NULL;
     return 0;
 }
 
-#ifdef USE_DBG_LOGGING
+#ifdef MPL_USE_DBG_LOGGING
 const char * MPIDI_Conn_GetStateString(int state) 
 {
     const char *name = "unknown";
@@ -119,6 +119,7 @@ const char * MPIDI_Conn_GetStateString(int state)
     case CONN_STATE_CONNECTED:       name = "CONN_STATE_CONNECTED"; break;
     case CONN_STATE_CLOSING:         name = "CONN_STATE_CLOSING"; break;
     case CONN_STATE_CLOSED:          name = "CONN_STATE_CLOSED"; break;
+    case CONN_STATE_DISCARD:         name = "CONN_STATE_DISCARD"; break;
     case CONN_STATE_FAILED:          name = "CONN_STATE_FAILE"; break;
     }
 

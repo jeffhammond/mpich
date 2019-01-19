@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
+#include "mpitest.h"
 
 //#define NUM_X 536870911
 #define NUM_X 536870912
@@ -36,7 +37,7 @@ int main(int argc, char **argv)
     MPI_Status status;
     MPI_Request request;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     if (sizeof(MPI_Aint) <= sizeof(int)) {
         /* can't test on this platform... */
@@ -47,6 +48,10 @@ int main(int argc, char **argv)
     /* create a large buffer 2 */
     buf_write = malloc(NUM_X * NUM_Y * sizeof(int));
     buf_read = malloc(NUM_X * NUM_Y * sizeof(int));
+    if (buf_write == NULL || buf_read == NULL) {
+        fprintf(stderr, "Not enough memory\n");
+        exit(1);
+    }
     memset(buf_read, 0, NUM_X * NUM_Y * sizeof(int));
 
     for (i = 0; i < NUM_X; i++) {
@@ -88,36 +93,34 @@ int main(int argc, char **argv)
     rc = MPI_File_open(MPI_COMM_WORLD, "testfile",
                        MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
     if (rc != MPI_SUCCESS) {
-        printf("Can't open file: %s\n", "testfile");
+        fprintf(stderr, "Can't open file: %s\n", "testfile");
         exit(1);
     }
 
-    rc = MPI_File_set_view(fh, 2144, MPI_BYTE, file_type, "native",
-                           MPI_INFO_NULL);
+    rc = MPI_File_set_view(fh, 2144, MPI_BYTE, file_type, "native", MPI_INFO_NULL);
     if (rc != MPI_SUCCESS) {
-        printf("ERROR SET VIEW\n");
+        fprintf(stderr, "ERROR SET VIEW\n");
         exit(1);
     }
 
     /* write everything */
-    rc = MPIX_File_iwrite_at_all(fh, 0, buf_write, 1, mem_type, &request);
+    rc = MPI_File_iwrite_at_all(fh, 0, buf_write, 1, mem_type, &request);
     if (rc != MPI_SUCCESS) {
-        printf("%d ERROR IWRITE AT ALL\n", rc);
+        fprintf(stderr, "%d ERROR IWRITE AT ALL\n", rc);
         exit(1);
     }
     MPI_Wait(&request, &status);
 
-    rc = MPI_File_set_view(fh, 2144, MPI_BYTE, file_type, "native",
-                           MPI_INFO_NULL);
+    rc = MPI_File_set_view(fh, 2144, MPI_BYTE, file_type, "native", MPI_INFO_NULL);
     if (rc != MPI_SUCCESS) {
-        printf("ERROR SET VIEW\n");
+        fprintf(stderr, "ERROR SET VIEW\n");
         exit(1);
     }
 
     /* read everything */
-    rc = MPIX_File_iread_at_all(fh, 0, buf_read, 1, mem_type, &request);
+    rc = MPI_File_iread_at_all(fh, 0, buf_read, 1, mem_type, &request);
     if (rc != MPI_SUCCESS) {
-        printf("%d ERROR IREAD AT ALL\n", rc);
+        fprintf(stderr, "%d ERROR IREAD AT ALL\n", rc);
         exit(1);
     }
     MPI_Wait(&request, &status);
@@ -138,8 +141,7 @@ int main(int argc, char **argv)
     MPI_Type_free(&file_type);
 
   exit:
-    MPI_Finalize();
-    printf(" No Errors\n");
+    MTest_Finalize(0);
 
     return 0;
 }

@@ -33,8 +33,8 @@
 #undef FUNCNAME
 #define FUNCNAME mpi_to_pmi_keyvals
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-static int  mpi_to_pmi_keyvals( MPID_Info *info_ptr, PMI_keyval_t **kv_ptr, 
+#define FCNAME MPL_QUOTE(FUNCNAME)
+static int  mpi_to_pmi_keyvals( MPIR_Info *info_ptr, PMI_keyval_t **kv_ptr,
 				int *nkeys_ptr )
 {
     char key[MPI_MAX_INFO_KEY];
@@ -49,23 +49,23 @@ static int  mpi_to_pmi_keyvals( MPID_Info *info_ptr, PMI_keyval_t **kv_ptr,
     if (nkeys == 0) {
 	goto fn_exit;
     }
-    kv = (PMI_keyval_t *)MPIU_Malloc( nkeys * sizeof(PMI_keyval_t) );
-    if (!kv) { MPIU_ERR_POP(mpi_errno); }
+    kv = (PMI_keyval_t *)MPL_malloc( nkeys * sizeof(PMI_keyval_t), MPL_MEM_DYNAMIC );
+    if (!kv) { MPIR_ERR_POP(mpi_errno); }
 
     for (i=0; i<nkeys; i++) {
 	mpi_errno = MPIR_Info_get_nthkey_impl( info_ptr, i, key );
-	if (mpi_errno) { MPIU_ERR_POP(mpi_errno); }
+	if (mpi_errno) { MPIR_ERR_POP(mpi_errno); }
 	MPIR_Info_get_valuelen_impl( info_ptr, key, &vallen, &flag );
-        MPIU_ERR_CHKANDJUMP1(!flag, mpi_errno, MPI_ERR_OTHER,"**infonokey", "**infonokey %s", key);
+        MPIR_ERR_CHKANDJUMP1(!flag, mpi_errno, MPI_ERR_OTHER,"**infonokey", "**infonokey %s", key);
 
-	kv[i].key = MPIU_Strdup(key);
-	kv[i].val = MPIU_Malloc( vallen + 1 );
+	kv[i].key = MPL_strdup(key);
+	kv[i].val = MPL_malloc( vallen + 1, MPL_MEM_DYNAMIC );
 	if (!kv[i].key || !kv[i].val) { 
-	    MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**nomem" );
+	    MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**nomem" );
 	}
 	MPIR_Info_get_impl( info_ptr, key, vallen+1, kv[i].val, &flag );
-        MPIU_ERR_CHKANDJUMP1(!flag, mpi_errno, MPI_ERR_OTHER,"**infonokey", "**infonokey %s", key);
-	MPIU_DBG_PRINTF(("key: <%s>, value: <%s>\n", kv[i].key, kv[i].val));
+        MPIR_ERR_CHKANDJUMP1(!flag, mpi_errno, MPI_ERR_OTHER,"**infonokey", "**infonokey %s", key);
+	MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER,TERSE,(MPL_DBG_FDEST,"key: <%s>, value: <%s>\n", kv[i].key, kv[i].val));
     }
 
  fn_fail:
@@ -84,13 +84,13 @@ static void free_pmi_keyvals(PMI_keyval_t **kv, int size, int *counts)
 	for (j=0; j<counts[i]; j++)
 	{
 	    if (kv[i][j].key != NULL)
-		MPIU_Free((char *)kv[i][j].key);
+		MPL_free((char *)kv[i][j].key);
 	    if (kv[i][j].val != NULL)
-		MPIU_Free(kv[i][j].val);
+		MPL_free(kv[i][j].val);
 	}
 	if (kv[i] != NULL)
 	{
-	    MPIU_Free(kv[i]);
+	    MPL_free(kv[i]);
 	}
     }
 }
@@ -101,11 +101,11 @@ static void free_pmi_keyvals(PMI_keyval_t **kv, int size, int *counts)
 #undef FUNCNAME
 #define FUNCNAME MPIDI_Comm_spawn_multiple
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_Comm_spawn_multiple(int count, char **commands,
                                   char ***argvs, const int *maxprocs,
-                                  MPID_Info **info_ptrs, int root,
-                                  MPID_Comm *comm_ptr, MPID_Comm
+                                  MPIR_Info **info_ptrs, int root,
+                                  MPIR_Comm *comm_ptr, MPIR_Comm
                                   **intercomm, int *errcodes) 
 {
     char port_name[MPI_MAX_PORT_NAME];
@@ -113,9 +113,9 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
     PMI_keyval_t **info_keyval_vectors=0, preput_keyval_vector;
     int *pmi_errcodes = 0, pmi_errno;
     int total_num_processes, should_accept = 1;
-    MPIDI_STATE_DECL(MPID_STATE_MPIDI_COMM_SPAWN_MULTIPLE);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_COMM_SPAWN_MULTIPLE);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDI_COMM_SPAWN_MULTIPLE);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_COMM_SPAWN_MULTIPLE);
 
 
     if (comm_ptr->rank == root) {
@@ -124,9 +124,9 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
 	for (i=0; i<count; i++) {
 	    total_num_processes += maxprocs[i];
 	}
-	pmi_errcodes = (int*)MPIU_Malloc(sizeof(int) * total_num_processes);
+	pmi_errcodes = (int*)MPL_malloc(sizeof(int) * total_num_processes, MPL_MEM_DYNAMIC);
 	if (pmi_errcodes == NULL) {
-	    MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**nomem");
+	    MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**nomem");
 	}
 
 	/* initialize them to 0 */
@@ -137,20 +137,20 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
 	/* FIXME: info may be needed for port name */
         mpi_errno = MPID_Open_port(NULL, port_name);
 	/* --BEGIN ERROR HANDLING-- */
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 	/* --END ERROR HANDLING-- */
 
 	/* Spawn the processes */
 #ifdef USE_PMI2_API
-        MPIU_Assert(count > 0);
+        MPIR_Assert(count > 0);
         {
-            int *argcs = MPIU_Malloc(count*sizeof(int));
-            struct MPID_Info preput;
-            struct MPID_Info *preput_p[1] = { &preput };
+            int *argcs = MPL_malloc(count*sizeof(int), MPL_MEM_DYNAMIC);
+            struct MPIR_Info preput;
+            struct MPIR_Info *preput_p[1] = { &preput };
 
-            MPIU_Assert(argcs);
+            MPIR_Assert(argcs);
             /*
-            info_keyval_sizes = MPIU_Malloc(count * sizeof(int));
+            info_keyval_sizes = MPL_malloc(count * sizeof(int), MPL_MEM_DYNAMIC);
             */
 
             /* FIXME cheating on constness */
@@ -173,22 +173,22 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
                 */
             }
             /* XXX DJG don't need this, PMI API is thread-safe? */
-            /*MPIU_THREAD_CS_ENTER(PMI,);*/
+            /*MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_PMI_MUTEX);*/
             /* release the global CS for spawn PMI calls */
-            MPIU_THREAD_CS_EXIT(ALLFUNC,);
+            MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
             pmi_errno = PMI2_Job_Spawn(count, (const char **)commands,
                                        argcs, (const char ***)argvs,
                                        maxprocs,
-                                       info_keyval_sizes, (const MPID_Info **)info_ptrs,
-                                       1, (const struct MPID_Info **)preput_p,
+                                       info_keyval_sizes, (const MPIR_Info **)info_ptrs,
+                                       1, (const struct MPIR_Info **)preput_p,
                                        NULL, 0,
                                        /*jobId, jobIdSize,*/ /* XXX DJG job stuff? */
                                        pmi_errcodes);
-            MPIU_THREAD_CS_ENTER(ALLFUNC,);
-            /*MPIU_THREAD_CS_EXIT(PMI,);*/
-            MPIU_Free(argcs);
+            MPID_THREAD_CS_ENTER(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
+            /*MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_PMI_MUTEX);*/
+            MPL_free(argcs);
             if (pmi_errno != PMI2_SUCCESS) {
-                MPIU_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER,
+                MPIR_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER,
                      "**pmi_spawn_multiple", "**pmi_spawn_multiple %d", pmi_errno);
             }
         }
@@ -199,11 +199,11 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
            the necessary arrays of key/value pairs */
 
         /* convert the infos into PMI keyvals */
-        info_keyval_sizes   = (int *) MPIU_Malloc(count * sizeof(int));
+        info_keyval_sizes   = (int *) MPL_malloc(count * sizeof(int), MPL_MEM_DYNAMIC);
         info_keyval_vectors = 
-            (PMI_keyval_t**) MPIU_Malloc(count * sizeof(PMI_keyval_t*));
+            (PMI_keyval_t**) MPL_malloc(count * sizeof(PMI_keyval_t*), MPL_MEM_DYNAMIC);
         if (!info_keyval_sizes || !info_keyval_vectors) { 
-            MPIU_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**nomem");
+            MPIR_ERR_SETANDJUMP(mpi_errno,MPI_ERR_OTHER,"**nomem");
         }
 
         if (!info_ptrs) {
@@ -217,7 +217,7 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
                 mpi_errno = mpi_to_pmi_keyvals( info_ptrs[i], 
                                                 &info_keyval_vectors[i],
                                                 &info_keyval_sizes[i] );
-                if (mpi_errno) { MPIU_ERR_POP(mpi_errno); }
+                if (mpi_errno) { MPIR_ERR_POP(mpi_errno); }
             }
         }
 
@@ -225,7 +225,7 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
         preput_keyval_vector.val = port_name;
 
 
-        MPIU_THREAD_CS_ENTER(PMI,);
+        MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_PMI_MUTEX);
         pmi_errno = PMI_Spawn_multiple(count, (const char **)
                                        commands, 
                                        (const char ***) argvs,
@@ -234,9 +234,9 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
                                        info_keyval_vectors, 1, 
                                        &preput_keyval_vector,
                                        pmi_errcodes);
-	MPIU_THREAD_CS_EXIT(PMI,);
+	MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_PMI_MUTEX);
         if (pmi_errno != PMI_SUCCESS) {
-	    MPIU_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER,
+	    MPIR_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER,
 		 "**pmi_spawn_multiple", "**pmi_spawn_multiple %d", pmi_errno);
         }
 #endif
@@ -256,25 +256,25 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
     }
 
     if (errcodes != MPI_ERRCODES_IGNORE) {
-        mpir_errflag_t errflag = MPIR_ERR_NONE;
-        mpi_errno = MPIR_Bcast_impl(&should_accept, 1, MPI_INT, root, comm_ptr, &errflag);
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        MPIR_Errflag_t errflag = MPIR_ERR_NONE;
+        mpi_errno = MPIR_Bcast(&should_accept, 1, MPI_INT, root, comm_ptr, &errflag);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 
-        mpi_errno = MPIR_Bcast_impl(&total_num_processes, 1, MPI_INT, root, comm_ptr, &errflag);
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        mpi_errno = MPIR_Bcast(&total_num_processes, 1, MPI_INT, root, comm_ptr, &errflag);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
         
-        mpi_errno = MPIR_Bcast_impl(errcodes, total_num_processes, MPI_INT, root, comm_ptr, &errflag);
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        mpi_errno = MPIR_Bcast(errcodes, total_num_processes, MPI_INT, root, comm_ptr, &errflag);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
 
-        MPIU_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
+        MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
     }
 
     if (should_accept) {
         mpi_errno = MPID_Comm_accept(port_name, NULL, root, comm_ptr, intercomm); 
-        if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
     }
     else {
-        MPIU_ERR_SETANDJUMP(mpi_errno, MPI_ERR_OTHER, "**pmi_spawn_multiple");
+        MPIR_ERR_SETANDJUMP(mpi_errno, MPI_ERR_OTHER, "**pmi_spawn_multiple");
     }
 
     if (comm_ptr->rank == root) {
@@ -283,7 +283,7 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
 	/* --BEGIN ERROR HANDLING-- */
 	if (mpi_errno != MPI_SUCCESS)
 	{
-	    MPIU_ERR_POP(mpi_errno);
+	    MPIR_ERR_POP(mpi_errno);
 	}
 	/* --END ERROR HANDLING-- */
     }
@@ -291,13 +291,13 @@ int MPIDI_Comm_spawn_multiple(int count, char **commands,
  fn_exit:
     if (info_keyval_vectors) {
 	free_pmi_keyvals(info_keyval_vectors, count, info_keyval_sizes);
-	MPIU_Free(info_keyval_sizes);
-	MPIU_Free(info_keyval_vectors);
+	MPL_free(info_keyval_sizes);
+	MPL_free(info_keyval_vectors);
     }
     if (pmi_errcodes) {
-	MPIU_Free(pmi_errcodes);
+	MPL_free(pmi_errcodes);
     }
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDI_COMM_SPAWN_MULTIPLE);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_COMM_SPAWN_MULTIPLE);
     return mpi_errno;
  fn_fail:
     goto fn_exit;
@@ -324,7 +324,7 @@ static char *parent_port_name = 0;    /* Name of parent port if this
 #undef FUNCNAME
 #define FUNCNAME MPIDI_CH3_GetParentPort
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3_GetParentPort(char ** parent_port)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -339,24 +339,24 @@ int MPIDI_CH3_GetParentPort(char ** parent_port)
 #ifdef USE_PMI2_API
         {
             int vallen = 0;
-            MPIU_THREAD_CS_ENTER(PMI,);
+            MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_PMI_MUTEX);
             pmi_errno = PMI2_KVS_Get(kvsname, PMI2_ID_NULL, PARENT_PORT_KVSKEY, val, sizeof(val), &vallen);
-            MPIU_THREAD_CS_EXIT(PMI,);
+            MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_PMI_MUTEX);
             if (pmi_errno)
-                MPIU_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER, "**pmi_kvsget", "**pmi_kvsget %s", PARENT_PORT_KVSKEY);
+                MPIR_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER, "**pmi_kvsget", "**pmi_kvsget %s", PARENT_PORT_KVSKEY);
         }
 #else
-	MPIU_THREAD_CS_ENTER(PMI,);
+	MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_PMI_MUTEX);
 	pmi_errno = PMI_KVS_Get( kvsname, PARENT_PORT_KVSKEY, val, sizeof(val));
-	MPIU_THREAD_CS_EXIT(PMI,);
+	MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_PMI_MUTEX);
 	if (pmi_errno) {
             mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_FATAL, FCNAME, __LINE__, MPI_ERR_OTHER, "**pmi_kvsget", "**pmi_kvsget %d", pmi_errno);
             goto fn_exit;
 	}
 #endif
-	parent_port_name = MPIU_Strdup(val);
+	parent_port_name = MPL_strdup(val);
 	if (parent_port_name == NULL) {
-	    MPIU_ERR_POP(mpi_errno); /* FIXME DARIUS */
+	    MPIR_ERR_POP(mpi_errno); /* FIXME DARIUS */
 	}
     }
 
@@ -370,7 +370,7 @@ int MPIDI_CH3_GetParentPort(char ** parent_port)
 void MPIDI_CH3_FreeParentPort(void)
 {
     if (parent_port_name) {
-	MPIU_Free( parent_port_name );
+	MPL_free( parent_port_name );
 	parent_port_name = 0;
     }
 }

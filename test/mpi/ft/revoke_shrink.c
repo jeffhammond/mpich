@@ -11,10 +11,12 @@
 #include <string.h>
 #include <unistd.h>
 #include "mpi.h"
+#include "mpitest.h"
 
 MPI_Comm comm_all;
 
-void error_handler(MPI_Comm *communicator, int *error_code, ...) {
+void error_handler(MPI_Comm * communicator, int *error_code, ...)
+{
     MPI_Comm *new_comm = malloc(sizeof(MPI_Comm));
 
     MPIX_Comm_revoke(comm_all);
@@ -25,7 +27,8 @@ void error_handler(MPI_Comm *communicator, int *error_code, ...) {
     comm_all = *new_comm;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     int rank, size, i;
     int sum = 0, val = 1;
     int errs = 0;
@@ -70,5 +73,5 @@ int main(int argc, char *argv[]) {
 
     MPI_Finalize();
 
-    return 0;
+    return MTestReturnValue(errs);
 }

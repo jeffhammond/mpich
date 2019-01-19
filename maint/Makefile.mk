@@ -19,8 +19,6 @@ dist_noinst_SCRIPTS +=                \
     maint/extractfixme.in             \
     maint/extractstates.in            \
     maint/extractstrings.in           \
-    maint/f77tof90                    \
-    maint/f77tof90.in                 \
     maint/findunusederrtxt            \
     maint/gcovmerge.in                \
     maint/getcoverage.in              \
@@ -48,10 +46,8 @@ dist_noinst_DATA +=                        \
     maint/mpi1.lst                         \
     maint/setup.jpg                        \
     maint/structalign.c                    \
-    maint/template.c                       \
     maint/version.m4
 
 ### TODO FIXME what do we do about these?
 ##makedefs
 ##sampleconf.in
-

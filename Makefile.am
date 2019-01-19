@@ -4,11 +4,12 @@
 #     See COPYRIGHT in top-level directory.
 #
 
-ACLOCAL_AMFLAGS = -I confdb
+ACLOCAL_AMFLAGS = -I confdb -I src/hwloc/config
 
 # automake requires that we initialize variables to something, even just empty,
 # before appending to them with "+="
-AM_CPPFLAGS =
+AM_CFLAGS = @VISIBILITY_CFLAGS@ @HWLOC_EMBEDDED_CFLAGS@
+AM_CPPFLAGS = @HWLOC_EMBEDDED_CPPFLAGS@
 AM_FFLAGS =
 AM_FCFLAGS =
 include_HEADERS =
@@ -35,6 +36,7 @@ MANDOC_SUBDIRS =
 HTMLDOC_SUBDIRS =
 INSTALL_DATA_LOCAL_TARGETS =
 doc1_src_txt =
+doc3_src_txt =
 
 # add (+=) target names to this variable to add them to the dependencies of the
 # 'clean-local' target
@@ -47,11 +49,11 @@ pkgconfigdir = @pkgconfigdir@
 # to build src/mpi/errhan/defmsg.h
 errnames_txt_files = 
 
-external_subdirs = @mplsrcdir@ @opasrcdir@
-external_ldflags = @mpllibdir@ @opalibdir@
-external_libs = @EXTERNAL_LIBS@
+external_subdirs = @mplsrcdir@ @opasrcdir@ @zmsrcdir@ @hwlocsrcdir@
+external_ldflags = @mpllibdir@ @opalibdir@ @zmlibdir@ @hwloclibdir@ @netloclibdir@
+external_libs = @WRAPPER_LIBS@
 mpi_convenience_libs =
-pmpi_convenience_libs = @mpllib@ @opalib@
+pmpi_convenience_libs = @opalib@ @mpllib@ @zmlib@ @hwloclib@
 
 # NOTE on our semi-unconventional usage of DIST_SUBDIRS:
 # The automake manual recommends thinking of DIST_SUBDIRS as the list of all
@@ -233,20 +235,44 @@ install-exec-hook:
 		fi ; \
 	done ; \
 	if test -e ${DESTDIR}${bindir}/@MPICXX_NAME@ ; then \
-		cd ${DESTDIR}${bindir} && ln -f -s @MPICXX_NAME@ @MPICPP_NAME@ ; fi ; \
+		if test "@MPICXX_NAME@" != "@MPICPP_NAME@" ; then \
+			cd ${DESTDIR}${bindir} && ln -f -s @MPICXX_NAME@ @MPICPP_NAME@ ; \
+		fi ; \
+	fi ; \
 	if test -e ${DESTDIR}${bindir}/@MPIFORT_NAME@ ; then \
-		cd ${DESTDIR}${bindir} && ln -f -s @MPIFORT_NAME@ @MPIF90_NAME@ ; fi ; \
+		if test "@MPIFORT_NAME@" != "@MPIF90_NAME@" ; then \
+			cd ${DESTDIR}${bindir} && ln -f -s @MPIFORT_NAME@ @MPIF90_NAME@ ; \
+		fi ; \
+	fi ; \
 	if test -e ${DESTDIR}${bindir}/@MPIFORT_NAME@ -a ! -e ${DESTDIR}${bindir}/@MPIF77_NAME@ ; then \
-		cd ${DESTDIR}${bindir} && ln -f -s @MPIFORT_NAME@ @MPIF77_NAME@ ; fi ; \
+		if test "@MPIFORT_NAME@" != "@MPIF77_NAME@" ; then \
+			cd ${DESTDIR}${bindir} && ln -f -s @MPIFORT_NAME@ @MPIF77_NAME@ ; \
+		fi ; \
+	fi ; \
 	if test -e ${DESTDIR}${libdir}/lib@MPILIBNAME@@SHLIB_EXT@ ; then \
-		cd ${DESTDIR}${libdir} && ln -f -s lib@MPILIBNAME@@SHLIB_EXT@ libmpl@SHLIB_EXT@ ; \
-		cd ${DESTDIR}${libdir} && ln -f -s lib@MPILIBNAME@@SHLIB_EXT@ libopa@SHLIB_EXT@ ; \
-		cd ${DESTDIR}${libdir} && ln -f -s lib@MPILIBNAME@@SHLIB_EXT@ libmpich@SHLIB_EXT@ ; fi ; \
+		if test "@MPILIBNAME@" != "mpl" ; then \
+			cd ${DESTDIR}${libdir} && ln -f -s lib@MPILIBNAME@@SHLIB_EXT@ libmpl@SHLIB_EXT@ ; \
+		fi ; \
+		if test "@MPILIBNAME@" != "opa" ; then \
+			cd ${DESTDIR}${libdir} && ln -f -s lib@MPILIBNAME@@SHLIB_EXT@ libopa@SHLIB_EXT@ ; \
+		fi ; \
+		if test "@MPILIBNAME@" != "mpich" ; then \
+			cd ${DESTDIR}${libdir} && ln -f -s lib@MPILIBNAME@@SHLIB_EXT@ libmpich@SHLIB_EXT@ ; \
+		fi ; \
+	fi ; \
 	if test -e ${DESTDIR}${libdir}/lib@MPIFCLIBNAME@@SHLIB_EXT@ ; then \
-		cd ${DESTDIR}${libdir} && ln -f -s lib@MPIFCLIBNAME@@SHLIB_EXT@ libfmpich@SHLIB_EXT@ ; \
-		cd ${DESTDIR}${libdir} && ln -f -s lib@MPIFCLIBNAME@@SHLIB_EXT@ libmpichf90@SHLIB_EXT@ ; fi ; \
+		if test "@MPIFCLIBNAME@" != "fmpich" ; then \
+			cd ${DESTDIR}${libdir} && ln -f -s lib@MPIFCLIBNAME@@SHLIB_EXT@ libfmpich@SHLIB_EXT@ ; \
+		fi ; \
+		if test "@MPIFCLIBNAME@" != "mpichf90" ; then \
+			cd ${DESTDIR}${libdir} && ln -f -s lib@MPIFCLIBNAME@@SHLIB_EXT@ libmpichf90@SHLIB_EXT@ ; \
+		fi ; \
+	fi ; \
 	if test -e ${DESTDIR}${libdir}/lib@MPICXXLIBNAME@@SHLIB_EXT@ ; then \
-		cd ${DESTDIR}${libdir} && ln -f -s lib@MPICXXLIBNAME@@SHLIB_EXT@ libmpichcxx@SHLIB_EXT@ ; fi
+		if test "@MPICXXLIBNAME@" != "mpichcxx" ; then \
+			cd ${DESTDIR}${libdir} && ln -f -s lib@MPICXXLIBNAME@@SHLIB_EXT@ libmpichcxx@SHLIB_EXT@ ; \
+		fi ; \
+	fi
 
 # the configure step checks for the 'lib' dir to decide whether a source
 # directory has been previously used for an in-path build before allowing a
@@ -300,30 +326,84 @@ gcov_sources = $(lib_lib@MPILIBNAME@_la_SOURCES)
 #   bcast.c --> {bcast.o,lib_libpmpi_la-bcast.o}
 # It still generates a bcast.c.gcov output for each object file.  Long file
 # names and preserved paths do not help with this problem.
-# What we can do in this case is to move the second files to a separate 
-# directory, rename name, and run the GCOV on the new files.
+# What we can do in this case is to move the second files to a separate
+# directory, rename name, and run gcov on the new files.
 # For the web-based coverage reports, the gcov output for the two files
-# needs to be merged; see maint/gcovmerge .  
-# To make it easier to re-run the coverage generation, we copy, rather than 
+# needs to be merged; see maint/gcovmerge .
+# To make it easier to re-run the coverage generation, we copy, rather than
 # move, when there are two object files for each source file.
+# A change to the build procedure broke this target.  This is a partial though
+# nearly complete fix to the broken build process.  The generated coverage
+# files after the fix appear mostly correct, though there appear to also be
+# errors in the gcov output itself (the format of this output changes
+# frequently).  However, the coverage analysis is still valuable and has
+# identified missing tests.
+#
+# The problem:
+#   The source file is foo.c
+#   gcov expects foo.o, foo.gcno, and foo.gcda files
+#   The MPICH build process, unfortunately, does not produce a foo.o file;
+#   instead, it produces a .libs/lib_lib@MPILIBNAME@_la-foo.o file (and
+#   similarly .libs/lib_lib@MPILIBNAME@_la_foo.gcno etc.
+#   This change broke this coverage target.  If further changes to the
+#   naming conventions for object files are made, make sure that the
+#   coverage target is also modified to correspond to those changes.
+#
 coverage:
 	@for file in $(gcov_sources) ; do \
 	    dir=`dirname $$file` ; \
 	    bname=`basename $$file` ; \
 	    aux=`echo $$bname | sed -e 's,\.*$$,,'` ; \
-	    echo "( $(GCOV) -b -f -o $$file $$file && mv $${bname}.gcov $$dir )" ; \
-	    ( $(GCOV) -b -f -o $$file $$file && mv $${bname}.gcov $$dir ) ; \
 	    sname=`echo $$bname | sed -e 's/\.[^\.]*$$//'` ;\
+	    if [ -s "$$dir/$$sname.o" ] ; then \
+	        echo "( $(GCOV) -b -f -o $$file $$file && mv $$bname.gcov $$dir )" ; \
+	        ( $(GCOV) -b -f -o $$file $$file && mv $$bname.gcov $$dir ) ; \
+	    elif [ -s "$$dir/lib_lib@MPILIBNAME@_la-$$sname.o" ] ; then \
+	        if [ ! -d $$dir-mpi ] ; then mkdir $$dir-mpi ; fi ; \
+		echo "Copying name-mangled files to $$dir-mpi" ; \
+		for pfile in $$dir/.libs/lib_lib@MPILIBNAME@_la-$$sname.* ; do \
+		     nfile=`echo $$pfile | sed -e 's/lib_lib@MPILIBNAME@_la-//'` ;\
+		     nfile=`basename $$nfile` ; \
+		     echo "cp -p $$pfile $$dir-mpi/$$nfile" ; \
+		     cp -p $$pfile $$dir-mpi/$$nfile ; \
+		done ; \
+		for pfile in $$dir/lib_lib@MPILIBNAME@_la-$$sname.o ; do \
+		     nfile=`echo $$pfile | sed -e 's/lib_lib@MPILIBNAME@_la-//'` ;\
+		     nfile=`basename $$nfile` ; \
+		     echo "( cd $$dir-mpi && $(GCOV) -b -f $$nfile )" ; \
+		     ( cd $$dir-mpi && $(GCOV) -b -f $$nfile ) ; \
+		     if [ ! -s $$dir-mpi/$$bname.gcov ] ; then \
+			echo "No $$bname.gcov file created" ;\
+		     else \
+		        mv $$dir-mpi/$$bname.gcov $$dir ; \
+		     fi ; \
+		done ; \
+	    else \
+		echo "Missing object file for source $$file" ; \
+	    fi ; \
 	    if [ -s "$$dir/lib_lib@PMPILIBNAME@_la-$$sname.o" ] ; then \
 	        if [ ! -d $$dir-pmpi ] ; then mkdir $$dir-pmpi ; fi ; \
-		for pfile in $$dir/lib_lib@PMPILIBNAME@_la-$$sname.* ; do \
+		echo "Copying name-mangled files to $$dir-pmpi" ; \
+		for pfile in $$dir/.libs/lib_lib@PMPILIBNAME@_la-$$sname.* ; do \
 		     nfile=`echo $$pfile | sed -e 's/lib_lib@PMPILIBNAME@_la-//'` ;\
 		     nfile=`basename $$nfile` ; \
-		     cp $$pfile $$dir-pmpi/$$nfile ; \
+		     echo "cp -p $$pfile $$dir-pmpi/$$nfile" ; \
+		     cp -p $$pfile $$dir-pmpi/$$nfile ; \
+		done ; \
+		for pfile in $$dir/lib_lib@PMPILIBNAME@_la-$$sname.o ; do \
+		     nfile=`echo $$pfile | sed -e 's/lib_lib@PMPILIBNAME@_la-//'` ;\
+		     nfile=`basename $$nfile` ; \
 		     echo "( cd $$dir-pmpi && $(GCOV) -b -f $$nfile )" ; \
 		     ( cd $$dir-pmpi && $(GCOV) -b -f $$nfile ) ; \
-		     $(srcdir)/maint/gcovmerge $$dir-pmpi/$$bname.gcov \
+		     if [ -s $$dir/$$bname.gcov ] ; then \
+		         echo "gcovmerge $$dir-pmpi/$$bname.gcov $$dir/$$bname.gcov > $$dir/$$bname.gcov.merge" ; \
+		         $(srcdir)/maint/gcovmerge $$dir-pmpi/$$bname.gcov \
 				$$dir/$$bname.gcov > $$dir/$$bname.gcov.merge ;\
+		     else \
+			 echo "Did not find file $$dir/$$bname.gcov" ; \
+		         echo "mv $$dir-pmpi/$$bname.gcov $$dir/$$bname.gcov";\
+			 mv $$dir-pmpi/$$bname.gcov $$dir/$$bname.gcov ; \
+		     fi ;\
 		done ; \
 	    fi ; \
 	    rm -f *.gcov ; \
@@ -360,7 +440,7 @@ endif !BUILD_COVERAGE
 # should be considered when dissecting suffix-based implicit rules.  These phony
 # suffix files should NOT be added to a .PHONY target, otherwise make will not
 # use the implicit rules to attempt to build them.
-SUFFIXES += .man-phony .html-phony .man1-phony .html1-phony .txt
+SUFFIXES += .man-phony .html-phony .man1-phony .html1-phony .man3-phony .html3-phony .txt
 
 # "make V=1" support for our documentation recipes
 doctextman_verbose = $(doctextman_verbose_$(V))
@@ -401,13 +481,22 @@ htmldoc_root3="--your-url-here--"
 .txt.html1-phony:
 	$(doctexthtml_verbose)$(DOCTEXT) -html -mpath $(htmldoc_path1) \
 	    -heading MPI -quotefmt -nolocation $(doctext_docnotes) $<
+.txt.man3-phony:
+	$(doctextman_verbose)$(DOCTEXT) -man -mpath $(mandoc_path3) -ext 3 \
+	    -heading MPI -quotefmt -nolocation $(doctext_docnotes) $<
+.txt.html3-phony:
+	$(doctexthtml_verbose)$(DOCTEXT) -html -mpath $(htmldoc_path3) \
+	    -heading MPI -quotefmt -nolocation \
+	    -index $(htmldoc_path3)/mpi.cit -indexdir $(htmldoc_root3) \
+		$(doctext_docnotes) $<
 
 # use mandoc-local target to force directory creation before running DOCTEXT
 mandoc:
 	test -d $(mandoc_path1) || $(MKDIR_P) $(mandoc_path1)
 	test -d $(mandoc_path3) || $(MKDIR_P) $(mandoc_path3)
 	$(MAKE) $(AM_MAKEFLAGS) mandoc-local
-mandoc-local: $(mpi_sources:.c=.man-phony) $(doc1_src_txt:.txt=.man1-phony)
+mandoc-local: $(mpi_sources:.c=.man-phony) $(doc1_src_txt:.txt=.man1-phony) \
+	$(doc3_src_txt:.txt=.man3-phony)
 	for subdir in $(MANDOC_SUBDIRS) - ; do \
 	    if test "x$$subdir" = "x-" ; then break ; fi ; \
 ## MANDOC_SUBDIRS might accidentally contain "."
@@ -424,14 +513,20 @@ mandoc-local: $(mpi_sources:.c=.man-phony) $(doc1_src_txt:.txt=.man1-phony)
 		fi \
 	    fi \
 	done
-
+#      FIXME: the 'mancnst' script need to be committed for this to work
+#      (cd $(abs_top_builddir) && $(abs_top_srcdir)/doc/mansrc/mancnst)
 
 # use htmldoc-local target to force directory creation before running DOCTEXT
+# Note that the mpi.cit is appended to by each update, so it must be removed
+# and recreated when the documentation files are updated
 htmldoc:
 	test -d $(top_builddir)/www/www1 || $(MKDIR_P) $(top_builddir)/www/www1
 	test -d $(top_builddir)/www/www3 || $(MKDIR_P) $(top_builddir)/www/www3
+	rm -f $(htmldoc_path3)/mpi.cit
 	$(MAKE) $(AM_MAKEFLAGS) htmldoc-local
-htmldoc-local: $(mpi_sources:.c=.html-phony) $(doc1_src_txt:.txt=.html1-phony)
+
+htmldoc-local: $(mpi_sources:.c=.html-phony) $(doc1_src_txt:.txt=.html1-phony) \
+	$(doc3_src_txt:.txt=.html3-phony)
 	for subdir in $(HTMLDOC_SUBDIRS) - ; do \
 	    if test "x$$subdir" = "x-" ; then break ; fi ; \
 ## HTMLDOC_SUBDIRS might accidentally contain "."
@@ -495,6 +590,7 @@ install-html-local:
 	fi ; \
 	export dir ; \
 	if test ! -z $$dir && test -d $$dir && cd $$dir ; then \
+	 if [ ! -e ${DESTDIR}${htmldir} ] ; then $(MKDIR_P) ${DESTDIR}${htmldir} ; fi ; \
 	 for name in * ; do \
 	  if [ "$$name" = "*" ] ; then continue ; fi ; \
 	  if [ -f $$name ] ; then \
@@ -541,3 +637,11 @@ include $(top_srcdir)/doc/Makefile.mk
 # -local targets
 install-data-local: $(INSTALL_DATA_LOCAL_TARGETS)
 
+
+# sometimes helpful when debugging macros to see the preprocessed output.
+# Also using '-CC' because comments provide useful landmarks
+
+SUFFIXES += .i
+
+.c.i:
+	$(COMPILE) -CC -E -o $@ $<

@@ -1,6 +1,6 @@
 /* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
+ *  (C) 2008 by Argonne National Laboratory.
  *      See COPYRIGHT in top-level directory.
  */
 
@@ -9,16 +9,16 @@
 #ifdef HAVE_WEAK_SYMBOLS
 
 #if defined(HAVE_PRAGMA_WEAK)
-#pragma weak MPIX_File_iread_all = PMPIX_File_iread_all
+#pragma weak MPI_File_iread_all = PMPI_File_iread_all
 #elif defined(HAVE_PRAGMA_HP_SEC_DEF)
-#pragma _HP_SECONDARY_DEF PMPIX_File_iread_all MPIX_File_iread_all
+#pragma _HP_SECONDARY_DEF PMPI_File_iread_all MPI_File_iread_all
 #elif defined(HAVE_PRAGMA_CRI_DUP)
-#pragma _CRI duplicate MPIX_File_iread_all as PMPIX_File_iread_all
+#pragma _CRI duplicate MPI_File_iread_all as PMPI_File_iread_all
 /* end of weak pragmas */
 #elif defined(HAVE_WEAK_ATTRIBUTE)
-int MPIX_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype,
-                       MPI_Request *request)
-    __attribute__((weak,alias("PMPIX_File_iread_all")));
+int MPI_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype,
+                       MPI_Request * request)
+    __attribute__ ((weak, alias("PMPI_File_iread_all")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -31,7 +31,7 @@ int MPIX_File_iread_all(MPI_File fh, void *buf, int count, MPI_Datatype datatype
 #endif
 
 /*@
-    MPIX_File_iread_all - Nonblocking collective read using individual file pointer
+    MPI_File_iread_all - Nonblocking collective read using individual file pointer
 
 Input Parameters:
 . fh - file handle (handle)
@@ -44,20 +44,19 @@ Output Parameters:
 
 .N fortran
 @*/
-int MPIX_File_iread_all(MPI_File fh, void *buf, int count,
-                       MPI_Datatype datatype, MPI_Request *request)
+int MPI_File_iread_all(MPI_File fh, void *buf, int count,
+                       MPI_Datatype datatype, MPI_Request * request)
 {
     int error_code;
-    static char myname[] = "MPIX_FILE_IREAD_ALL";
+    static char myname[] = "MPI_FILE_IREAD_ALL";
 #ifdef MPI_hpux
     int fl_xmpi;
 
     HPMP_IO_START(fl_xmpi, BLKMPIFILEREADALL, TRDTBLOCK, fh, datatype, count);
 #endif /* MPI_hpux */
 
-    error_code = MPIOI_File_iread_all(fh, (MPI_Offset)0,
-                     ADIO_INDIVIDUAL, buf,
-                     count, datatype, myname, request);
+    error_code = MPIOI_File_iread_all(fh, (MPI_Offset) 0,
+                                      ADIO_INDIVIDUAL, buf, count, datatype, myname, request);
 
     /* --BEGIN ERROR HANDLING-- */
     if (error_code != MPI_SUCCESS) {
@@ -72,24 +71,21 @@ int MPIX_File_iread_all(MPI_File fh, void *buf, int count,
     return error_code;
 }
 
-/* Note: MPIOI_File_iread_all also used by MPIX_File_iread_at_all */
+/* Note: MPIOI_File_iread_all also used by MPI_File_iread_at_all */
 /* prevent multiple definitions of this routine */
 #ifdef MPIO_BUILD_PROFILING
 int MPIOI_File_iread_all(MPI_File fh,
-            MPI_Offset offset,
-            int file_ptr_type,
-            void *buf,
-            int count,
-            MPI_Datatype datatype,
-            char *myname,
-            MPI_Request *request)
+                         MPI_Offset offset,
+                         int file_ptr_type,
+                         void *buf,
+                         int count, MPI_Datatype datatype, char *myname, MPI_Request * request)
 {
     int error_code;
     MPI_Count datatype_size;
     ADIO_File adio_fh;
-    void *xbuf=NULL, *e32_buf=NULL;
+    void *xbuf = NULL, *e32_buf = NULL;
 
-    MPIU_THREAD_CS_ENTER(ALLFUNC,);
+    ROMIO_THREAD_CS_ENTER();
 
     adio_fh = MPIO_File_resolve(fh);
 
@@ -100,8 +96,7 @@ int MPIOI_File_iread_all(MPI_File fh,
 
     if (file_ptr_type == ADIO_EXPLICIT_OFFSET && offset < 0) {
         error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
-                                          myname, __LINE__, MPI_ERR_ARG,
-                                          "**iobadoffset", 0);
+                                          myname, __LINE__, MPI_ERR_ARG, "**iobadoffset", 0);
         error_code = MPIO_Err_return_file(adio_fh, error_code);
         goto fn_exit;
     }
@@ -123,7 +118,7 @@ int MPIOI_File_iread_all(MPI_File fh,
         if (error_code != MPI_SUCCESS)
             goto fn_exit;
 
-        e32_buf = ADIOI_Malloc(e32_size*count);
+        e32_buf = ADIOI_Malloc(e32_size * count);
         xbuf = e32_buf;
     }
 
@@ -132,17 +127,16 @@ int MPIOI_File_iread_all(MPI_File fh,
 
     /* --BEGIN ERROR HANDLING-- */
     if (error_code != MPI_SUCCESS)
-    error_code = MPIO_Err_return_file(adio_fh, error_code);
+        error_code = MPIO_Err_return_file(adio_fh, error_code);
     /* --END ERROR HANDLING-- */
 
     if (e32_buf != NULL) {
-        error_code = MPIU_read_external32_conversion_fn(xbuf, datatype,
-                                                        count, e32_buf);
+        error_code = MPIU_read_external32_conversion_fn(buf, datatype, count, e32_buf);
         ADIOI_Free(e32_buf);
     }
 
-fn_exit:
-    MPIU_THREAD_CS_EXIT(ALLFUNC,);
+  fn_exit:
+    ROMIO_THREAD_CS_EXIT();
 
     return error_code;
 }

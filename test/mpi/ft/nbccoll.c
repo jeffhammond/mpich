@@ -7,6 +7,7 @@
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "mpitest.h"
 
 /*
  * This test checks if a non-blocking collective failing impacts the result
@@ -36,8 +37,8 @@ int main(int argc, char **argv)
     MPI_Group_free(&small_grp);
 
     if (size < 4) {
-        fprintf( stderr, "Must run with at least 2 processes\n" );
-        MPI_Abort( MPI_COMM_WORLD, 1 );
+        fprintf(stderr, "Must run with at least 2 processes\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     if (rank == excl) {
@@ -72,5 +73,5 @@ int main(int argc, char **argv)
 
     MPI_Finalize();
 
-    return 0;
+    return MTestReturnValue(err);
 }

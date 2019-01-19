@@ -7,6 +7,10 @@
 #include "ptl_impl.h"
 #include "rptl.h"
 
+/* FIXME: turn this into a CVAR, or fraction of the event limit from
+   rptl_init */
+#define PER_TARGET_THRESHOLD 50
+
 /*
  * Prereqs:
  *
@@ -66,16 +70,16 @@ struct rptl_info rptl_info;
 #undef FUNCNAME
 #define FUNCNAME find_target
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int find_target(ptl_process_t id, struct rptl_target **target)
 {
     int mpi_errno = MPI_SUCCESS;
     int ret = PTL_OK;
     struct rptl_target *t;
-    MPIU_CHKPMEM_DECL(1);
-    MPIDI_STATE_DECL(MPID_STATE_FIND_TARGET);
+    MPIR_CHKPMEM_DECL(1);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_FIND_TARGET);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_FIND_TARGET);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_FIND_TARGET);
 
     for (t = rptl_info.target_list; t; t = t->next)
         if (IDS_ARE_EQUAL(t->id, id))
@@ -83,8 +87,8 @@ static int find_target(ptl_process_t id, struct rptl_target **target)
 
     /* if the target does not already exist, create one */
     if (t == NULL) {
-        MPIU_CHKPMEM_MALLOC(t, struct rptl_target *, sizeof(struct rptl_target), mpi_errno, "rptl target");
-        MPL_DL_APPEND(rptl_info.target_list, t);
+        MPIR_CHKPMEM_MALLOC(t, struct rptl_target *, sizeof(struct rptl_target), mpi_errno, "rptl target", MPL_MEM_ADDRESS);
+        DL_APPEND(rptl_info.target_list, t);
 
         t->id = id;
         t->state = RPTL_TARGET_STATE_ACTIVE;
@@ -93,19 +97,20 @@ static int find_target(ptl_process_t id, struct rptl_target **target)
         t->op_pool = NULL;
         t->data_op_list = NULL;
         t->control_op_list = NULL;
+        t->issued_data_ops = 0;
     }
 
     *target = t;
 
   fn_exit:
-    MPIU_CHKPMEM_COMMIT();
-    MPIDI_FUNC_EXIT(MPID_STATE_FIND_TARGET);
+    MPIR_CHKPMEM_COMMIT();
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_FIND_TARGET);
     return ret;
 
   fn_fail:
     if (mpi_errno)
         ret = PTL_FAIL;
-    MPIU_CHKPMEM_REAP();
+    MPIR_CHKPMEM_REAP();
     goto fn_exit;
 }
 
@@ -118,7 +123,7 @@ static int rptl_put(ptl_handle_md_t md_handle, ptl_size_t local_offset, ptl_size
 #undef FUNCNAME
 #define FUNCNAME poke_progress
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int poke_progress(void)
 {
     int ret = PTL_OK;
@@ -129,9 +134,9 @@ static int poke_progress(void)
     int mpi_errno = MPI_SUCCESS;
     ptl_process_t id;
     ptl_pt_index_t data_pt, control_pt;
-    MPIDI_STATE_DECL(MPID_STATE_POKE_PROGRESS);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_POKE_PROGRESS);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_POKE_PROGRESS);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_POKE_PROGRESS);
 
     /* make progress on local RPTLs */
     for (rptl = rptl_info.rptl_list; rptl; rptl = rptl->next) {
@@ -220,7 +225,7 @@ static int poke_progress(void)
             /* we should not get any NACKs on the control portal */
             assert(op->state != RPTL_OP_STATE_NACKED);
 
-            if (rptl_info.origin_events_left < 2) {
+            if (rptl_info.origin_events_left < 2 || target->issued_data_ops > PER_TARGET_THRESHOLD) {
                 /* too few origin events left.  we can't issue this op
                  * or any following op to this target in order to
                  * maintain ordering */
@@ -228,6 +233,7 @@ static int poke_progress(void)
             }
 
             rptl_info.origin_events_left -= 2;
+            target->issued_data_ops++;
 
             /* force request for an ACK even if the user didn't ask
              * for it.  replace the user pointer with the OP id. */
@@ -255,7 +261,7 @@ static int poke_progress(void)
                 if (op->state == RPTL_OP_STATE_NACKED)
                     break;
 
-                if (rptl_info.origin_events_left < 2) {
+                if (rptl_info.origin_events_left < 2 || target->issued_data_ops > PER_TARGET_THRESHOLD) {
                     /* too few origin events left.  we can't issue
                      * this op or any following op to this target in
                      * order to maintain ordering */
@@ -263,6 +269,7 @@ static int poke_progress(void)
                 }
 
                 rptl_info.origin_events_left -= 2;
+                target->issued_data_ops++;
 
                 /* force request for an ACK even if the user didn't
                  * ask for it.  replace the user pointer with the OP
@@ -283,7 +290,7 @@ static int poke_progress(void)
                 if (op->state == RPTL_OP_STATE_NACKED)
                     break;
 
-                if (rptl_info.origin_events_left < 1) {
+                if (rptl_info.origin_events_left < 1 || target->issued_data_ops > PER_TARGET_THRESHOLD) {
                     /* too few origin events left.  we can't issue
                      * this op or any following op to this target in
                      * order to maintain ordering */
@@ -291,6 +298,7 @@ static int poke_progress(void)
                 }
 
                 rptl_info.origin_events_left--;
+                target->issued_data_ops++;
 
                 ret = PtlGet(op->u.get.md_handle, op->u.get.local_offset, op->u.get.length,
                              op->u.get.target_id, op->u.get.pt_index, op->u.get.match_bits,
@@ -303,7 +311,7 @@ static int poke_progress(void)
     }
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_POKE_PROGRESS);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_POKE_PROGRESS);
     return ret;
 
   fn_fail:
@@ -314,7 +322,7 @@ static int poke_progress(void)
 #undef FUNCNAME
 #define FUNCNAME rptl_put
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int rptl_put(ptl_handle_md_t md_handle, ptl_size_t local_offset, ptl_size_t length,
                     ptl_ack_req_t ack_req, ptl_process_t target_id, ptl_pt_index_t pt_index,
                     ptl_match_bits_t match_bits, ptl_size_t remote_offset, void *user_ptr,
@@ -323,9 +331,9 @@ static int rptl_put(ptl_handle_md_t md_handle, ptl_size_t local_offset, ptl_size
     struct rptl_op *op;
     int ret = PTL_OK;
     struct rptl_target *target;
-    MPIDI_STATE_DECL(MPID_STATE_RPTL_PUT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_RPTL_PUT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_RPTL_PUT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_RPTL_PUT);
 
     ret = find_target(target_id, &target);
     RPTLU_ERR_POP(ret, "error finding target structure\n");
@@ -356,15 +364,15 @@ static int rptl_put(ptl_handle_md_t md_handle, ptl_size_t local_offset, ptl_size
     op->target = target;
 
     if (op->u.put.pt_type == RPTL_PT_DATA)
-        MPL_DL_APPEND(target->data_op_list, op);
+        DL_APPEND(target->data_op_list, op);
     else
-        MPL_DL_APPEND(target->control_op_list, op);
+        DL_APPEND(target->control_op_list, op);
 
     ret = poke_progress();
     RPTLU_ERR_POP(ret, "Error from poke_progress\n");
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_RPTL_PUT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_RPTL_PUT);
     return ret;
 
   fn_fail:
@@ -375,7 +383,7 @@ static int rptl_put(ptl_handle_md_t md_handle, ptl_size_t local_offset, ptl_size
 #undef FUNCNAME
 #define FUNCNAME rptl_put
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_ptl_rptl_put(ptl_handle_md_t md_handle, ptl_size_t local_offset, ptl_size_t length,
                           ptl_ack_req_t ack_req, ptl_process_t target_id, ptl_pt_index_t pt_index,
                           ptl_match_bits_t match_bits, ptl_size_t remote_offset, void *user_ptr,
@@ -389,7 +397,7 @@ int MPID_nem_ptl_rptl_put(ptl_handle_md_t md_handle, ptl_size_t local_offset, pt
 #undef FUNCNAME
 #define FUNCNAME MPID_nem_ptl_rptl_get
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_ptl_rptl_get(ptl_handle_md_t md_handle, ptl_size_t local_offset, ptl_size_t length,
                           ptl_process_t target_id, ptl_pt_index_t pt_index,
                           ptl_match_bits_t match_bits, ptl_size_t remote_offset, void *user_ptr)
@@ -397,9 +405,9 @@ int MPID_nem_ptl_rptl_get(ptl_handle_md_t md_handle, ptl_size_t local_offset, pt
     struct rptl_op *op;
     int ret = PTL_OK;
     struct rptl_target *target;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_NEM_PTL_RPTL_GET);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_PTL_RPTL_GET);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_NEM_PTL_RPTL_GET);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_PTL_RPTL_GET);
 
     ret = find_target(target_id, &target);
     RPTLU_ERR_POP(ret, "error finding target structure\n");
@@ -423,13 +431,13 @@ int MPID_nem_ptl_rptl_get(ptl_handle_md_t md_handle, ptl_size_t local_offset, pt
     op->events_ready = 0;
     op->target = target;
 
-    MPL_DL_APPEND(target->data_op_list, op);
+    DL_APPEND(target->data_op_list, op);
 
     ret = poke_progress();
     RPTLU_ERR_POP(ret, "Error from poke_progress\n");
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_NEM_PTL_RPTL_GET);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_PTL_RPTL_GET);
     return ret;
 
   fn_fail:
@@ -440,16 +448,16 @@ int MPID_nem_ptl_rptl_get(ptl_handle_md_t md_handle, ptl_size_t local_offset, pt
 #undef FUNCNAME
 #define FUNCNAME send_pause_messages
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int send_pause_messages(struct rptl *rptl)
 {
     int i, mpi_errno = MPI_SUCCESS;
     ptl_process_t id;
     ptl_pt_index_t data_pt, control_pt;
     int ret = PTL_OK;
-    MPIDI_STATE_DECL(MPID_STATE_SEND_PAUSE_MESSAGES);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_SEND_PAUSE_MESSAGES);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_SEND_PAUSE_MESSAGES);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_SEND_PAUSE_MESSAGES);
 
     /* if no control portal is setup for this rptl, we are doomed */
     assert(rptl->control.pt != PTL_PT_ANY);
@@ -476,7 +484,7 @@ static int send_pause_messages(struct rptl *rptl)
     }
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_SEND_PAUSE_MESSAGES);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_SEND_PAUSE_MESSAGES);
     return ret;
 
   fn_fail:
@@ -487,15 +495,15 @@ static int send_pause_messages(struct rptl *rptl)
 #undef FUNCNAME
 #define FUNCNAME clear_nacks
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int clear_nacks(ptl_process_t target_id)
 {
     struct rptl_target *target;
     struct rptl_op *op;
     int ret = PTL_OK;
-    MPIDI_STATE_DECL(MPID_STATE_CLEAR_NACKS);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_CLEAR_NACKS);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_CLEAR_NACKS);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_CLEAR_NACKS);
 
     ret = find_target(target_id, &target);
     RPTLU_ERR_POP(ret, "error finding target\n");
@@ -513,7 +521,7 @@ static int clear_nacks(ptl_process_t target_id)
     RPTLU_ERR_POP(ret, "error in poke_progress\n");
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_CLEAR_NACKS);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_CLEAR_NACKS);
     return ret;
 
   fn_fail:
@@ -524,21 +532,23 @@ static int clear_nacks(ptl_process_t target_id)
 #undef FUNCNAME
 #define FUNCNAME get_event_info
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int get_event_info(ptl_event_t * event, struct rptl **ret_rptl, struct rptl_op **ret_op)
 {
     struct rptl *rptl;
     struct rptl_op *op;
     int ret = PTL_OK;
-    MPIDI_STATE_DECL(MPID_STATE_GET_EVENT_INFO);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_GET_EVENT_INFO);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_GET_EVENT_INFO);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_GET_EVENT_INFO);
 
     if (event->type == PTL_EVENT_SEND || event->type == PTL_EVENT_REPLY ||
         event->type == PTL_EVENT_ACK) {
         op = (struct rptl_op *) event->user_ptr;
 
         rptl_info.origin_events_left++;
+        if (event->type != PTL_EVENT_SEND)
+            op->target->issued_data_ops--;
 
         /* see if there are any pending ops to be issued */
         ret = poke_progress();
@@ -562,7 +572,7 @@ static int get_event_info(ptl_event_t * event, struct rptl **ret_rptl, struct rp
     *ret_op = op;
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_GET_EVENT_INFO);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_GET_EVENT_INFO);
     return ret;
 
   fn_fail:
@@ -573,15 +583,15 @@ static int get_event_info(ptl_event_t * event, struct rptl **ret_rptl, struct rp
 #undef FUNCNAME
 #define FUNCNAME stash_event
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 static int stash_event(struct rptl_op *op, ptl_event_t event)
 {
     int mpi_errno = MPI_SUCCESS;
     int ret = PTL_OK;
-    MPIU_CHKPMEM_DECL(1);
-    MPIDI_STATE_DECL(MPID_STATE_STASH_EVENT);
+    MPIR_CHKPMEM_DECL(1);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_STASH_EVENT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_STASH_EVENT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_STASH_EVENT);
 
     /* make sure this is of the event type we know of */
     assert(event.type == PTL_EVENT_SEND || event.type == PTL_EVENT_ACK);
@@ -597,25 +607,25 @@ static int stash_event(struct rptl_op *op, ptl_event_t event)
     assert(op->u.put.send == NULL && op->u.put.ack == NULL);
 
     if (event.type == PTL_EVENT_SEND) {
-        MPIU_CHKPMEM_MALLOC(op->u.put.send, ptl_event_t *, sizeof(ptl_event_t), mpi_errno,
-                            "ptl event");
+        MPIR_CHKPMEM_MALLOC(op->u.put.send, ptl_event_t *, sizeof(ptl_event_t), mpi_errno,
+                            "ptl event", MPL_MEM_OTHER);
         memcpy(op->u.put.send, &event, sizeof(ptl_event_t));
     }
     else {
-        MPIU_CHKPMEM_MALLOC(op->u.put.ack, ptl_event_t *, sizeof(ptl_event_t), mpi_errno,
-                            "ptl event");
+        MPIR_CHKPMEM_MALLOC(op->u.put.ack, ptl_event_t *, sizeof(ptl_event_t), mpi_errno,
+                            "ptl event", MPL_MEM_OTHER);
         memcpy(op->u.put.ack, &event, sizeof(ptl_event_t));
     }
 
   fn_exit:
-    MPIU_CHKPMEM_COMMIT();
-    MPIDI_FUNC_EXIT(MPID_STATE_STASH_EVENT);
+    MPIR_CHKPMEM_COMMIT();
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_STASH_EVENT);
     return ret;
 
   fn_fail:
     if (mpi_errno)
         ret = PTL_FAIL;
-    MPIU_CHKPMEM_REAP();
+    MPIR_CHKPMEM_REAP();
     goto fn_exit;
 }
 
@@ -626,7 +636,7 @@ static int pending_event_valid = 0;
 #undef FUNCNAME
 #define FUNCNAME MPID_nem_ptl_rptl_eqget
 #undef FCNAME
-#define FCNAME MPIU_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
 {
     struct rptl_op *op = NULL;
@@ -634,9 +644,9 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
     int ret = PTL_OK, tmp_ret = PTL_OK;
     int mpi_errno = MPI_SUCCESS;
     struct rptl_target *target;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_NEM_PTL_RPTL_EQGET);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_PTL_RPTL_EQGET);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_NEM_PTL_RPTL_EQGET);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_PTL_RPTL_EQGET);
 
     ret = poke_progress();
     RPTLU_ERR_POP(ret, "error poking progress\n");
@@ -771,11 +781,11 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
                 /* discard pending events, since we will retransmit
                  * this op anyway */
                 if (op->u.put.ack) {
-                    MPIU_Free(op->u.put.ack);
+                    MPL_free(op->u.put.ack);
                     op->u.put.ack = NULL;
                 }
                 if (op->u.put.send) {
-                    MPIU_Free(op->u.put.send);
+                    MPL_free(op->u.put.send);
                     op->u.put.send = NULL;
                 }
             }
@@ -802,7 +812,7 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
             event->user_ptr = op->u.get.user_ptr;
 
             /* GET operations only go into the data op list */
-            MPL_DL_DELETE(op->target->data_op_list, op);
+            DL_DELETE(op->target->data_op_list, op);
             rptli_op_free(op);
         }
 
@@ -819,8 +829,8 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
              * events */
             if (op->u.put.pt_type == RPTL_PT_CONTROL) {
                 /* drop the ack event */
-                MPIU_Free(op->u.put.ack);
-                MPL_DL_DELETE(op->target->control_op_list, op);
+                MPL_free(op->u.put.ack);
+                DL_DELETE(op->target->control_op_list, op);
                 rptli_op_free(op);
 
                 /* drop the send event */
@@ -837,8 +847,8 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
                     memcpy(&pending_event, op->u.put.ack, sizeof(ptl_event_t));
                     pending_event_valid = 1;
                 }
-                MPIU_Free(op->u.put.ack);
-                MPL_DL_DELETE(op->target->data_op_list, op);
+                MPL_free(op->u.put.ack);
+                DL_DELETE(op->target->data_op_list, op);
                 rptli_op_free(op);
             }
         }
@@ -856,8 +866,8 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
              * events */
             if (op->u.put.pt_type == RPTL_PT_CONTROL) {
                 /* drop the send event */
-                MPIU_Free(op->u.put.send);
-                MPL_DL_DELETE(op->target->control_op_list, op);
+                MPL_free(op->u.put.send);
+                DL_DELETE(op->target->control_op_list, op);
                 rptli_op_free(op);
 
                 /* drop the ack event */
@@ -872,7 +882,7 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
                     /* user asked for an ACK, so return it to the user
                      * and queue up the SEND event for next time */
                     memcpy(&pending_event, op->u.put.send, sizeof(ptl_event_t));
-                    MPIU_Free(op->u.put.send);
+                    MPL_free(op->u.put.send);
                     assert(pending_event_valid == 0);
                     pending_event_valid = 1;
                 }
@@ -880,14 +890,14 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
                     /* user didn't ask for an ACK, overwrite the ACK
                      * event with the pending send event */
                     memcpy(event, op->u.put.send, sizeof(ptl_event_t));
-                    MPIU_Free(op->u.put.send);
+                    MPL_free(op->u.put.send);
 
                     /* set the event user pointer again, since we
                      * copied over the original event */
                     event->user_ptr = op->u.put.user_ptr;
                 }
                 /* we should be in the data op list */
-                MPL_DL_DELETE(op->target->data_op_list, op);
+                DL_DELETE(op->target->data_op_list, op);
                 rptli_op_free(op);
             }
         }
@@ -905,7 +915,7 @@ int MPID_nem_ptl_rptl_eqget(ptl_handle_eq_t eq_handle, ptl_event_t * event)
     }
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_NEM_PTL_RPTL_EQGET);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_PTL_RPTL_EQGET);
     return ret;
 
   fn_fail:

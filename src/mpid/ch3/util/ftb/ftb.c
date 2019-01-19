@@ -23,7 +23,7 @@ static FTB_event_info_t event_info[] = {
 };
 
 #ifdef DEBUG_MPIDU_FTB
-#define CHECK_FTB_ERROR(x) do { MPIU_Assertp(x); } while(0)
+#define CHECK_FTB_ERROR(x) do { MPIR_Assertp(x); } while(0)
 #else
 #define CHECK_FTB_ERROR(x) (void)x
 #endif
@@ -31,37 +31,37 @@ static FTB_event_info_t event_info[] = {
 #undef FUNCNAME
 #define FUNCNAME MPIDU_Ftb_init
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDU_Ftb_init(void)
 {
     int mpi_errno = MPI_SUCCESS;
     int ret;
     FTB_client_t ci;
-    MPIDI_STATE_DECL(MPID_STATE_MPIDU_FTB_INIT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDU_FTB_INIT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDU_FTB_INIT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDU_FTB_INIT);
 
-    MPIU_Strncpy(ci.event_space, "ftb.mpi.mpich", sizeof(ci.event_space));
-    MPIU_Strncpy(ci.client_name, "mpich " MPICH_VERSION, sizeof(ci.client_name));
-    MPIU_Strncpy(ci.client_subscription_style, "FTB_SUBSCRIPTION_NONE", sizeof(ci.client_subscription_style));
+    MPL_strncpy(ci.event_space, "ftb.mpi.mpich", sizeof(ci.event_space));
+    MPL_strncpy(ci.client_name, "mpich " MPICH_VERSION, sizeof(ci.client_name));
+    MPL_strncpy(ci.client_subscription_style, "FTB_SUBSCRIPTION_NONE", sizeof(ci.client_subscription_style));
     ci.client_polling_queue_len = -1;
     
 #ifdef USE_PMI2_API
     ret = PMI2_Job_GetId(ci.client_jobid, sizeof(ci.client_jobid));
-    MPIU_ERR_CHKANDJUMP(ret, mpi_errno, MPI_ERR_OTHER, "**pmi_jobgetid");
+    MPIR_ERR_CHKANDJUMP(ret, mpi_errno, MPI_ERR_OTHER, "**pmi_jobgetid");
 #else
     ret = PMI_KVS_Get_my_name(ci.client_jobid, sizeof(ci.client_jobid));
-    MPIU_ERR_CHKANDJUMP(ret, mpi_errno, MPI_ERR_OTHER, "**pmi_get_id");
+    MPIR_ERR_CHKANDJUMP(ret, mpi_errno, MPI_ERR_OTHER, "**pmi_get_id");
 #endif
     
     ret = FTB_Connect(&ci, &client_handle);
-    MPIU_ERR_CHKANDJUMP(ret, mpi_errno, MPI_ERR_OTHER, "**ftb_connect");
+    MPIR_ERR_CHKANDJUMP(ret, mpi_errno, MPI_ERR_OTHER, "**ftb_connect");
 
     ret = FTB_Declare_publishable_events(client_handle, NULL, event_info, sizeof(event_info) / sizeof(event_info[0]));
-    MPIU_ERR_CHKANDJUMP(ret, mpi_errno, MPI_ERR_OTHER, "**ftb_declare_publishable_events");
+    MPIR_ERR_CHKANDJUMP(ret, mpi_errno, MPI_ERR_OTHER, "**ftb_declare_publishable_events");
 
 fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDU_FTB_INIT);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDU_FTB_INIT);
     return mpi_errno;
 fn_fail:
     goto fn_exit;
@@ -75,21 +75,21 @@ fn_fail:
 #undef FUNCNAME
 #define FUNCNAME MPIDU_Ftb_publish
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 void MPIDU_Ftb_publish(const char *event_name, const char *event_payload)
 {
     FTB_event_properties_t event_prop;
     FTB_event_handle_t event_handle;
-    MPIDI_STATE_DECL(MPID_STATE_MPIDU_FTB_PUBLISH);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDU_FTB_PUBLISH);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDU_FTB_PUBLISH);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDU_FTB_PUBLISH);
 
     event_prop.event_type = 1;
-    MPIU_Strncpy(event_prop.event_payload, event_payload, sizeof(event_prop.event_payload));
+    MPL_strncpy(event_prop.event_payload, event_payload, sizeof(event_prop.event_payload));
     
     CHECK_FTB_ERROR(FTB_Publish(client_handle, event_name, &event_prop, &event_handle));
 
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDU_FTB_PUBLISH);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDU_FTB_PUBLISH);
     return;
 }
 
@@ -97,13 +97,13 @@ void MPIDU_Ftb_publish(const char *event_name, const char *event_payload)
 #undef FUNCNAME
 #define FUNCNAME MPIDU_Ftb_publish_vc
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 void MPIDU_Ftb_publish_vc(const char *event_name, struct MPIDI_VC *vc)
 {
     char payload[FTB_MAX_PAYLOAD_DATA] = "";
 
     if (vc && vc->pg)  /* pg can be null for temp VCs (dynamic processes) */
-        MPIU_Snprintf(payload, sizeof(payload), "[id: {%s:{%d}}]", (char*)vc->pg->id, vc->pg_rank);
+        MPL_snprintf(payload, sizeof(payload), "[id: {%s:{%d}}]", (char*)vc->pg->id, vc->pg_rank);
     MPIDU_Ftb_publish(event_name, payload);
     return;
 }
@@ -112,12 +112,12 @@ void MPIDU_Ftb_publish_vc(const char *event_name, struct MPIDI_VC *vc)
 #undef FUNCNAME
 #define FUNCNAME MPIDU_Ftb_publish_me
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 void MPIDU_Ftb_publish_me(const char *event_name)
 {
     char payload[FTB_MAX_PAYLOAD_DATA] = "";
 
-    MPIU_Snprintf(payload, sizeof(payload), "[id: {%s:{%d}}]", (char *)MPIDI_Process.my_pg->id, MPIDI_Process.my_pg_rank);
+    MPL_snprintf(payload, sizeof(payload), "[id: {%s:{%d}}]", (char *)MPIDI_Process.my_pg->id, MPIDI_Process.my_pg_rank);
     MPIDU_Ftb_publish(event_name, payload);
     return;
 }
@@ -129,16 +129,16 @@ void MPIDU_Ftb_publish_me(const char *event_name)
 #undef FUNCNAME
 #define FUNCNAME MPIDU_Ftb_finalize
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 void MPIDU_Ftb_finalize(void)
 {
-    MPIDI_STATE_DECL(MPID_STATE_MPIDU_FTB_FINALIZE);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDU_FTB_FINALIZE);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDU_FTB_FINALIZE);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDU_FTB_FINALIZE);
 
     CHECK_FTB_ERROR(FTB_Disconnect(client_handle));
 
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDU_FTB_FINALIZE);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDU_FTB_FINALIZE);
     return;
 }
 

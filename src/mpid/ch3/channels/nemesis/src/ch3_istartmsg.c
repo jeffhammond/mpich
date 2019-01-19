@@ -23,17 +23,17 @@
 #undef FUNCNAME
 #define FUNCNAME MPIDI_CH3_iStartMsg
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, MPIDI_msg_sz_t hdr_sz, MPID_Request **sreq_ptr)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, intptr_t hdr_sz, MPIR_Request **sreq_ptr)
 {
     int mpi_errno = MPI_SUCCESS;
     int again = 0;
     int in_cs = 0;
-    MPIDI_STATE_DECL(MPID_STATE_MPIDI_CH3_ISTARTMSG);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3_ISTARTMSG);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDI_CH3_ISTARTMSG);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3_ISTARTMSG);
 
-    MPIU_ERR_CHKANDJUMP1(vc->state == MPIDI_VC_STATE_MORIBUND, mpi_errno, MPIX_ERR_PROC_FAILED, "**comm_fail", "**comm_fail %d", vc->pg_rank);
+    MPIR_ERR_CHKANDJUMP1(vc->state == MPIDI_VC_STATE_MORIBUND, mpi_errno, MPIX_ERR_PROC_FAILED, "**comm_fail", "**comm_fail %d", vc->pg_rank);
 
     if (vc->ch.iStartContigMsg)
     {
@@ -41,24 +41,24 @@ int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, MPIDI_msg_sz_t hdr_sz, MPID_
         goto fn_exit;
     }
 
-    /*MPIU_Assert(vc->ch.is_local);*/
-    MPIU_Assert(hdr_sz <= sizeof(MPIDI_CH3_Pkt_t));
+    /*MPIR_Assert(vc->ch.is_local);*/
+    MPIR_Assert(hdr_sz <= sizeof(MPIDI_CH3_Pkt_t));
 
     /* This channel uses a fixed length header, the size of which is
      * the maximum of all possible packet headers */
     hdr_sz = sizeof(MPIDI_CH3_Pkt_t);
     MPIDI_DBG_Print_packet((MPIDI_CH3_Pkt_t*)hdr);
 
-    MPIU_THREAD_CS_ENTER(MPIDCOMM,);
+    MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
     in_cs = 1;
 
     if (MPIDI_CH3I_Sendq_empty(MPIDI_CH3I_shm_sendq))
        /* MT */
     {
-        MPIU_Assert(hdr_sz <= INT_MAX);
-	MPIU_DBG_MSG_D (CH3_CHANNEL, VERBOSE, "iStartMsg %d", (int) hdr_sz);
+        MPIR_Assert(hdr_sz <= INT_MAX);
+	MPL_DBG_MSG_D (MPIDI_CH3_DBG_CHANNEL, VERBOSE, "iStartMsg %d", (int) hdr_sz);
 	mpi_errno = MPID_nem_mpich_send_header (hdr, (int)hdr_sz, vc, &again);
-        if (mpi_errno) MPIU_ERR_POP (mpi_errno);
+        if (mpi_errno) MPIR_ERR_POP (mpi_errno);
 	if (again)
 	{
 	    goto enqueue_it;
@@ -75,28 +75,27 @@ int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, MPIDI_msg_sz_t hdr_sz, MPID_
 
  fn_exit:
     if (in_cs) {
-        MPIU_THREAD_CS_EXIT(MPIDCOMM,);
+        MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
     }
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDI_CH3_ISTARTMSG);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3_ISTARTMSG);
     return mpi_errno;
  fn_fail:
     goto fn_exit;
 
  enqueue_it:
     {
-	MPID_Request * sreq = NULL;
+	MPIR_Request * sreq = NULL;
 	
-	MPIDI_DBG_PRINTF((55, FCNAME, "enqueuing"));
+	MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER, TERSE, "enqueuing");
 
 	/* create a request */
-	sreq = MPID_Request_create();
-	MPIU_Assert (sreq != NULL);
-	MPIU_Object_set_ref (sreq, 2);
-	sreq->kind = MPID_REQUEST_SEND;
+    sreq = MPIR_Request_create(MPIR_REQUEST_KIND__SEND);
+	MPIR_Assert (sreq != NULL);
+	MPIR_Object_set_ref (sreq, 2);
 
 	sreq->dev.pending_pkt = *(MPIDI_CH3_Pkt_t *) hdr;
-	sreq->dev.iov[0].MPID_IOV_BUF = (char *) &sreq->dev.pending_pkt;
-	sreq->dev.iov[0].MPID_IOV_LEN = hdr_sz;
+	sreq->dev.iov[0].MPL_IOV_BUF = (char *) &sreq->dev.pending_pkt;
+	sreq->dev.iov[0].MPL_IOV_LEN = hdr_sz;
 	sreq->dev.iov_count = 1;
 	sreq->dev.iov_offset = 0;
         sreq->ch.noncontig = FALSE;
@@ -112,7 +111,7 @@ int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, MPIDI_msg_sz_t hdr_sz, MPID_
             /* FIXME we are sometimes called from within the progress engine, we
              * shouldn't be calling the progress engine again */
             mpi_errno = MPIDI_CH3I_Shm_send_progress();
-            if (mpi_errno) MPIU_ERR_POP(mpi_errno);
+            if (mpi_errno) MPIR_ERR_POP(mpi_errno);
         }
     
 	*sreq_ptr = sreq;

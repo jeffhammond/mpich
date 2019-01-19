@@ -12,33 +12,22 @@
 #include "pmi.h"
 #endif
 
-/* FIXME: We should move this into a header file so that we don't
-   need the ifdef.  Also, don't use exit (add to coding check) since
-   not safe in windows.  To avoid confusion, define a RobustExit? or
-   MPIU_Exit? */
-#ifdef HAVE_WINDOWS_H
-/* exit can hang if libc fflushes output while in/out/err buffers are locked
-   (this must be a bug in exit?).  ExitProcess does not hang (what does this
-   mean about the state of the locked buffers?). */
-#define exit(_e) ExitProcess(_e)
-#endif
-
 /* FIXME: This routine *or* MPI_Abort should provide abort callbacks,
    similar to the support in MPI_Finalize */
 
 #undef FUNCNAME
 #define FUNCNAME MPID_Abort
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_Abort(MPID_Comm * comm, int mpi_errno, int exit_code, 
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_Abort(MPIR_Comm * comm, int mpi_errno, int exit_code,
 	       const char *error_msg)
 {
     int rank;
     char msg[MPI_MAX_ERROR_STRING] = "";
     char error_str[MPI_MAX_ERROR_STRING + 100];
-    MPIDI_STATE_DECL(MPID_STATE_MPID_ABORT);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_ABORT);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_ABORT);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_ABORT);
 
     if (error_msg == NULL) {
 	/* Create a default error message */
@@ -67,12 +56,12 @@ int MPID_Abort(MPID_Comm * comm, int mpi_errno, int exit_code,
 	{
 	    MPIR_Err_get_string(mpi_errno, msg, MPI_MAX_ERROR_STRING, NULL);
 	    /* FIXME: Not internationalized */
-	    MPIU_Snprintf(error_str, sizeof(error_str), "internal ABORT - process %d: %s", rank, msg);
+	    MPL_snprintf(error_str, sizeof(error_str), "internal ABORT - process %d: %s", rank, msg);
 	}
 	else
 	{
 	    /* FIXME: Not internationalized */
-	    MPIU_Snprintf(error_str, sizeof(error_str), "internal ABORT - process %d", rank);
+	    MPL_snprintf(error_str, sizeof(error_str), "internal ABORT - process %d", rank);
 	}
     }
     
@@ -80,7 +69,7 @@ int MPID_Abort(MPID_Comm * comm, int mpi_errno, int exit_code,
     MPIDU_Ftb_finalize();
     
 #ifdef HAVE_DEBUGGER_SUPPORT
-    MPIR_DebuggerSetAborting( error_msg );
+    MPIR_Debugger_set_aborting( error_msg );
 #endif
 
     /* Dumping the error message in MPICH and passing the same
@@ -90,7 +79,7 @@ int MPID_Abort(MPID_Comm * comm, int mpi_errno, int exit_code,
      * where the stdout/stderr pipes from MPICH to the PM are
      * broken), but not all PMs might display respect the message
      * (this problem was noticed with SLURM). */
-    MPIU_Error_printf("%s\n", error_msg);
+    MPL_error_printf("%s\n", error_msg);
     fflush(stderr);
 
     /* FIXME: What is the scope for PMI_Abort?  Shouldn't it be one or more
@@ -106,8 +95,8 @@ int MPID_Abort(MPID_Comm * comm, int mpi_errno, int exit_code,
 
     /* pmi_abort should not return but if it does, exit here.  If it does,
        add the function exit code before calling the final exit.  */
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_ABORT);
-    MPIU_Exit(exit_code);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_ABORT);
+    MPL_exit(exit_code);
 
     return MPI_ERR_INTERN;
 }

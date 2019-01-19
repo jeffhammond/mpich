@@ -4,10 +4,10 @@
  *      See COPYRIGHT in top-level directory.
  */
 
-#ifndef HAVE_MPIDPKT_H
-#define HAVE_MPIDPKT_H
+#ifndef MPIDPKT_H_INCLUDED
+#define MPIDPKT_H_INCLUDED
 
-#include "oputil.h"
+#include "mpir_op_util.h"
 
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -23,7 +23,21 @@
 #define MPIDI_EAGER_SHORT_SIZE 16
 
 /* This is the number of ints that can be carried within an RMA packet */
-#define MPIDI_RMA_IMMED_BYTES 16
+#define MPIDI_RMA_IMMED_BYTES 8
+
+/* Union for immediate data in RMA packet headers.*/
+typedef union {
+    char payload[MPIDI_RMA_IMMED_BYTES];
+#ifdef NEEDS_STRICT_ALIGNMENT
+    /* Because the data is accessed per predefined type in the packet handler
+     * of accumulate-like operations, we need extra union members to ensure
+     * aligned access.
+     * NOTE: this fix might increase the packet size (long double complex
+     * can be 32bytes), thus we only enable this fix for a few platforms which
+     * are alignment-sensitive.*/
+    MPL_mem_alignment_t alignment;
+#endif
+} MPIDI_CH3_RMA_Immed_u;
 
 /* Union over all types (integer, logical, and multi-language types) that are
    allowed in a CAS operation.  This is used to allocate enough space in the
@@ -97,12 +111,17 @@ typedef enum {
     MPIDI_CH3_PKT_LOCK_OP_ACK,
     MPIDI_CH3_PKT_UNLOCK,
     MPIDI_CH3_PKT_FLUSH,
-    MPIDI_CH3_PKT_FLUSH_ACK,
+    MPIDI_CH3_PKT_ACK,  /* ACK packet for FLUSH, UNLOCK, DECR_AT_COUNTER */
     MPIDI_CH3_PKT_DECR_AT_COUNTER,
     /* RMA Packets end here */
     MPIDI_CH3_PKT_FLOW_CNTL_UPDATE,     /* FIXME: Unused */
     MPIDI_CH3_PKT_CLOSE,
     MPIDI_CH3_PKT_REVOKE,
+#ifndef MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS
+    /* Dynamic Connection Management */
+    MPIDI_CH3_PKT_CONN_ACK,
+    MPIDI_CH3_PKT_ACCEPT_ACK,
+#endif
     MPIDI_CH3_PKT_END_CH3,
     /* The channel can define additional types by defining the value
      * MPIDI_CH3_PKT_ENUM */
@@ -123,20 +142,21 @@ typedef enum {
     MPIDI_CH3_PKT_FLAG_RMA_REQ_ACK = 16,
     MPIDI_CH3_PKT_FLAG_RMA_DECR_AT_COUNTER = 32,
     MPIDI_CH3_PKT_FLAG_RMA_NOCHECK = 64,
-    MPIDI_CH3_PKT_FLAG_RMA_FLUSH_ACK = 128,
+    MPIDI_CH3_PKT_FLAG_RMA_ACK = 128,
     MPIDI_CH3_PKT_FLAG_RMA_LOCK_GRANTED = 256,
     MPIDI_CH3_PKT_FLAG_RMA_LOCK_QUEUED_DATA_QUEUED = 512,
     MPIDI_CH3_PKT_FLAG_RMA_LOCK_QUEUED_DATA_DISCARDED = 1024,
     MPIDI_CH3_PKT_FLAG_RMA_LOCK_DISCARDED = 2048,
     MPIDI_CH3_PKT_FLAG_RMA_UNLOCK_NO_ACK = 4096,
-    MPIDI_CH3_PKT_FLAG_RMA_IMMED_RESP = 8192
+    MPIDI_CH3_PKT_FLAG_RMA_IMMED_RESP = 8192,
+    MPIDI_CH3_PKT_FLAG_RMA_STREAM = 16384
 } MPIDI_CH3_Pkt_flags_t;
 
 typedef struct MPIDI_CH3_Pkt_send {
     MPIDI_CH3_Pkt_type_t type;  /* XXX - uint8_t to conserve space ??? */
     MPIDI_Message_match match;
     MPI_Request sender_req_id;  /* needed for ssend and send cancel */
-    MPIDI_msg_sz_t data_sz;
+    intptr_t data_sz;
 #if defined(MPID_USE_SEQUENCE_NUMBERS)
     MPID_Seqnum_t seqnum;
 #endif
@@ -152,7 +172,7 @@ typedef MPIDI_CH3_Pkt_send_t MPIDI_CH3_Pkt_ready_send_t;
 typedef struct MPIDI_CH3_Pkt_eagershort_send {
     MPIDI_CH3_Pkt_type_t type;  /* XXX - uint8_t to conserve space ??? */
     MPIDI_Message_match match;
-    MPIDI_msg_sz_t data_sz;
+    intptr_t data_sz;
 #if defined(MPID_USE_SEQUENCE_NUMBERS)
     MPID_Seqnum_t seqnum;
 #endif
@@ -227,7 +247,7 @@ MPIDI_CH3_PKT_DEFS
             datatype_ = (pkt_).fop.datatype;                            \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
 
@@ -258,7 +278,7 @@ MPIDI_CH3_PKT_DEFS
             count_ = 1;                                                 \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
 
@@ -270,16 +290,16 @@ MPIDI_CH3_PKT_DEFS
         err_ = MPI_SUCCESS;                                             \
         switch((pkt_).type) {                                           \
         case (MPIDI_CH3_PKT_PUT_IMMED):                                 \
-            immed_data_ = (pkt_).put.info.data;                         \
+            immed_data_ = &((pkt_).put.info.data);                      \
             break;                                                      \
         case (MPIDI_CH3_PKT_ACCUMULATE_IMMED):                          \
-            immed_data_ = (pkt_).accum.info.data;                       \
+            immed_data_ = &((pkt_).accum.info.data);                    \
             break;                                                      \
         case (MPIDI_CH3_PKT_GET_ACCUM_IMMED):                           \
-            immed_data_ = (pkt_).get_accum.info.data;                   \
+            immed_data_ = &((pkt_).get_accum.info.data);                \
             break;                                                      \
         case (MPIDI_CH3_PKT_FOP_IMMED):                                 \
-            immed_data_ = (pkt_).fop.info.data;                         \
+            immed_data_ = &((pkt_).fop.info.data);                      \
             break;                                                      \
         case (MPIDI_CH3_PKT_CAS_IMMED):                                 \
             /* Note that here we return pointer of origin data, not     \
@@ -287,19 +307,19 @@ MPIDI_CH3_PKT_DEFS
             immed_data_ = &((pkt_).cas.origin_data);                    \
             break;                                                      \
         case (MPIDI_CH3_PKT_GET_RESP_IMMED):                            \
-            immed_data_ = (pkt_).get_resp.info.data;                    \
+            immed_data_ = &((pkt_).get_resp.info.data);                 \
             break;                                                      \
         case (MPIDI_CH3_PKT_GET_ACCUM_RESP_IMMED):                      \
-            immed_data_ = (pkt_).get_accum_resp.info.data;              \
+            immed_data_ = &((pkt_).get_accum_resp.info.data);           \
             break;                                                      \
         case (MPIDI_CH3_PKT_FOP_RESP_IMMED):                            \
-            immed_data_ = (pkt_).fop_resp.info.data;                    \
+            immed_data_ = &((pkt_).fop_resp.info.data);                 \
             break;                                                      \
         case (MPIDI_CH3_PKT_CAS_RESP_IMMED):                            \
             immed_data_ = &((pkt_).cas_resp.info.data);                 \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
 
@@ -362,7 +382,30 @@ MPIDI_CH3_PKT_DEFS
             flags_ = (pkt_).lock_op_ack.flags;                          \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+        }                                                               \
+    }
+
+#define MPIDI_CH3_PKT_RMA_GET_OP(pkt_, op_, err_)                       \
+    {                                                                   \
+        /* This macro returns op in RMA operation packets (ACC, GACC,   \
+           FOP) */                                                      \
+        err_ = MPI_SUCCESS;                                             \
+        switch((pkt_).type) {                                           \
+        case (MPIDI_CH3_PKT_ACCUMULATE):                                \
+        case (MPIDI_CH3_PKT_ACCUMULATE_IMMED):                          \
+            op_ = (pkt_).accum.op;                                      \
+            break;                                                      \
+        case (MPIDI_CH3_PKT_GET_ACCUM):                                 \
+        case (MPIDI_CH3_PKT_GET_ACCUM_IMMED):                           \
+            op_ = (pkt_).get_accum.op;                                  \
+            break;                                                      \
+        case (MPIDI_CH3_PKT_FOP):                                       \
+        case (MPIDI_CH3_PKT_FOP_IMMED):                                 \
+            op_ = (pkt_).fop.op;                                        \
+            break;                                                      \
+        default:                                                        \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
 
@@ -425,7 +468,7 @@ MPIDI_CH3_PKT_DEFS
             (pkt_).lock_op_ack.flags = MPIDI_CH3_PKT_FLAG_NONE;         \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
 
@@ -435,7 +478,7 @@ MPIDI_CH3_PKT_DEFS
            packets (PUT, GET, ACC, GACC, CAS, FOP), RMA operation       \
            response packets (GET_RESP, GACC_RESP, CAS_RESP, FOP_RESP),  \
            RMA control packets (LOCK, UNLOCK, FLUSH), and RMA control   \
-           response packets (LOCK_ACK, LOCK_OP_ACK, FLUSH_ACK). */      \
+           response packets (LOCK_ACK, LOCK_OP_ACK, ACK). */            \
         err_ = MPI_SUCCESS;                                             \
         switch((pkt_).type) {                                           \
         case (MPIDI_CH3_PKT_PUT):                                       \
@@ -461,11 +504,11 @@ MPIDI_CH3_PKT_DEFS
         case (MPIDI_CH3_PKT_LOCK_OP_ACK):                               \
             win_hdl_ = (pkt_).lock_op_ack.source_win_handle;            \
             break;                                                      \
-        case (MPIDI_CH3_PKT_FLUSH_ACK):                                 \
-            win_hdl_ = (pkt_).flush_ack.source_win_handle;              \
+        case (MPIDI_CH3_PKT_ACK):                                       \
+            win_hdl_ = (pkt_).ack.source_win_handle;                    \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
 
@@ -511,7 +554,7 @@ MPIDI_CH3_PKT_DEFS
             win_hdl_ = (pkt_).decr_at_cnt.target_win_handle;            \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
 
@@ -522,34 +565,19 @@ MPIDI_CH3_PKT_DEFS
         err_ = MPI_SUCCESS;                                             \
         switch((pkt_).type) {                                           \
         case (MPIDI_CH3_PKT_PUT):                                       \
-            (pkt_).put.info.metadata.dataloop_size = (dataloop_size_);  \
+            (pkt_).put.info.dataloop_size = (dataloop_size_);           \
             break;                                                      \
         case (MPIDI_CH3_PKT_GET):                                       \
-            (pkt_).get.info.metadata.dataloop_size = (dataloop_size_);  \
+            (pkt_).get.info.dataloop_size = (dataloop_size_);           \
             break;                                                      \
         case (MPIDI_CH3_PKT_ACCUMULATE):                                \
-            (pkt_).accum.info.metadata.dataloop_size = (dataloop_size_); \
+            (pkt_).accum.info.dataloop_size = (dataloop_size_);         \
             break;                                                      \
         case (MPIDI_CH3_PKT_GET_ACCUM):                                 \
-            (pkt_).get_accum.info.metadata.dataloop_size = (dataloop_size_); \
+            (pkt_).get_accum.info.dataloop_size = (dataloop_size_);     \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
-        }                                                               \
-    }
-
-#define MPIDI_CH3_PKT_RMA_GET_STREAM_OFFSET(pkt_, stream_offset_, err_) \
-    {                                                                   \
-        err_ = MPI_SUCCESS;                                             \
-        switch((pkt_).type) {                                           \
-        case (MPIDI_CH3_PKT_ACCUMULATE):                                \
-            (stream_offset_) = (pkt_).accum.info.metadata.stream_offset; \
-            break;                                                      \
-        case (MPIDI_CH3_PKT_GET_ACCUM):                                 \
-            (stream_offset_) = (pkt_).get_accum.info.metadata.stream_offset; \
-            break;                                                      \
-        default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
 
@@ -596,9 +624,29 @@ MPIDI_CH3_PKT_DEFS
             request_hdl_ = (pkt_).lock_op_ack.request_handle;           \
             break;                                                      \
         default:                                                        \
-            MPIU_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
+            MPIR_ERR_SETANDJUMP1(err_, MPI_ERR_OTHER, "**invalidpkt", "**invalidpkt %d", (pkt_).type); \
         }                                                               \
     }
+
+
+/* This macro judges if the RMA operation is a read operation,
+ * which means, it will triffer the issuing of response data from
+ * the target to the origin */
+#define MPIDI_CH3I_RMA_PKT_IS_READ_OP(pkt_)                             \
+    ((pkt_).type == MPIDI_CH3_PKT_GET_ACCUM_IMMED ||                    \
+     (pkt_).type == MPIDI_CH3_PKT_GET_ACCUM ||                          \
+     (pkt_).type == MPIDI_CH3_PKT_FOP_IMMED ||                          \
+     (pkt_).type == MPIDI_CH3_PKT_FOP ||                                \
+     (pkt_).type == MPIDI_CH3_PKT_CAS_IMMED ||                          \
+     (pkt_).type == MPIDI_CH3_PKT_GET)
+
+/* This macro judges if the RMA operation is a immed operation */
+#define MPIDI_CH3I_RMA_PKT_IS_IMMED_OP(pkt_)                            \
+    ((pkt_).type == MPIDI_CH3_PKT_GET_ACCUM_IMMED ||                    \
+     (pkt_).type == MPIDI_CH3_PKT_FOP_IMMED ||                          \
+     (pkt_).type == MPIDI_CH3_PKT_CAS_IMMED ||                          \
+     (pkt_).type == MPIDI_CH3_PKT_PUT_IMMED ||                          \
+     (pkt_).type == MPIDI_CH3_PKT_ACCUMULATE_IMMED)
 
 typedef struct MPIDI_CH3_Pkt_put {
     MPIDI_CH3_Pkt_type_t type;
@@ -609,13 +657,8 @@ typedef struct MPIDI_CH3_Pkt_put {
     MPI_Win target_win_handle;
     MPI_Win source_win_handle;
     union {
-        /* note that we use struct here in order
-         * to consistently access dataloop_size
-         * by "pkt->info.metadata.dataloop_size". */
-        struct {
-            int dataloop_size;
-        } metadata;
-        char data[MPIDI_RMA_IMMED_BYTES];
+        int dataloop_size;
+        MPIDI_CH3_RMA_Immed_u data;
     } info;
 } MPIDI_CH3_Pkt_put_t;
 
@@ -626,12 +669,7 @@ typedef struct MPIDI_CH3_Pkt_get {
     int count;
     MPI_Datatype datatype;
     struct {
-        /* note that we use struct here in order
-         * to consistently access dataloop_size
-         * by "pkt->info.metadata.dataloop_size". */
-        struct {
-            int dataloop_size;  /* for derived datatypes */
-        } metadata;
+        int dataloop_size;      /* for derived datatypes */
     } info;
     MPI_Request request_handle;
     MPI_Win target_win_handle;
@@ -648,7 +686,7 @@ typedef struct MPIDI_CH3_Pkt_get_resp {
         /* note that we use struct here in order
          * to consistently access data
          * by "pkt->info.data". */
-        char data[MPIDI_RMA_IMMED_BYTES];
+        MPIDI_CH3_RMA_Immed_u data;
     } info;
 } MPIDI_CH3_Pkt_get_resp_t;
 
@@ -662,11 +700,8 @@ typedef struct MPIDI_CH3_Pkt_accum {
     MPI_Win target_win_handle;
     MPI_Win source_win_handle;
     union {
-        struct {
-            int dataloop_size;
-            MPI_Aint stream_offset;
-        } metadata;
-        char data[MPIDI_RMA_IMMED_BYTES];
+        int dataloop_size;
+        MPIDI_CH3_RMA_Immed_u data;
     } info;
 } MPIDI_CH3_Pkt_accum_t;
 
@@ -680,11 +715,8 @@ typedef struct MPIDI_CH3_Pkt_get_accum {
     MPI_Op op;
     MPI_Win target_win_handle;
     union {
-        struct {
-            int dataloop_size;
-            MPI_Aint stream_offset;
-        } metadata;
-        char data[MPIDI_RMA_IMMED_BYTES];
+        int dataloop_size;
+        MPIDI_CH3_RMA_Immed_u data;
     } info;
 } MPIDI_CH3_Pkt_get_accum_t;
 
@@ -699,7 +731,7 @@ typedef struct MPIDI_CH3_Pkt_get_accum_resp {
         /* note that we use struct here in order
          * to consistently access data
          * by "pkt->info.data". */
-        char data[MPIDI_RMA_IMMED_BYTES];
+        MPIDI_CH3_RMA_Immed_u data;
     } info;
 } MPIDI_CH3_Pkt_get_accum_resp_t;
 
@@ -740,7 +772,7 @@ typedef struct MPIDI_CH3_Pkt_fop {
         /* note that we use struct here in order
          * to consistently access data
          * by "pkt->info.data". */
-        char data[MPIDI_RMA_IMMED_BYTES];
+        MPIDI_CH3_RMA_Immed_u data;
     } info;
 } MPIDI_CH3_Pkt_fop_t;
 
@@ -751,7 +783,7 @@ typedef struct MPIDI_CH3_Pkt_fop_resp {
         /* note that we use struct here in order
          * to consistently access data
          * by "pkt->info.data". */
-        char data[MPIDI_RMA_IMMED_BYTES];
+        MPIDI_CH3_RMA_Immed_u data;
     } info;
     /* followings are used to decrement ack_counter at orign */
     int target_rank;
@@ -805,22 +837,37 @@ typedef struct MPIDI_CH3_Pkt_lock_op_ack {
     int target_rank;
 } MPIDI_CH3_Pkt_lock_op_ack_t;
 
-typedef struct MPIDI_CH3_Pkt_flush_ack {
+/* This ACK packet is the acknowledgement
+ * for FLUSH, UNLOCK and DECR_AT_COUNTER
+ * packet */
+typedef struct MPIDI_CH3_Pkt_ack {
     MPIDI_CH3_Pkt_type_t type;
     MPI_Win source_win_handle;
     int target_rank;
     MPIDI_CH3_Pkt_flags_t flags;
-} MPIDI_CH3_Pkt_flush_ack_t;
+} MPIDI_CH3_Pkt_ack_t;
 
 typedef struct MPIDI_CH3_Pkt_decr_at_counter {
     MPIDI_CH3_Pkt_type_t type;
     MPI_Win target_win_handle;
+    MPI_Win source_win_handle;
+    MPIDI_CH3_Pkt_flags_t flags;
 } MPIDI_CH3_Pkt_decr_at_counter_t;
 
 typedef struct MPIDI_CH3_Pkt_close {
     MPIDI_CH3_Pkt_type_t type;
     int ack;
 } MPIDI_CH3_Pkt_close_t;
+
+#ifndef MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS
+/* packet types used in dynamic process connection. */
+typedef struct MPIDI_CH3_Pkt_conn_ack {
+    MPIDI_CH3_Pkt_type_t type;
+    int ack;
+} MPIDI_CH3_Pkt_conn_ack_t;
+
+typedef MPIDI_CH3_Pkt_conn_ack_t MPIDI_CH3_Pkt_accept_ack_t;
+#endif /* end of MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS */
 
 typedef struct MPIDI_CH3_Pkt_revoke {
     MPIDI_CH3_Pkt_type_t type;
@@ -851,9 +898,13 @@ typedef union MPIDI_CH3_Pkt {
     MPIDI_CH3_Pkt_lock_op_ack_t lock_op_ack;
     MPIDI_CH3_Pkt_unlock_t unlock;
     MPIDI_CH3_Pkt_flush_t flush;
-    MPIDI_CH3_Pkt_flush_ack_t flush_ack;
+    MPIDI_CH3_Pkt_ack_t ack;
     MPIDI_CH3_Pkt_decr_at_counter_t decr_at_cnt;
     MPIDI_CH3_Pkt_close_t close;
+#ifndef MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS
+    MPIDI_CH3_Pkt_conn_ack_t conn_ack;
+    MPIDI_CH3_Pkt_accept_ack_t accept_ack;
+#endif
     MPIDI_CH3_Pkt_cas_t cas;
     MPIDI_CH3_Pkt_cas_resp_t cas_resp;
     MPIDI_CH3_Pkt_fop_t fop;
@@ -865,6 +916,61 @@ typedef union MPIDI_CH3_Pkt {
 #endif
 } MPIDI_CH3_Pkt_t;
 
+/* Extended header packet types */
+
+/* to send derived datatype across in RMA ops */
+typedef struct MPIDI_RMA_dtype_info {   /* for derived datatypes */
+    int is_contig;
+    MPI_Aint max_contig_blocks;
+    MPI_Aint size;
+    MPI_Aint extent;
+    MPI_Aint dataloop_size;     /* not needed because this info is sent in
+                                 * packet header. remove it after lock/unlock
+                                 * is implemented in the device */
+    void *dataloop;             /* pointer needed to update pointers
+                                 * within dataloop on remote side */
+    int dataloop_depth;
+    int basic_type;
+    MPI_Aint ub, lb, true_ub, true_lb;
+    int has_sticky_ub, has_sticky_lb;
+} MPIDI_RMA_dtype_info;
+
+typedef struct MPIDI_CH3_Ext_pkt_stream {
+    MPI_Aint stream_offset;
+} MPIDI_CH3_Ext_pkt_stream_t;
+
+typedef struct MPIDI_CH3_Ext_pkt_derived {
+    MPIDI_RMA_dtype_info dtype_info;
+    /* Follow with variable-length dataloop.
+     * On origin we allocate a large buffer including
+     * this header and the dataloop; on target we use
+     * separate buffer to receive dataloop in order
+     * to avoid extra copy.*/
+} MPIDI_CH3_Ext_pkt_derived_t;
+
+typedef struct MPIDI_CH3_Ext_pkt_stream_derived {
+    MPI_Aint stream_offset;
+    MPIDI_RMA_dtype_info dtype_info;
+    /* follow with variable-length dataloop. */
+} MPIDI_CH3_Ext_pkt_stream_derived_t;
+
+/* Note that since ACC and GET_ACC contain the same extended attributes,
+ * we use generic routines for them in some places (see below).
+ * If we add OP-specific attribute in future, we should handle them separately.
+ *  1. origin issuing function
+ *  2. target packet handler
+ *  3. target data receive complete handler. */
+typedef MPIDI_CH3_Ext_pkt_stream_t MPIDI_CH3_Ext_pkt_accum_stream_t;
+typedef MPIDI_CH3_Ext_pkt_derived_t MPIDI_CH3_Ext_pkt_accum_derived_t;
+typedef MPIDI_CH3_Ext_pkt_stream_derived_t MPIDI_CH3_Ext_pkt_accum_stream_derived_t;
+
+typedef MPIDI_CH3_Ext_pkt_stream_t MPIDI_CH3_Ext_pkt_get_accum_stream_t;
+typedef MPIDI_CH3_Ext_pkt_derived_t MPIDI_CH3_Ext_pkt_get_accum_derived_t;
+typedef MPIDI_CH3_Ext_pkt_stream_derived_t MPIDI_CH3_Ext_pkt_get_accum_stream_derived_t;
+
+typedef MPIDI_CH3_Ext_pkt_derived_t MPIDI_CH3_Ext_pkt_put_derived_t;
+typedef MPIDI_CH3_Ext_pkt_derived_t MPIDI_CH3_Ext_pkt_get_derived_t;
+
 #if defined(MPID_USE_SEQUENCE_NUMBERS)
 typedef struct MPIDI_CH3_Pkt_send_container {
     MPIDI_CH3_Pkt_send_t pkt;
@@ -872,4 +978,4 @@ typedef struct MPIDI_CH3_Pkt_send_container {
 } MPIDI_CH3_Pkt_send_container_t;
 #endif
 
-#endif
+#endif /* MPIDPKT_H_INCLUDED */

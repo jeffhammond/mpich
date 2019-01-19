@@ -1,5 +1,9 @@
 /* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
+ *  (C) 2014 by Argonne National Laboratory.
+ *      See COPYRIGHT in top-level directory.
+ *
+ *  Portion of this code were written by Mellanox Technologies, Inc.
  *  (C) 2014 Mellanox Technologies, Inc.
  *
  */
@@ -9,25 +13,25 @@
 #include "mxm_impl.h"
 
 static int _mxm_poll(void);
-static int _mxm_handle_rreq(MPID_Request * req);
+static int _mxm_handle_rreq(MPIR_Request * req);
 static void _mxm_recv_completion_cb(void *context);
 static int _mxm_irecv(MPID_nem_mxm_ep_t * ep, MPID_nem_mxm_req_area * req, int id, mxm_mq_h mxm_mq,
                       mxm_tag_t mxm_tag);
-static int _mxm_process_rdtype(MPID_Request ** rreq_p, MPI_Datatype datatype,
-                               MPID_Datatype * dt_ptr, MPIDI_msg_sz_t data_sz, const void *buf,
+static int _mxm_process_rdtype(MPIR_Request ** rreq_p, MPI_Datatype datatype,
+                               MPIR_Datatype* dt_ptr, intptr_t data_sz, const void *buf,
                                int count, mxm_req_buffer_t ** iov_buf, int *iov_count);
 
 #undef FUNCNAME
 #define FUNCNAME MPID_nem_mxm_poll
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_mxm_poll(int in_blocking_progress)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPID_Request *req = NULL;
+    MPIR_Request *req = NULL;
 
-    MPIDI_STATE_DECL(MPID_STATE_MXM_POLL);
-    MPIDI_FUNC_ENTER(MPID_STATE_MXM_POLL);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MXM_POLL);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MXM_POLL);
 
     while (!MPID_nem_mxm_queue_empty(mxm_obj->sreq_queue)) {
         MPID_nem_mxm_queue_dequeue(&mxm_obj->sreq_queue, &req);
@@ -36,10 +40,10 @@ int MPID_nem_mxm_poll(int in_blocking_progress)
 
     mpi_errno = _mxm_poll();
     if (mpi_errno)
-        MPIU_ERR_POP(mpi_errno);
+        MPIR_ERR_POP(mpi_errno);
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MXM_POLL);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MXM_POLL);
     return mpi_errno;
   fn_fail:
     goto fn_exit;
@@ -67,50 +71,50 @@ static int _mxm_poll(void)
 #undef FUNCNAME
 #define FUNCNAME MPID_nem_mxm_get_adi_msg
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
+#define FCNAME MPL_QUOTE(FUNCNAME)
 void MPID_nem_mxm_get_adi_msg(mxm_conn_h conn, mxm_imm_t imm, void *data,
                               size_t length, size_t offset, int last)
 {
     MPIDI_VC_t *vc = NULL;
 
-    MPIU_DBG_MSG(CH3_CHANNEL, VERBOSE, "MPID_nem_mxm_get_adi_msg");
+    MPL_DBG_MSG(MPIDI_CH3_DBG_CHANNEL, VERBOSE, "MPID_nem_mxm_get_adi_msg");
 
     vc = mxm_conn_ctx_get(conn);
 
     _dbg_mxm_output(5, "========> Getting ADI msg (from=%d data_size %d) \n", vc->pg_rank, length);
     _dbg_mxm_out_buf(data, (length > 16 ? 16 : length));
 
-    MPID_nem_handle_pkt(vc, data, (MPIDI_msg_sz_t) (length));
+    MPID_nem_handle_pkt(vc, data, (intptr_t) (length));
 }
 
 
 #undef FUNCNAME
 #define FUNCNAME MPID_nem_mxm_anysource_posted
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-void MPID_nem_mxm_anysource_posted(MPID_Request * req)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+void MPID_nem_mxm_anysource_posted(MPIR_Request * req)
 {
     int mpi_errno = MPI_SUCCESS;
 
-    MPIDI_STATE_DECL(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_POSTED);
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_POSTED);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_POSTED);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_POSTED);
 
     _dbg_mxm_output(5, "Any Source ========> Posting req %p \n", req);
 
     mpi_errno = MPID_nem_mxm_recv(NULL, req);
-    MPIU_Assert(mpi_errno == MPI_SUCCESS);
+    MPIR_Assert(mpi_errno == MPI_SUCCESS);
 
     _dbg_mxm_out_req(req);
 
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_POSTED);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_POSTED);
 }
 
 
 #undef FUNCNAME
 #define FUNCNAME MPID_nem_mxm_anysource_matched
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_nem_mxm_anysource_matched(MPID_Request * req)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_nem_mxm_anysource_matched(MPIR_Request * req)
 {
     mxm_error_t ret = MXM_OK;
     MPID_nem_mxm_req_area *req_area = NULL;
@@ -125,21 +129,21 @@ int MPID_nem_mxm_anysource_matched(MPID_Request * req)
      * with a network capable of matching, and the same request is matched
      * by the network and, e.g., shared-memory.
      */
-    MPIDI_STATE_DECL(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_MATCHED);
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_MATCHED);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_MATCHED);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_MATCHED);
 
     _dbg_mxm_output(5, "Any Source ========> Matching req %p \n", req);
 
     req_area = REQ_BASE(req);
     ret = mxm_req_cancel_recv(&req_area->mxm_req->item.recv);
     mxm_req_wait(&req_area->mxm_req->item.base);
-    if ((MXM_OK != ret) && (MXM_ERR_NO_PROGRESS != ret)) {
+    if (req_area->mxm_req->item.base.error != MXM_ERR_CANCELED) {
         matched = TRUE;
     }
 
     _dbg_mxm_out_req(req);
 
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_MATCHED);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MXM_ANYSOURCE_MATCHED);
     return matched;
 }
 
@@ -147,20 +151,20 @@ int MPID_nem_mxm_anysource_matched(MPID_Request * req)
 #undef FUNCNAME
 #define FUNCNAME MPID_nem_mxm_recv
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_nem_mxm_recv(MPIDI_VC_t * vc, MPID_Request * rreq)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_nem_mxm_recv(MPIDI_VC_t * vc, MPIR_Request * rreq)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPIDI_msg_sz_t data_sz;
+    intptr_t data_sz;
     int dt_contig;
     MPI_Aint dt_true_lb;
-    MPID_Datatype *dt_ptr;
+    MPIR_Datatype*dt_ptr;
 
-    MPIDI_STATE_DECL(MPID_STATE_MPID_NEM_MXM_RECV);
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_NEM_MXM_RECV);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_MXM_RECV);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_MXM_RECV);
 
-    MPIU_Assert(rreq);
-    MPIU_Assert(((rreq->dev.match.parts.rank == MPI_ANY_SOURCE) && (vc == NULL)) ||
+    MPIR_Assert(rreq);
+    MPIR_Assert(((rreq->dev.match.parts.rank == MPI_ANY_SOURCE) && (vc == NULL)) ||
                 (vc && !vc->ch.is_local));
 
     MPIDI_Datatype_get_info(rreq->dev.user_count, rreq->dev.datatype, dt_contig, data_sz,
@@ -172,6 +176,7 @@ int MPID_nem_mxm_recv(MPIDI_VC_t * vc, MPID_Request * rreq)
         MPID_nem_mxm_vc_area *vc_area = NULL;
         MPID_nem_mxm_req_area *req_area = NULL;
 
+        mxm_mq_h *mq_h_v = (mxm_mq_h *) rreq->comm->dev.ch.netmod_priv;
         rreq->dev.OnDataAvail = NULL;
         rreq->dev.tmpbuf = NULL;
         rreq->ch.vc = vc;
@@ -201,45 +206,47 @@ int MPID_nem_mxm_recv(MPIDI_VC_t * vc, MPID_Request * rreq)
                                             rreq->dev.user_buf, rreq->dev.user_count,
                                             &req_area->iov_buf, &req_area->iov_count);
             if (mpi_errno)
-                MPIU_ERR_POP(mpi_errno);
+                MPIR_ERR_POP(mpi_errno);
         }
 
         mpi_errno = _mxm_irecv((vc_area ? vc_area->mxm_ep : NULL), req_area,
                                tag,
-                               (rreq->comm ? (mxm_mq_h) rreq->comm->dev.ch.netmod_priv : mxm_obj->
-                                mxm_mq), _mxm_tag_mpi2mxm(tag, context_id));
+                               (rreq->comm ? mq_h_v[0] : mxm_obj->mxm_mq), _mxm_tag_mpi2mxm(tag,
+                                                                                            context_id));
         if (mpi_errno)
-            MPIU_ERR_POP(mpi_errno);
+            MPIR_ERR_POP(mpi_errno);
     }
 
     if (vc)
         _dbg_mxm_out_req(rreq);
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_NEM_MXM_RECV);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_MXM_RECV);
     return mpi_errno;
   fn_fail:ATTRIBUTE((unused))
         goto fn_exit;
 }
 
 
-static int _mxm_handle_rreq(MPID_Request * req)
+static int _mxm_handle_rreq(MPIR_Request * req)
 {
-    int complete = FALSE;
+    int complete = FALSE, found = FALSE;
     int dt_contig;
     MPI_Aint dt_true_lb ATTRIBUTE((unused));
-    MPIDI_msg_sz_t userbuf_sz;
-    MPID_Datatype *dt_ptr;
-    MPIDI_msg_sz_t data_sz;
+    intptr_t userbuf_sz;
+    MPIR_Datatype*dt_ptr;
+    intptr_t data_sz;
     MPID_nem_mxm_vc_area *vc_area ATTRIBUTE((unused)) = NULL;
     MPID_nem_mxm_req_area *req_area = NULL;
     void *tmp_buf = NULL;
 
-    MPIU_THREAD_CS_ENTER(MSGQUEUE, req);
-    complete = MPIDI_CH3U_Recvq_DP(req);
-    MPIU_THREAD_CS_EXIT(MSGQUEUE, req);
-    if (!complete) {
-        return TRUE;
+    MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_MSGQ_MUTEX);
+    found = MPIDI_CH3U_Recvq_DP(req);
+    MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_MSGQ_MUTEX);
+    /* an MPI_ANY_SOURCE request may have been previously removed from the
+     * CH3 queue by an FDP (find and dequeue posted) operation */
+    if (req->dev.match.parts.rank != MPI_ANY_SOURCE) {
+        MPIR_Assert(found);
     }
 
     MPIDI_Datatype_get_info(req->dev.user_count, req->dev.datatype, dt_contig, userbuf_sz, dt_ptr,
@@ -249,8 +256,7 @@ static int _mxm_handle_rreq(MPID_Request * req)
     req_area = REQ_BASE(req);
 
     _dbg_mxm_out_buf(req_area->iov_buf[0].ptr,
-                     (req_area->iov_buf[0].length >
-                      16 ? 16 : req_area->iov_buf[0].length));
+                     (req_area->iov_buf[0].length > 16 ? 16 : req_area->iov_buf[0].length));
 
     if (req->dev.recv_data_sz <= userbuf_sz) {
         data_sz = req->dev.recv_data_sz;
@@ -267,10 +273,10 @@ static int _mxm_handle_rreq(MPID_Request * req)
     else {
         data_sz = userbuf_sz;
         MPIR_STATUS_SET_COUNT(req->status, userbuf_sz);
-        MPIU_DBG_MSG_FMT(CH3_OTHER, VERBOSE, (MPIU_DBG_FDEST,
+        MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER, VERBOSE, (MPL_DBG_FDEST,
                                               "receive buffer too small; message truncated, msg_sz="
-                                              MPIDI_MSG_SZ_FMT ", userbuf_sz="
-                                              MPIDI_MSG_SZ_FMT, req->dev.recv_data_sz, userbuf_sz));
+                                              PRIdPTR ", userbuf_sz="
+                                              PRIdPTR, req->dev.recv_data_sz, userbuf_sz));
         req->status.MPI_ERROR = MPIR_Err_create_code(MPI_SUCCESS,
                                                      MPIR_ERR_RECOVERABLE, FCNAME, __LINE__,
                                                      MPI_ERR_TRUNCATE, "**truncate",
@@ -280,16 +286,16 @@ static int _mxm_handle_rreq(MPID_Request * req)
     }
 
     if (!dt_contig) {
-        MPIDI_msg_sz_t last = 0;
+        intptr_t last = 0;
 
         if (req->dev.tmpbuf != NULL) {
             last = req->dev.recv_data_sz;
-            MPID_Segment_unpack(req->dev.segment_ptr, 0, &last, req->dev.tmpbuf);
+            MPIR_Segment_unpack(req->dev.segment_ptr, 0, &last, req->dev.tmpbuf);
             tmp_buf = req->dev.tmpbuf;
         }
         else {
-            mxm_req_buffer_t * iov_buf;
-            MPID_IOV *iov;
+            mxm_req_buffer_t *iov_buf;
+            MPL_IOV *iov;
             int n_iov = 0;
             int index;
 
@@ -297,16 +303,17 @@ static int _mxm_handle_rreq(MPID_Request * req)
             n_iov = req_area->iov_count;
             iov_buf = req_area->iov_buf;
             if (last && n_iov > 0) {
-                iov = MPIU_Malloc(n_iov * sizeof(*iov));
-                MPIU_Assert(iov);
+                iov = MPL_malloc(n_iov * sizeof(*iov), MPL_MEM_BUFFER);
+                MPIR_Assert(iov);
 
                 for (index = 0; index < n_iov; index++) {
-                    iov[index].MPID_IOV_BUF = iov_buf[index].ptr;
-                    iov[index].MPID_IOV_LEN = iov_buf[index].length;
+                    iov[index].MPL_IOV_BUF = iov_buf[index].ptr;
+                    iov[index].MPL_IOV_LEN = iov_buf[index].length;
                 }
 
-                MPID_Segment_unpack_vector(req->dev.segment_ptr, req->dev.segment_first, &last, iov, &n_iov);
-                MPIU_Free(iov);
+                MPIR_Segment_unpack_vector(req->dev.segment_ptr, req->dev.segment_first, &last, iov,
+                                           &n_iov);
+                MPL_free(iov);
             }
             if (req_area->iov_count > MXM_MPICH_MAX_IOV) {
                 tmp_buf = req_area->iov_buf;
@@ -321,15 +328,16 @@ static int _mxm_handle_rreq(MPID_Request * req)
                  *  mismatch between the datatype and the amount of
                  *  data received.  Throw away received data.
                  */
-                MPIU_ERR_SETSIMPLE(req->status.MPI_ERROR, MPI_ERR_TYPE, "**dtypemismatch");
+                MPIR_ERR_SETSIMPLE(req->status.MPI_ERROR, MPI_ERR_TYPE, "**dtypemismatch");
             }
         }
     }
 
     MPIDI_CH3U_Handle_recv_req(req->ch.vc, req, &complete);
-    MPIU_Assert(complete == TRUE);
+    MPIR_Assert(complete == TRUE);
 
-    if (tmp_buf) MPIU_Free(tmp_buf);
+    if (tmp_buf)
+        MPL_free(tmp_buf);
 
     return complete;
 }
@@ -337,11 +345,11 @@ static int _mxm_handle_rreq(MPID_Request * req)
 
 static void _mxm_recv_completion_cb(void *context)
 {
-    MPID_Request *req = (MPID_Request *) context;
+    MPIR_Request *req = (MPIR_Request *) context;
     mxm_recv_req_t *mxm_rreq;
     MPID_nem_mxm_req_area *req_area = NULL;
 
-    MPIU_Assert(req);
+    MPIR_Assert(req);
     _dbg_mxm_out_req(req);
 
     req_area = REQ_BASE(req);
@@ -379,7 +387,7 @@ static int _mxm_irecv(MPID_nem_mxm_ep_t * ep, MPID_nem_mxm_req_area * req, int i
     mxm_recv_req_t *mxm_rreq;
     list_head_t *free_queue = NULL;
 
-    MPIU_Assert(req);
+    MPIR_Assert(req);
 
     free_queue = (ep ? &ep->free_queue : &mxm_obj->free_queue);
     req->mxm_req = list_dequeue_mxm_req(free_queue);
@@ -387,7 +395,7 @@ static int _mxm_irecv(MPID_nem_mxm_ep_t * ep, MPID_nem_mxm_req_area * req, int i
         list_grow_mxm_req(free_queue);
         req->mxm_req = list_dequeue_mxm_req(free_queue);
         if (!req->mxm_req) {
-            MPIU_DBG_MSG(CH3_CHANNEL, VERBOSE, "empty free queue");
+            MPL_DBG_MSG(MPIDI_CH3_DBG_CHANNEL, VERBOSE, "empty free queue");
             mpi_errno = MPI_ERR_OTHER;
             goto fn_fail;
         }
@@ -428,54 +436,55 @@ static int _mxm_irecv(MPID_nem_mxm_ep_t * ep, MPID_nem_mxm_req_area * req, int i
 }
 
 
-static int _mxm_process_rdtype(MPID_Request ** rreq_p, MPI_Datatype datatype,
-                               MPID_Datatype * dt_ptr, MPIDI_msg_sz_t data_sz, const void *buf,
+static int _mxm_process_rdtype(MPIR_Request ** rreq_p, MPI_Datatype datatype,
+                               MPIR_Datatype* dt_ptr, intptr_t data_sz, const void *buf,
                                int count, mxm_req_buffer_t ** iov_buf, int *iov_count)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPID_Request *rreq = *rreq_p;
-    MPIDI_msg_sz_t last;
-    MPID_IOV *iov;
+    MPIR_Request *rreq = *rreq_p;
+    intptr_t last;
+    MPL_IOV *iov;
     int n_iov = 0;
     int index;
 
     if (rreq->dev.segment_ptr == NULL) {
-        rreq->dev.segment_ptr = MPID_Segment_alloc();
-        MPIU_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem",
-                             "**nomem %s", "MPID_Segment_alloc");
+        rreq->dev.segment_ptr = MPIR_Segment_alloc();
+        MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem",
+                             "**nomem %s", "MPIR_Segment_alloc");
     }
-    MPID_Segment_init(buf, count, datatype, rreq->dev.segment_ptr, 0);
+    MPIR_Segment_init(buf, count, datatype, rreq->dev.segment_ptr);
     rreq->dev.segment_first = 0;
     rreq->dev.segment_size = data_sz;
 
     last = rreq->dev.segment_size;
-    MPID_Segment_count_contig_blocks(rreq->dev.segment_ptr, rreq->dev.segment_first, &last,
+    MPIR_Segment_count_contig_blocks(rreq->dev.segment_ptr, rreq->dev.segment_first, &last,
                                      (MPI_Aint *) & n_iov);
-    MPIU_Assert(n_iov > 0);
-    iov = MPIU_Malloc(n_iov * sizeof(*iov));
-    MPIU_Assert(iov);
+    MPIR_Assert(n_iov > 0);
+    iov = MPL_malloc(n_iov * sizeof(*iov), MPL_MEM_BUFFER);
+    MPIR_Assert(iov);
 
     last = rreq->dev.segment_size;
-    MPID_Segment_unpack_vector(rreq->dev.segment_ptr, rreq->dev.segment_first, &last, iov, &n_iov);
-    MPIU_Assert(last == rreq->dev.segment_size);
+    MPIR_Segment_unpack_vector(rreq->dev.segment_ptr, rreq->dev.segment_first, &last, iov, &n_iov);
+    MPIR_Assert(last == rreq->dev.segment_size);
 
 #if defined(MXM_DEBUG) && (MXM_DEBUG > 0)
-    _dbg_mxm_output(7, "Recv Noncontiguous data vector %i entries (free slots : %i)\n", n_iov, MXM_REQ_DATA_MAX_IOV);
-    for(index = 0; index < n_iov; index++) {
+    _dbg_mxm_output(7, "Recv Noncontiguous data vector %i entries (free slots : %i)\n", n_iov,
+                    MXM_REQ_DATA_MAX_IOV);
+    for (index = 0; index < n_iov; index++) {
         _dbg_mxm_output(7, "======= Recv iov[%i] = ptr : %p, len : %i \n",
-                        index, iov[index].MPID_IOV_BUF, iov[index].MPID_IOV_LEN);
+                        index, iov[index].MPL_IOV_BUF, iov[index].MPL_IOV_LEN);
     }
 #endif
 
     if (n_iov <= MXM_REQ_DATA_MAX_IOV) {
         if (n_iov > MXM_MPICH_MAX_IOV) {
-            *iov_buf = (mxm_req_buffer_t *) MPIU_Malloc(n_iov * sizeof(**iov_buf));
-            MPIU_Assert(*iov_buf);
+            *iov_buf = (mxm_req_buffer_t *) MPL_malloc(n_iov * sizeof(**iov_buf), MPL_MEM_BUFFER);
+            MPIR_Assert(*iov_buf);
         }
 
         for (index = 0; index < n_iov; index++) {
-            (*iov_buf)[index].ptr = iov[index].MPID_IOV_BUF;
-            (*iov_buf)[index].length = iov[index].MPID_IOV_LEN;
+            (*iov_buf)[index].ptr = iov[index].MPL_IOV_BUF;
+            (*iov_buf)[index].length = iov[index].MPL_IOV_LEN;
         }
         rreq->dev.tmpbuf = NULL;
         rreq->dev.tmpbuf_sz = 0;
@@ -484,14 +493,14 @@ static int _mxm_process_rdtype(MPID_Request ** rreq_p, MPI_Datatype datatype,
     else {
         MPI_Aint packsize = 0;
         MPIR_Pack_size_impl(rreq->dev.user_count, rreq->dev.datatype, &packsize);
-        rreq->dev.tmpbuf = MPIU_Malloc((size_t) packsize);
-        MPIU_Assert(rreq->dev.tmpbuf);
+        rreq->dev.tmpbuf = MPL_malloc((size_t) packsize, MPL_MEM_BUFFER);
+        MPIR_Assert(rreq->dev.tmpbuf);
         rreq->dev.tmpbuf_sz = packsize;
         (*iov_buf)[0].ptr = rreq->dev.tmpbuf;
         (*iov_buf)[0].length = (size_t) packsize;
         *iov_count = 1;
     }
-    MPIU_Free(iov);
+    MPL_free(iov);
 
   fn_exit:
     return mpi_errno;
