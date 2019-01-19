@@ -20,30 +20,29 @@
         }               \
     } while (0)
 
-MPI_Comm               comms[NUM_THREADS];
-int                    rank, size;
+MPI_Comm comms[NUM_THREADS];
+int rank, size;
 
 MTEST_THREAD_RETURN_TYPE test_comm_create(void *arg)
 {
     int i;
 
     for (i = 0; i < NUM_ITER; i++) {
-        MPI_Group   world_group;
-        MPI_Comm    comm;
+        MPI_Group world_group;
+        MPI_Comm comm;
 
-        MPI_Comm_group(comms[*(int*)arg], &world_group);
+        MPI_Comm_group(comms[*(int *) arg], &world_group);
 
         /* Every thread paticipates in a distinct MPI_Comm_create on distinct
          * communicators.  Thus, there is no violation of MPI threads +
          * communicators semantics.
          */
 
-        MPI_Comm_create(comms[*(int*)arg], world_group, &comm);
+        MPI_Comm_create(comms[*(int *) arg], world_group, &comm);
         MPI_Barrier(comm);
         MPI_Comm_free(&comm);
 
         MPI_Group_free(&world_group);
-
     }
 
     return NULL;
@@ -52,10 +51,10 @@ MTEST_THREAD_RETURN_TYPE test_comm_create(void *arg)
 
 int main(int argc, char **argv)
 {
-    int         thread_args[NUM_THREADS];
-    int         i, err, provided;
+    int thread_args[NUM_THREADS];
+    int i, err, provided;
 
-    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+    MTest_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 
     check(provided == MPI_THREAD_MULTIPLE);
 
@@ -68,7 +67,7 @@ int main(int argc, char **argv)
 
     for (i = 0; i < NUM_THREADS; i++) {
         thread_args[i] = i;
-        MTest_Start_thread( test_comm_create, (void *)&thread_args[i] );
+        MTest_Start_thread(test_comm_create, (void *) &thread_args[i]);
     }
 
     MTest_Join_threads();
@@ -77,10 +76,7 @@ int main(int argc, char **argv)
         MPI_Comm_free(&comms[i]);
     }
 
-    if (rank == 0)
-        printf(" No Errors\n");
-
-    MPI_Finalize();
+    MTest_Finalize(0);
 
     return 0;
 }

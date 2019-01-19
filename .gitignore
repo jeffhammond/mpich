@@ -72,7 +72,6 @@ Makefile
 *.vfproj
 *conf.h
 *conf.h.in
-*fs.c
 *old*.pdf
 .*-cache
 .deps
@@ -105,9 +104,9 @@ summary.xml
 summary.junit.xml
 summary.tap
 tags
+apply-xfail.sh
 
-# the hooks dir shouldn't be accidentally committed
-/maint/hooks
+/maint/getfuncstack
 
 # directories copied by autogen.sh from other directories and (generally) should
 # not have any contents added directly to them
@@ -117,8 +116,16 @@ tags
 /src/pm/hydra/confdb
 /src/pm/hydra/mpl
 /src/pm/hydra/mpl/confdb
+/src/pm/hydra/tools/topo/hwloc/hwloc
+/src/pm/hydra2/confdb
+/src/pm/hydra2/mpl
+/src/pm/hydra2/mpl/confdb
+/src/pm/hydra2/libhydra/topo/hwloc/hwloc
+/src/mpi/romio/mpl
+/src/mpi/romio/mpl/confdb
 /src/mpi/romio/version.m4
 /src/pm/hydra/version.m4
+/src/pm/hydra2/version.m4
 /test/mpi/version.m4
 
 # created by the build process in the test dirs
@@ -175,7 +182,7 @@ Makefile.am-stamp
 
 # random additions 2
 /mpich-doxygen
-/src/include/glue_romio.h
+/src/include/mpir_ext.h
 /src/include/mpichinfo.h
 /src/packaging/envmods/mpich.module
 /src/packaging/pkgconfig/mpich.pc
@@ -197,6 +204,7 @@ Makefile.am-stamp
 /src/mpl/confdb
 /src/mpl/libtool
 /src/mpl/include/mplconfig.h
+/src/mpl/include/mpl_timer.h
 /src/mpl/include/stamp-h1
 /src/mpl/include/config.h
 /src/mpl/include/stamp-h2
@@ -219,8 +227,8 @@ Makefile.am-stamp
 /src/binding/fortran/use_mpi_f08/Makefile.mk
 
 # MPICH2 parameter handling
-/src/include/mpich_cvars.h
-/src/util/cvar/mpich_cvars.c
+/src/include/mpir_cvars.h
+/src/util/cvar/mpir_cvars.c
 
 
 ################################################################################
@@ -371,7 +379,6 @@ Makefile.am-stamp
 /maint/createcoverage
 /maint/showsizes
 /maint/getcross
-/maint/f77tof90
 /maint/makerpm
 /maint/clmake
 /maint/conftimestamp
@@ -473,11 +480,10 @@ Makefile.am-stamp
 # /src/include/
 /src/include/mpi.h
 /src/include/mpif.h
-/src/include/mpichtimer.h
 #/src/include/mpe_thread.h
 /src/include/mpimod.pcl
-/src/include/mpid_datatype.h
-/src/include/mpid_dataloop.h
+/src/include/mpidu_datatype.h
+/src/include/mpidu_dataloop.h
 /src/include/gen_dataloop.h
 /src/include/mpich2info.h
 /src/include/mpio.h
@@ -530,9 +536,6 @@ Makefile.am-stamp
 
 # /src/mpi/spawn/
 
-# /src/mpi/timer/
-/src/mpi/timer/mpichtimer.h
-
 # /src/mpid/ch3/channels/nemesis/nemesis/src/
 /src/mpid/ch3/channels/nemesis/src/mpid_nem_net_array.c
 
@@ -562,9 +565,6 @@ Makefile.am-stamp
 # /src/pm/util/test/
 /src/pm/util/test/argstest
 /src/pm/util/test/forktest
-
-# /src/util/dbg/
-/src/util/dbg/getfuncstack
 
 # /src/util/logging/common/
 /src/util/logging/common/describe_states.c
@@ -601,4 +601,3 @@ Makefile.am-stamp
 
 # /test/util/timer/
 /test/util/timer/timertest
-

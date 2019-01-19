@@ -4,12 +4,11 @@
  *      See COPYRIGHT in top-level directory.
  */
 #include "mpi.h"
-/* USE_STRICT_MPI may be defined in mpitestconf.h */
-#include "mpitestconf.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include "mpitest.h"
 
 int main(int argc, char *argv[])
 {
@@ -17,7 +16,7 @@ int main(int argc, char *argv[])
     MPI_Group world_group, even_group;
     MPI_Comm even_comm;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -39,21 +38,17 @@ int main(int argc, char *argv[])
     MPI_Group_excl(world_group, size / 2, excl, &even_group);
     MPI_Group_free(&world_group);
 
-#if !defined(USE_STRICT_MPI) && defined(MPICH)
     if (rank % 2 == 0) {
         /* Even processes create a group for themselves */
         MPI_Comm_create_group(MPI_COMM_WORLD, even_group, 0, &even_comm);
         MPI_Barrier(even_comm);
         MPI_Comm_free(&even_comm);
     }
-#endif /* USE_STRICT_MPI */
 
     MPI_Group_free(&even_group);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    if (rank == 0)
-        printf(" No errors\n");
-
-    MPI_Finalize();
+    free(excl);
+    MTest_Finalize(0);
     return 0;
 }

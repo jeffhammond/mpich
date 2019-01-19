@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     int target_rank;
     MPI_Aint bases[2];
     MPI_Aint disp, offset;
-    MPI_Win  win;
+    MPI_Win win;
 
     MTest_Init(&argc, &argv);
 
@@ -50,15 +50,15 @@ int main(int argc, char **argv)
     MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, bases, 1, MPI_AINT, MPI_COMM_WORLD);
 
     MPI_Win_create_dynamic(MPI_INFO_NULL, MPI_COMM_WORLD, &win);
-    MPI_Win_attach(win, array, sizeof(int)*1024);
+    MPI_Win_attach(win, array, sizeof(int) * 1024);
 
     /* Do MPI_Aint addressing arithmetic */
     if (rank == 0) {
-        disp = sizeof(int)*511;
-        offset = MPIX_Aint_add(bases[1], disp); /* offset points to array[1023]*/
+        disp = sizeof(int) * 511;
+        offset = MPI_Aint_add(bases[1], disp);  /* offset points to array[1023] */
     } else if (rank == 1) {
-        disp = sizeof(int)*512;
-        offset = MPIX_Aint_diff(bases[0], disp); /* offset points to array[0] */
+        disp = sizeof(int) * 512;
+        offset = MPI_Aint_diff(bases[0], disp); /* offset points to array[0] */
     }
 
     /* Get val and verify it */
@@ -75,6 +75,5 @@ int main(int argc, char **argv)
     MPI_Win_free(&win);
 
     MTest_Finalize(errs);
-    MPI_Finalize();
-    return 0;
+    return MTestReturnValue(errs);
 }

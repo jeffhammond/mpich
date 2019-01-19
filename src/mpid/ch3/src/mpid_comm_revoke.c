@@ -18,19 +18,19 @@
 #undef FUNCNAME
 #define FUNCNAME MPID_Comm_revoke
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPID_Comm_revoke(MPID_Comm *comm_ptr, int is_remote)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPID_Comm_revoke(MPIR_Comm *comm_ptr, int is_remote)
 {
     MPIDI_VC_t *vc;
-    MPID_IOV iov[MPID_IOV_LIMIT];
+    MPL_IOV iov[MPL_IOV_LIMIT];
     int mpi_errno = MPI_SUCCESS;
     int i, size, my_rank;
-    MPID_Request *request;
+    MPIR_Request *request;
     MPIDI_CH3_Pkt_t upkt;
     MPIDI_CH3_Pkt_revoke_t *revoke_pkt = &upkt.revoke;
-    MPIDI_STATE_DECL(MPID_STATE_MPID_COMM_REVOKE);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_COMM_REVOKE);
 
-    MPIDI_FUNC_ENTER(MPID_STATE_MPID_COMM_REVOKE);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_COMM_REVOKE);
 
     if (0 == comm_ptr->revoked) {
         /* Mark the communicator as revoked locally */
@@ -41,7 +41,7 @@ int MPID_Comm_revoke(MPID_Comm *comm_ptr, int is_remote)
         /* Start a counter to track how many revoke messages we've received from
          * other ranks */
         comm_ptr->dev.waiting_for_revoke = comm_ptr->local_size - 1 - is_remote; /* Subtract the processes who already know about the revoke */
-        MPIU_DBG_MSG_FMT(CH3_OTHER, VERBOSE, (MPIU_DBG_FDEST, "Comm %08x waiting_for_revoke: %d", comm_ptr->handle, comm_ptr->dev.waiting_for_revoke));
+        MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER, VERBOSE, (MPL_DBG_FDEST, "Comm %08x waiting_for_revoke: %d", comm_ptr->handle, comm_ptr->dev.waiting_for_revoke));
 
         /* Keep a reference to this comm so it doesn't get destroyed while
          * it's being revoked */
@@ -59,23 +59,23 @@ int MPID_Comm_revoke(MPID_Comm *comm_ptr, int is_remote)
 
             MPIDI_Comm_get_vc_set_active(comm_ptr, i, &vc);
 
-            iov[0].MPID_IOV_BUF = (MPID_IOV_BUF_CAST) revoke_pkt;
-            iov[0].MPID_IOV_LEN = sizeof(*revoke_pkt);
+            iov[0].MPL_IOV_BUF = (MPL_IOV_BUF_CAST) revoke_pkt;
+            iov[0].MPL_IOV_LEN = sizeof(*revoke_pkt);
 
-            MPIU_THREAD_CS_ENTER(CH3COMM, vc);
+            MPID_THREAD_CS_ENTER(POBJ, vc->pobj_mutex);
             mpi_errno = MPIDI_CH3_iStartMsgv(vc, iov, 1, &request);
-            MPIU_THREAD_CS_EXIT(CH3COMM, vc);
+            MPID_THREAD_CS_EXIT(POBJ, vc->pobj_mutex);
             if (mpi_errno) comm_ptr->dev.waiting_for_revoke--;
             if (NULL != request)
                 /* We don't need to keep a reference to this request. The
                  * progress engine will keep a reference until it completes
                  * later */
-                MPID_Request_release(request);
+                MPIR_Request_free(request);
         }
 
         /* Check to see if we are done revoking */
         if (comm_ptr->dev.waiting_for_revoke == 0) {
-            MPIR_Comm_release(comm_ptr, 0);
+            MPIR_Comm_release(comm_ptr);
         }
 
         /* Go clean up all of the existing operations involving this
@@ -84,20 +84,20 @@ int MPID_Comm_revoke(MPID_Comm *comm_ptr, int is_remote)
          * aren't any unexpected messages hanging around. */
 
         /* Clean up the receive and unexpected queues */
-        MPIU_THREAD_CS_ENTER(MSGQUEUE,);
+        MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_MSGQ_MUTEX);
         MPIDI_CH3U_Clean_recvq(comm_ptr);
-        MPIU_THREAD_CS_EXIT(MSGQUEUE,);
+        MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_MSGQ_MUTEX);
     } else if (is_remote)  { /* If this is local, we've already revoked and don't need to do it again. */
         /* Decrement the revoke counter */
         comm_ptr->dev.waiting_for_revoke--;
-        MPIU_DBG_MSG_FMT(CH3_OTHER, VERBOSE, (MPIU_DBG_FDEST, "Comm %08x waiting_for_revoke: %d", comm_ptr->handle, comm_ptr->dev.waiting_for_revoke));
+        MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER, VERBOSE, (MPL_DBG_FDEST, "Comm %08x waiting_for_revoke: %d", comm_ptr->handle, comm_ptr->dev.waiting_for_revoke));
 
         /* Check to see if we are done revoking */
         if (comm_ptr->dev.waiting_for_revoke == 0) {
-            MPIR_Comm_release(comm_ptr, 0);
+            MPIR_Comm_release(comm_ptr);
         }
     }
 
-    MPIDI_FUNC_EXIT(MPID_STATE_MPID_COMM_REVOKE);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_COMM_REVOKE);
     return MPI_SUCCESS;
 }

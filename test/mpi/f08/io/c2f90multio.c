@@ -14,46 +14,38 @@
 */
 #include "mpi.h"
 #include <stdio.h>
+#include "mpitest.h"
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
     MPI_Fint handleA, handleB;
-    int      rc;
-    int      errs = 0;
-    int      rank;
+    int rc;
+    int errs = 0;
+    int rank;
     MPI_File cFile;
 
-    MPI_Init( &argc, &argv );
-    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+    MTest_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     /* File */
-    rc = MPI_File_open( MPI_COMM_WORLD, (char*)"temp",
-		   MPI_MODE_RDWR | MPI_MODE_DELETE_ON_CLOSE | MPI_MODE_CREATE,
-		   MPI_INFO_NULL, &cFile );
+    rc = MPI_File_open(MPI_COMM_WORLD, (char *) "temp",
+                       MPI_MODE_RDWR | MPI_MODE_DELETE_ON_CLOSE | MPI_MODE_CREATE,
+                       MPI_INFO_NULL, &cFile);
     if (rc) {
-	errs++;
-	printf( "Unable to open file \"temp\"\n" );
+        errs++;
+        printf("Unable to open file \"temp\"\n");
+    } else {
+        handleA = MPI_File_c2f(cFile);
+        handleB = MPI_File_c2f(cFile);
+        if (handleA != handleB) {
+            errs++;
+            printf("MPI_File_c2f does not give the same handle twice on the same MPI_File\n");
+        }
     }
-    else {
-	handleA = MPI_File_c2f( cFile );
-	handleB = MPI_File_c2f( cFile );
-	if (handleA != handleB) {
-	    errs++;
-	    printf( "MPI_File_c2f does not give the same handle twice on the same MPI_File\n" );
-	}
-    }
-    MPI_File_close( &cFile );
+    MPI_File_close(&cFile);
 
-    if (rank == 0) {
-	if (errs) {
-	    fprintf(stderr, "Found %d errors\n", errs);
-	}
-	else {
-	    printf(" No Errors\n");
-	}
-    }
+    MTest_Finalize(errs);
 
-    MPI_Finalize();
 
-    return 0;
+    return MTestReturnValue(errs);
 }

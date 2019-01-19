@@ -7,33 +7,41 @@
 #include "mpidimpl.h"
 #include "mpidrma.h"
 
-/* Note the the following function is called when request-based RMA operation
-   is completed at origin side. Here we complete the user request associated
-   with this request-based operation. */
+
 #undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_ReqHandler_ReqOpsComplete
+#define FUNCNAME MPIDI_CH3_Req_handler_rma_op_complete
 #undef FCNAME
-#define FCNAME MPIDI_QUOTE(FUNCNAME)
-int MPIDI_CH3_ReqHandler_ReqOpsComplete(MPIDI_VC_t * vc, MPID_Request * sreq, int *complete)
+#define FCNAME MPL_QUOTE(FUNCNAME)
+int MPIDI_CH3_Req_handler_rma_op_complete(MPIR_Request * sreq)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPID_Request *ureq = NULL;
+    MPIR_Request *ureq = NULL;
+    MPIR_Win *win_ptr = NULL;
 
-    MPIDI_STATE_DECL(MPID_STATE_MPIDI_CH3_REQHANDLER_REQOPSCOMPLETE);
-    MPIDI_FUNC_ENTER(MPID_STATE_MPIDI_CH3_REQHANDLER_REQOPSCOMPLETE);
+    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3_REQ_HANDLER_RMA_OP_COMPLETE);
+    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3_REQ_HANDLER_RMA_OP_COMPLETE);
 
-    MPID_Request_get_ptr(sreq->dev.request_handle, ureq);
-    MPIU_Assert(ureq != NULL);
+    if (sreq->dev.rma_target_ptr != NULL) {
+        (sreq->dev.rma_target_ptr)->num_pkts_wait_for_local_completion--;
+    }
 
-    /* Complete user request and release ref of completion handler.
-     * Note that ch3 ref is released by later clean_up call. */
-    MPIDI_CH3U_Request_complete(ureq);
+    /* get window, decrement active request cnt on window */
+    MPIR_Win_get_ptr(sreq->dev.source_win_handle, win_ptr);
+    MPIR_Assert(win_ptr != NULL);
+    MPIDI_CH3I_RMA_Active_req_cnt--;
+    MPIR_Assert(MPIDI_CH3I_RMA_Active_req_cnt >= 0);
 
-    MPIDI_CH3U_Request_complete(sreq);
-    *complete = TRUE;
+    if (sreq->dev.request_handle != MPI_REQUEST_NULL) {
+        /* get user request */
+        MPIR_Request_get_ptr(sreq->dev.request_handle, ureq);
+        mpi_errno = MPID_Request_complete(ureq);
+        if (mpi_errno != MPI_SUCCESS) {
+            MPIR_ERR_POP(mpi_errno);
+        }
+    }
 
   fn_exit:
-    MPIDI_FUNC_EXIT(MPID_STATE_MPIDI_CH3_REQHANDLER_REQOPSCOMPLETE);
+    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3_REQ_HANDLER_RMA_OP_COMPLETE);
     return mpi_errno;
 
   fn_fail:

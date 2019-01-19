@@ -1,4 +1,4 @@
-#! @PERL@
+#! /usr/bin/env perl
 # -*- Mode: perl; -*-
 # @configure_input@
 #
@@ -50,7 +50,7 @@ $hasDemon   = 0;
 @enable_array = ( 
 		  'error-checking;no;runtime;all', 
 		  'error-messages;all;generic;class;none',
-		  'timer-type;linux86_cycle;gethrtime;clock_gettime;gettimeofday;linuxalpha_cycle',
+		  'timer-type;linux86_cycle;gethrtime;clock_gettime;gettimeofday',
 		  'timing;none;all;runtime;log;log_detailed',
 		  'g;none;all;handle;dbg;log;meminit;handlealloc;instr;mem;mutex;mutexnesting;memarena',
 		  'fast;nochkmsg;notiming;ndebug;all',
@@ -68,9 +68,7 @@ $hasDemon   = 0;
                   'thread-cs;global;per-object;lock-free',
                   'refcount;lock;lock-free;none',
                   'mutex-timing',
-                  'handle-allocation;tls;mutex',
                   'multi-aliases',
-                  'wrapper-rpath',
                   'predefined-refcount',
                   'alloca',
                   'yield;sched_yield;yield;select;usleep;sleep',
@@ -84,6 +82,7 @@ $hasDemon   = 0;
 	       'pm;gforker', #;remshell
 	       'namepublisher;no;file', #;ldap:ldapserver',
 	       'device;ch3;ch3:sock',
+	       'wrapper-dl-type;runpath;rpath;none',
 );
 %chosenWith = ();
 @env_array = (

@@ -43,15 +43,9 @@ noinst_PROGRAMS =          \
     fetchandadd            \
     fetchandadd_tree       \
     winname                \
-    putfence1              \
     putfidx                \
-    epochtest              \
-    getfence1              \
-    accfence1              \
     accfence2              \
     adlb_mimic1            \
-    putpscw1               \
-    accpscw1               \
     getgroup               \
     contig_displ           \
     test1_am               \
@@ -112,6 +106,18 @@ noinst_PROGRAMS =          \
     fetch_and_op_long      \
     fetch_and_op_double    \
     fetch_and_op_long_double \
+    fetch_and_op_char_hwacc        \
+    fetch_and_op_short_hwacc       \
+    fetch_and_op_int_hwacc         \
+    fetch_and_op_long_hwacc        \
+    fetch_and_op_double_hwacc      \
+    fetch_and_op_long_double_hwacc \
+    fetch_and_op_char_accop_hwacc        \
+    fetch_and_op_short_accop_hwacc       \
+    fetch_and_op_int_accop_hwacc         \
+    fetch_and_op_long_accop_hwacc        \
+    fetch_and_op_double_accop_hwacc      \
+    fetch_and_op_long_double_accop_hwacc \
     get_accumulate_short   \
     get_accumulate_long    \
     get_accumulate_double  \
@@ -132,23 +138,73 @@ noinst_PROGRAMS =          \
     mutex_bench_shared     \
     mutex_bench_shm        \
     mutex_bench_shm_ordered\
-    rma-contig             \
+    rma_contig             \
     badrma                 \
     nb_test                \
-    acc-loc                \
+    acc_loc                \
+    acc_ordering           \
     fence_shm              \
-    get-struct             \
+    get_struct             \
     rput_local_comp        \
     racc_local_comp        \
     at_complete            \
     atomic_rmw_fop         \
     atomic_rmw_cas         \
     atomic_rmw_gacc	   \
-    acc-pairtype
+    atomic_get_short_int           \
+    atomic_get_2int                \
+    atomic_get_long_int            \
+    atomic_get_float_int           \
+    atomic_get_double_int          \
+    atomic_get_long_double_int     \
+    acc_pairtype           \
+    acc_pairtype_shm       \
+    manyget                \
+    derived_acc_flush_local\
+    large_acc_flush_local  \
+    large_small_acc        \
+    put_flush_get  \
+    acc_flush_get  \
+    gacc_flush_get \
+    fop_flush_get  \
+    cas_flush_get  \
+    win_shared_put_flush_load  \
+    win_shared_acc_flush_load  \
+    win_shared_gacc_flush_load \
+    win_shared_fop_flush_load  \
+    win_shared_cas_flush_load  \
+    overlap_wins_put  \
+    overlap_wins_acc  \
+    overlap_wins_gacc  \
+    overlap_wins_fop  \
+    overlap_wins_cas  \
+    rget_unlock  \
+    lock_nested  \
+    rget_testall \
+    get_flushlocal         \
+    get_flushlocal_shm     \
+    win_shared_query_null
 
 if BUILD_MPIX_TESTS
 noinst_PROGRAMS += aint
 endif
+
+atomic_get_short_int_SOURCES      = atomic_get.c
+atomic_get_2int_SOURCES           = atomic_get.c
+atomic_get_long_int_SOURCES       = atomic_get.c
+atomic_get_float_int_SOURCES      = atomic_get.c
+atomic_get_double_int_SOURCES     = atomic_get.c
+atomic_get_long_double_int_SOURCES= atomic_get.c
+
+atomic_get_short_int_CPPFLAGS       = -DTEST_SHORT_INT $(AM_CPPFLAGS)
+atomic_get_2int_CPPFLAGS            = -DTEST_2INT $(AM_CPPFLAGS)
+atomic_get_long_int_CPPFLAGS        = -DTEST_LONG_INT $(AM_CPPFLAGS)
+atomic_get_float_int_CPPFLAGS       = -DTEST_FLOAT_INT $(AM_CPPFLAGS)
+atomic_get_double_int_CPPFLAGS      = -DTEST_DOUBLE_INT $(AM_CPPFLAGS)
+atomic_get_long_double_int_CPPFLAGS = -DTEST_LONG_DOUBLE_INT $(AM_CPPFLAGS)
+
+acc_pairtype_shm_SOURCES            = acc_pairtype.c
+acc_pairtype_shm_CPPFLAGS           = -DUSE_WIN_ALLOCATE $(AM_CPPFLAGS)
 
 strided_acc_indexed_LDADD       = $(LDADD) -lm
 strided_acc_onelock_LDADD       = $(LDADD) -lm
@@ -172,6 +228,34 @@ fetch_and_op_int_SOURCES         = fetch_and_op.c
 fetch_and_op_long_SOURCES        = fetch_and_op.c
 fetch_and_op_double_SOURCES      = fetch_and_op.c
 fetch_and_op_long_double_SOURCES = fetch_and_op.c
+
+fetch_and_op_char_hwacc_CPPFLAGS       = -DFOP_TYPE_CHAR -DTEST_HWACC_INFO $(AM_CPPFLAGS)
+fetch_and_op_short_hwacc_CPPFLAGS      = -DFOP_TYPE_SHORT -DTEST_HWACC_INFO $(AM_CPPFLAGS)
+fetch_and_op_int_hwacc_CPPFLAGS        = -DFOP_TYPE_INT -DTEST_HWACC_INFO $(AM_CPPFLAGS)
+fetch_and_op_long_hwacc_CPPFLAGS       = -DFOP_TYPE_LONG -DTEST_HWACC_INFO $(AM_CPPFLAGS)
+fetch_and_op_double_hwacc_CPPFLAGS     = -DFOP_TYPE_DOUBLE -DTEST_HWACC_INFO $(AM_CPPFLAGS)
+fetch_and_op_long_double_hwacc_CPPFLAGS= -DFOP_TYPE_LONG_DOUBLE -DTEST_HWACC_INFO $(AM_CPPFLAGS)
+
+fetch_and_op_char_hwacc_SOURCES        = fetch_and_op.c
+fetch_and_op_short_hwacc_SOURCES       = fetch_and_op.c
+fetch_and_op_int_hwacc_SOURCES         = fetch_and_op.c
+fetch_and_op_long_hwacc_SOURCES        = fetch_and_op.c
+fetch_and_op_double_hwacc_SOURCES      = fetch_and_op.c
+fetch_and_op_long_double_hwacc_SOURCES = fetch_and_op.c
+
+fetch_and_op_char_accop_hwacc_CPPFLAGS       = -DFOP_TYPE_CHAR -DTEST_HWACC_INFO -DTEST_ACCOPS_INFO $(AM_CPPFLAGS)
+fetch_and_op_short_accop_hwacc_CPPFLAGS      = -DFOP_TYPE_SHORT -DTEST_HWACC_INFO -DTEST_ACCOPS_INFO $(AM_CPPFLAGS)
+fetch_and_op_int_accop_hwacc_CPPFLAGS        = -DFOP_TYPE_INT -DTEST_HWACC_INFO -DTEST_ACCOPS_INFO $(AM_CPPFLAGS)
+fetch_and_op_long_accop_hwacc_CPPFLAGS       = -DFOP_TYPE_LONG -DTEST_HWACC_INFO -DTEST_ACCOPS_INFO $(AM_CPPFLAGS)
+fetch_and_op_double_accop_hwacc_CPPFLAGS     = -DFOP_TYPE_DOUBLE -DTEST_HWACC_INFO -DTEST_ACCOPS_INFO $(AM_CPPFLAGS)
+fetch_and_op_long_double_accop_hwacc_CPPFLAGS= -DFOP_TYPE_LONG_DOUBLE -DTEST_HWACC_INFO -DTEST_ACCOPS_INFO $(AM_CPPFLAGS)
+
+fetch_and_op_char_accop_hwacc_SOURCES        = fetch_and_op.c
+fetch_and_op_short_accop_hwacc_SOURCES       = fetch_and_op.c
+fetch_and_op_int_accop_hwacc_SOURCES         = fetch_and_op.c
+fetch_and_op_long_accop_hwacc_SOURCES        = fetch_and_op.c
+fetch_and_op_double_accop_hwacc_SOURCES      = fetch_and_op.c
+fetch_and_op_long_double_accop_hwacc_SOURCES = fetch_and_op.c
 
 get_accumulate_short_CPPFLAGS    = -DGACC_TYPE_SHORT $(AM_CPPFLAGS)
 get_accumulate_long_CPPFLAGS     = -DGACC_TYPE_LONG $(AM_CPPFLAGS)
@@ -214,13 +298,13 @@ test2_am_shm_SOURCES             = test2_am.c
 test3_shm_SOURCES                = test3.c
 test3_am_shm_SOURCES             = test3_am.c
 
-mutex_bench_SOURCES              = mutex_bench.c mcs-mutex.c mcs-mutex.h
+mutex_bench_SOURCES              = mutex_bench.c mcs_mutex.c mcs_mutex.h
 mutex_bench_shared_CPPFLAGS      = -DUSE_WIN_SHARED $(AM_CPPFLAGS)
-mutex_bench_shared_SOURCES       = mutex_bench.c mcs-mutex.c mcs-mutex.h
+mutex_bench_shared_SOURCES       = mutex_bench.c mcs_mutex.c mcs_mutex.h
 mutex_bench_shm_CPPFLAGS         = -DUSE_WIN_ALLOC_SHM $(AM_CPPFLAGS)
-mutex_bench_shm_SOURCES          = mutex_bench.c mcs-mutex.c mcs-mutex.h
+mutex_bench_shm_SOURCES          = mutex_bench.c mcs_mutex.c mcs_mutex.h
 mutex_bench_shm_ordered_CPPFLAGS = -DUSE_WIN_ALLOC_SHM -DUSE_CONTIGUOUS_RANK $(AM_CPPFLAGS)
-mutex_bench_shm_ordered_SOURCES  = mutex_bench.c mcs-mutex.c mcs-mutex.h
+mutex_bench_shm_ordered_SOURCES  = mutex_bench.c mcs_mutex.c mcs_mutex.h
 
 linked_list_bench_lock_shr_nocheck_SOURCES  = linked_list_bench_lock_shr.c
 linked_list_bench_lock_shr_nocheck_CPPFLAGS = -DUSE_MODE_NOCHECK $(AM_CPPFLAGS)
@@ -228,3 +312,44 @@ linked_list_bench_lock_shr_nocheck_CPPFLAGS = -DUSE_MODE_NOCHECK $(AM_CPPFLAGS)
 win_shared_create_allocshm_SOURCES = win_shared_create.c
 win_shared_create_no_allocshm_SOURCES = win_shared_create.c
 win_shared_create_allocshm_CPPFLAGS = -DUSE_INFO_ALLOC_SHM $(AM_CPPFLAGS)
+
+put_flush_get_SOURCES        = wrma_flush_get.c
+acc_flush_get_SOURCES        = wrma_flush_get.c
+gacc_flush_get_SOURCES       = wrma_flush_get.c
+fop_flush_get_SOURCES        = wrma_flush_get.c
+cas_flush_get_SOURCES        = wrma_flush_get.c
+
+put_flush_get_CPPFLAGS  = -DTEST_PUT $(AM_CPPFLAGS)
+acc_flush_get_CPPFLAGS  = -DTEST_ACC $(AM_CPPFLAGS)
+gacc_flush_get_CPPFLAGS = -DTEST_GACC $(AM_CPPFLAGS)
+fop_flush_get_CPPFLAGS  = -DTEST_FOP $(AM_CPPFLAGS)
+cas_flush_get_CPPFLAGS  = -DTEST_CAS $(AM_CPPFLAGS)
+
+win_shared_put_flush_load_SOURCES        = win_shared_rma_flush_load.c
+win_shared_acc_flush_load_SOURCES        = win_shared_rma_flush_load.c
+win_shared_gacc_flush_load_SOURCES       = win_shared_rma_flush_load.c
+win_shared_fop_flush_load_SOURCES        = win_shared_rma_flush_load.c
+win_shared_cas_flush_load_SOURCES        = win_shared_rma_flush_load.c
+
+win_shared_put_flush_load_CPPFLAGS  = -DTEST_PUT $(AM_CPPFLAGS)
+win_shared_acc_flush_load_CPPFLAGS  = -DTEST_ACC $(AM_CPPFLAGS)
+win_shared_gacc_flush_load_CPPFLAGS = -DTEST_GACC $(AM_CPPFLAGS)
+win_shared_fop_flush_load_CPPFLAGS  = -DTEST_FOP $(AM_CPPFLAGS)
+win_shared_cas_flush_load_CPPFLAGS  = -DTEST_CAS $(AM_CPPFLAGS)
+
+overlap_wins_put_SOURCES        = overlap_wins_rma.c
+overlap_wins_acc_SOURCES        = overlap_wins_rma.c
+overlap_wins_gacc_SOURCES        = overlap_wins_rma.c
+overlap_wins_fop_SOURCES        = overlap_wins_rma.c
+overlap_wins_cas_SOURCES        = overlap_wins_rma.c
+
+overlap_wins_put_CPPFLAGS  = -DTEST_PUT $(AM_CPPFLAGS)
+overlap_wins_acc_CPPFLAGS  = -DTEST_ACC $(AM_CPPFLAGS)
+overlap_wins_gacc_CPPFLAGS = -DTEST_GACC $(AM_CPPFLAGS)
+overlap_wins_fop_CPPFLAGS  = -DTEST_FOP $(AM_CPPFLAGS)
+overlap_wins_cas_CPPFLAGS  = -DTEST_CAS $(AM_CPPFLAGS)
+
+get_flushlocal_shm_SOURCES        = get_flushlocal.c
+get_flushlocal_shm_CPPFLAGS       = -DUSE_WIN_ALLOCATE $(AM_CPPFLAGS)
+
+include Makefile.dtp

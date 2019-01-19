@@ -41,7 +41,7 @@ type(MPI_File) :: fh
 errs = 0
 str = "iotest.txt"
 
-call MPI_INIT(ierr)
+call MTEST_INIT(ierr)
 call MPI_COMM_SIZE(MPI_COMM_WORLD, nprocs, ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, mynod, ierr)
 
@@ -108,7 +108,7 @@ call MPI_FILE_OPEN(MPI_COMM_WORLD, str, MPI_MODE_CREATE+MPI_MODE_RDWR, MPI_INFO_
 
 disp = 0
 call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, newtype, "native", MPI_INFO_NULL, ierr)
-call MPIX_FILE_IWRITE_ALL(fh, writebuf, bufcount, MPI_INTEGER, request, ierr)
+call MPI_FILE_IWRITE_ALL(fh, writebuf, bufcount, MPI_INTEGER, request, ierr)
 call MPI_WAIT(request, status, ierr)
 call MPI_FILE_CLOSE(fh, ierr)
 
@@ -117,7 +117,7 @@ call MPI_FILE_CLOSE(fh, ierr)
 call MPI_FILE_OPEN(MPI_COMM_WORLD, str, MPI_MODE_CREATE+MPI_MODE_RDWR, MPI_INFO_NULL, fh, ierr)
 
 call MPI_FILE_SET_VIEW(fh, disp, MPI_INTEGER, newtype, "native", MPI_INFO_NULL, ierr)
-call MPIX_FILE_IREAD_ALL(fh, readbuf, bufcount, MPI_INTEGER, request, ierr)
+call MPI_FILE_IREAD_ALL(fh, readbuf, bufcount, MPI_INTEGER, request, ierr)
 call MPI_WAIT(request, status, ierr)
 call MPI_FILE_CLOSE(fh, ierr)
 
@@ -139,17 +139,7 @@ if (mynod .eq. 0) then
     endif
 endif
 
-call MPI_Allreduce( errs, toterrs, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr )
-
-if (mynod .eq. 0) then
-  if( toterrs .gt. 0 ) then
-     print *, 'Found ', toterrs, ' errors'
-  else
-     print *, ' No Errors'
-  endif
-endif
-
-call MPI_FINALIZE(ierr)
+call MTEST_FINALIZE(errs)
 
 stop
 end

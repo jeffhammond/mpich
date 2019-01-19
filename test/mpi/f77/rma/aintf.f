@@ -21,8 +21,8 @@
       integer :: win
       integer :: intsize
 
-      integer(kind=MPI_ADDRESS_KIND), external :: MPIX_Aint_add
-      integer(kind=MPI_ADDRESS_KIND), external :: MPIX_Aint_diff
+      integer(kind=MPI_ADDRESS_KIND), external :: MPI_Aint_add !F77ONLY
+      integer(kind=MPI_ADDRESS_KIND), external :: MPI_Aint_diff !F77ONLY
 
       errs = 0
       call mtest_init(ierr);
@@ -46,7 +46,7 @@
       endif
 
 ! Exchange bases
-      call MPI_Type_size(MPI_INT, intsize, ierr);
+      call MPI_Type_size(MPI_INTEGER, intsize, ierr);
 
       call MPI_Allgather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, bases,
      &                   1, MPI_AINT, MPI_COMM_WORLD, ierr)
@@ -60,16 +60,16 @@
 ! Do MPI_Aint addressing arithmetic
       if (rank == 0) then
         disp = intsize*511
-        offset = MPIX_Aint_add(bases(1), disp)
+        offset = MPI_Aint_add(bases(1), disp)
       else if (rank == 1) then
         disp = intsize*512
-        offset = MPIX_Aint_diff(bases(0), disp)
+        offset = MPI_Aint_diff(bases(0), disp)
       endif
 
 ! Get value and verify it
       call MPI_Win_fence(MPI_MODE_NOPRECEDE, win, ierr)
-      call MPI_Get(val, 1, MPI_INT, target_rank,
-     &             offset, 1, MPI_INT, win, ierr)
+      call MPI_Get(val, 1, MPI_INTEGER, target_rank,
+     &             offset, 1, MPI_INTEGER, win, ierr)
       call MPI_Win_fence(MPI_MODE_NOSUCCEED, win, ierr)
 
       if (val /= 1234) then
@@ -81,5 +81,4 @@
       call MPI_Win_free(win, ierr)
 
       call MTest_Finalize(errs)
-      call MPI_Finalize(ierr);
       end
