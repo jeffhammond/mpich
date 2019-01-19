@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
+#include "mpitest.h"
 
 #define YLEN 5
 #define XLEN 10
@@ -46,6 +47,15 @@ char compare_buf[XLEN * 4][YLEN * 4] = {
 #define VERBOSE 1
 */
 
+#define HANDLE_ERROR(err) \
+    if (err != MPI_SUCCESS) { \
+        char msg[MPI_MAX_ERROR_STRING]; \
+        int resultlen; \
+        MPI_Error_string(err, msg, &resultlen); \
+        fprintf(stderr, "%s line %d: %s\n", __FILE__, __LINE__, msg); \
+        MPI_Abort(MPI_COMM_WORLD, 1); \
+    }
+
 /*----< main() >------------------------------------------------------------*/
 int main(int argc, char **argv)
 {
@@ -62,19 +72,18 @@ int main(int argc, char **argv)
     MPI_Status *statuses;
     MPI_Status status;
     MPI_Offset offset = 0;
-    int nr_errors = 0;
+    int errs = 0;
 #ifdef VERBOSE
     int k;
 #endif
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &np);
 
     if (np != 4) {
         if (!rank)
             printf("Please run with 4 processes. Exiting ...\n\n");
-        MPI_Finalize();
         return 1;
     }
 
@@ -82,8 +91,8 @@ int main(int argc, char **argv)
 
     num_io = 2;
 
-    request = (MPI_Request *)malloc(num_io * sizeof(MPI_Request));
-    statuses = (MPI_Status *)malloc(num_io * sizeof(MPI_Status));
+    request = (MPI_Request *) malloc(num_io * sizeof(MPI_Request));
+    statuses = (MPI_Status *) malloc(num_io * sizeof(MPI_Status));
 
     /*-----------------------------------------------------------------------*/
     /* process rank in each dimension */
@@ -103,16 +112,15 @@ int main(int argc, char **argv)
 
     /* define data type for file view */
     count = array_of_subsizes[0] * 2;   /* 2 is the no. blocks along X */
-    blocklengths = (int *)malloc(count * sizeof(int));
-    displacements = (MPI_Aint *)malloc(count * sizeof(MPI_Aint));
+    blocklengths = (int *) malloc(count * sizeof(int));
+    displacements = (MPI_Aint *) malloc(count * sizeof(MPI_Aint));
     for (i = 0; i < count; i++)
         blocklengths[i] = array_of_subsizes[1] / 2;
     for (i = 0; i < array_of_subsizes[0]; i++)
         for (j = 0; j < 2; j++)
             displacements[i * 2 + j] = offset + i * 2 * array_of_sizes[1]
-                                     + j * XLEN / 2;
-    MPI_Type_create_hindexed(count, blocklengths, displacements, MPI_CHAR,
-                             &ftype);
+                + j * XLEN / 2;
+    MPI_Type_create_hindexed(count, blocklengths, displacements, MPI_CHAR, &ftype);
     MPI_Type_commit(&ftype);
     MPI_Type_size_x(ftype, &ftype_size);
 
@@ -146,18 +154,20 @@ int main(int argc, char **argv)
 */
 
     /* initialize the write buffer */
-    buf = (char *)malloc(array_of_subsizes[0] * array_of_subsizes[1]);
+    buf = (char *) malloc(array_of_subsizes[0] * array_of_subsizes[1]);
     for (i = 0; i < array_of_subsizes[0] * array_of_subsizes[1]; i++)
         buf[i] = '0' + rank * 20 + i % 79;
 
     /* zero file contents --------------------------------------------------- */
     if (rank == 0) {
-        char *wr_buf = (char *)calloc(num_io * global_array_size, 1);
-        MPI_File_open(MPI_COMM_SELF, filename,
-                      MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
-        MPI_File_write(fh, wr_buf, num_io * global_array_size, MPI_CHAR,
-                       &status);
-        MPI_File_close(&fh);
+        char *wr_buf = (char *) calloc(num_io * global_array_size, 1);
+        err = MPI_File_open(MPI_COMM_SELF, filename,
+                            MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
+        HANDLE_ERROR(err);
+        err = MPI_File_write(fh, wr_buf, num_io * global_array_size, MPI_CHAR, &status);
+        HANDLE_ERROR(err);
+        err = MPI_File_close(&fh);
+        HANDLE_ERROR(err);
         free(wr_buf);
     }
     /* open the file -------------------------------------------------------- */
@@ -173,21 +183,26 @@ int main(int argc, char **argv)
     for (i = 0; i < num_io; i++) {
         offset = i * global_array_size;
         /* set the file view */
-        MPI_File_set_view(fh, offset, MPI_BYTE, ftype, "native", MPI_INFO_NULL);
-        MPIX_File_iwrite_all(fh, buf, ftype_size, MPI_CHAR, &request[i]);
+        err = MPI_File_set_view(fh, offset, MPI_BYTE, ftype, "native", MPI_INFO_NULL);
+        HANDLE_ERROR(err);
+        err = MPI_File_iwrite_all(fh, buf, ftype_size, MPI_CHAR, &request[i]);
+        HANDLE_ERROR(err);
     }
-    MPI_Waitall(num_io, request, statuses);
-    MPI_File_close(&fh);
+    err = MPI_Waitall(num_io, request, statuses);
+    HANDLE_ERROR(err);
+    err = MPI_File_close(&fh);
+    HANDLE_ERROR(err);
 
     /* read and print file contents ----------------------------------------- */
     if (rank == 0) {
         char *ptr;
-        char *rd_buf = (char *)calloc(num_io * global_array_size, 1);
-        MPI_File_open(MPI_COMM_SELF, filename, MPI_MODE_RDONLY, MPI_INFO_NULL,
-                      &fh);
-        MPI_File_read(fh, rd_buf, num_io * global_array_size, MPI_CHAR, &status);
-        MPI_File_close(&fh);
-
+        char *rd_buf = (char *) calloc(num_io * global_array_size, 1);
+        err = MPI_File_open(MPI_COMM_SELF, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
+        HANDLE_ERROR(err);
+        err = MPI_File_read(fh, rd_buf, num_io * global_array_size, MPI_CHAR, &status);
+        HANDLE_ERROR(err);
+        err = MPI_File_close(&fh);
+        HANDLE_ERROR(err);
 #ifdef VERBOSE
         printf("-------------------------------------------------------\n");
         printf("   [");
@@ -223,17 +238,12 @@ int main(int argc, char **argv)
                 if (*ptr != compare_buf[i][j]) {
                     fprintf(stderr, "expected %d got %d at [%d][%d]\n",
                             *ptr, compare_buf[i][j], i, j);
-                    nr_errors++;
+                    errs++;
                 }
                 ptr++;
             }
         }
         free(rd_buf);
-
-        if (nr_errors == 0)
-            fprintf(stdout, " No Errors\n");
-        else
-            fprintf(stderr, "Found %d errors\n", nr_errors);
     }
 
     free(blocklengths);
@@ -242,8 +252,8 @@ int main(int argc, char **argv)
     free(request);
     free(statuses);
     MPI_Type_free(&ftype);
-    MPI_Finalize();
-    return 0;
+    MTest_Finalize(errs);
+    return MTestReturnValue(errs);
 }
 
 /* command-line outputs are: (the global array is written twice)

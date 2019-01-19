@@ -21,15 +21,14 @@
  * to turn on MPICH's internal memory checking.
  */
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
     int errs = 0;
     MPI_Datatype type;
 
-    MTest_Init( &argc, &argv );
-    MPI_Type_dup( MPI_INT, &type );
-    MPI_Type_free( &type );
-    MTest_Finalize( errs );
-    MPI_Finalize();
-    return 0;
+    MTest_Init(&argc, &argv);
+    MPI_Type_dup(MPI_INT, &type);
+    MPI_Type_free(&type);
+    MTest_Finalize(errs);
+    return MTestReturnValue(errs);
 }

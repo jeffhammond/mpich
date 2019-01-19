@@ -14,7 +14,7 @@ int main(int argc, char **argv)
     int rank, size, rc, errclass, errs = 0;
     int flag = 1;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
@@ -24,14 +24,17 @@ int main(int argc, char **argv)
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    if (2 == rank) exit(EXIT_FAILURE);
+    if (2 == rank)
+        exit(EXIT_FAILURE);
 
-    if (0 == rank) flag = 0;
+    if (0 == rank)
+        flag = 0;
 
     rc = MPIX_Comm_agree(MPI_COMM_WORLD, &flag);
     MPI_Error_class(rc, &errclass);
     if (errclass != MPIX_ERR_PROC_FAILED) {
-        fprintf(stderr, "[%d] Expected MPIX_ERR_PROC_FAILED after agree. Received: %d\n", rank, errclass);
+        fprintf(stderr, "[%d] Expected MPIX_ERR_PROC_FAILED after agree. Received: %d\n", rank,
+                errclass);
         MPI_Abort(MPI_COMM_WORLD, 1);
         errs++;
     } else if (0 != flag) {
@@ -41,8 +44,10 @@ int main(int argc, char **argv)
 
     MPIX_Comm_failure_ack(MPI_COMM_WORLD);
 
-    if (0 == rank) flag = 0;
-    else flag = 1;
+    if (0 == rank)
+        flag = 0;
+    else
+        flag = 1;
     rc = MPIX_Comm_agree(MPI_COMM_WORLD, &flag);
     MPI_Error_class(rc, &errclass);
     if (MPI_SUCCESS != rc) {
@@ -55,14 +60,7 @@ int main(int argc, char **argv)
         errs++;
     }
 
-    MPI_Finalize();
+    MTest_Finalize(errs);
 
-    if (0 == rank) {
-        if (errs == 0)
-            fprintf(stdout, " No Errors\n");
-        else
-            fprintf(stdout, " Found %d errors\n", errs);
-    }
-
-    return errs;
+    return MTestReturnValue(errs);
 }

@@ -23,13 +23,14 @@
 
 static const int verbose = 0;
 
-int main(int argc, char **argv) {
-    int       rank, nproc, mpi_errno;
-    int       i, ncomm;
-    int       errors = 1;
+int main(int argc, char **argv)
+{
+    int rank, nproc, mpi_errno;
+    int i, ncomm;
+    int errs = 1;
     MPI_Comm *comm_hdls;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
@@ -45,8 +46,9 @@ int main(int argc, char **argv) {
         if (mpi_errno == MPI_SUCCESS) {
             ncomm++;
         } else {
-            if (verbose) printf("%d: Error creating comm %d\n", rank, i);
-            errors = 0;
+            if (verbose)
+                printf("%d: Error creating comm %d\n", rank, i);
+            errs = 0;
             break;
         }
     }
@@ -55,8 +57,7 @@ int main(int argc, char **argv) {
         MPI_Comm_free(&comm_hdls[i]);
 
     free(comm_hdls);
-    MTest_Finalize(errors);
-    MPI_Finalize();
+    MTest_Finalize(errs);
 
-    return 0;
+    return MTestReturnValue(errs);
 }

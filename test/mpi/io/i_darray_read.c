@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include "mpitest.h"
 
 #define NSIDE 5
 #define NBLOCK 3
@@ -53,33 +54,32 @@ int main(int argc, char *argv[])
 
     filename = (argc > 1) ? argv[1] : "testfile";
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     /* Set up type */
     CHECK(MPI_Type_create_darray(size, rank, 2, gsize, distrib,
-                                 bsize, psize, MPI_ORDER_FORTRAN, MPI_DOUBLE,
-                                 &darray));
+                                 bsize, psize, MPI_ORDER_FORTRAN, MPI_DOUBLE, &darray));
     CHECK(MPI_Type_commit(&darray));
     CHECK(MPI_Type_size(darray, &tsize));
     nelem = tsize / sizeof(double);
 
-    for (i = 0; i < (NSIDE * NSIDE); i++) data[i] = i;
+    for (i = 0; i < (NSIDE * NSIDE); i++)
+        data[i] = i;
 
     if (rank == 0) {
         CHECK(MPI_File_open(MPI_COMM_SELF, filename,
-                            MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL,
-                            &dfile));
+                            MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &dfile));
         CHECK(MPI_File_write(dfile, data, NSIDE * NSIDE, MPI_DOUBLE, &status));
         CHECK(MPI_File_close(&dfile));
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
     /* Allocate buffer */
-    ldata = (double *)malloc(tsize);
-    pdata = (double *)malloc(tsize);
+    ldata = (double *) malloc(tsize);
+    pdata = (double *) malloc(tsize);
 
     /* Use Pack to pull out array */
     bpos = 0;
@@ -88,11 +88,9 @@ int main(int argc, char *argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
     /* Read in array from file.  */
-    CHECK(MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_RDONLY,
-                        MPI_INFO_NULL, &mpi_fh));
-    CHECK(MPI_File_set_view(mpi_fh, 0, MPI_DOUBLE, darray, "native",
-                            MPI_INFO_NULL));
-    CHECK(MPIX_File_iread_all(mpi_fh, ldata, nelem, MPI_DOUBLE, &request));
+    CHECK(MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &mpi_fh));
+    CHECK(MPI_File_set_view(mpi_fh, 0, MPI_DOUBLE, darray, "native", MPI_INFO_NULL));
+    CHECK(MPI_File_iread_all(mpi_fh, ldata, nelem, MPI_DOUBLE, &request));
     CHECK(MPI_Wait(&request, &status));
     CHECK(MPI_File_close(&mpi_fh));
 
@@ -124,14 +122,11 @@ int main(int argc, char *argv[])
             }
         }
     }
-    MPI_Allreduce(&nerrors, &total_errors, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-    if (rank == 0 && total_errors == 0)
-        printf(" No Errors\n");
 
     free(ldata);
     free(pdata);
     MPI_Type_free(&darray);
-    MPI_Finalize();
+    MTest_Finalize(nerrors);
 
-    exit(total_errors);
+    MTestReturnValue(total_errors);
 }

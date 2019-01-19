@@ -46,7 +46,7 @@
 AC_DEFUN([AX_TLS], [
   AC_MSG_CHECKING(for thread local storage specifier)
   AC_CACHE_VAL(ac_cv_tls, [
-    ax_tls_keywords="__thread __declspec(thread) none"
+    ax_tls_keywords="_Thread_local __thread __declspec(thread) none"
     for ax_tls_keyword in $ax_tls_keywords; do
        case $ax_tls_keyword in
           none) ac_cv_tls=none ; break ;;
@@ -58,17 +58,34 @@ AC_DEFUN([AX_TLS], [
              # link line.
              AC_LINK_IFELSE(
                  [AC_LANG_PROGRAM([$ax_tls_keyword int bar = 5;],[++bar;])],
-                 [ac_cv_tls=$ax_tls_keyword ; break],
+                 [ac_cv_tls=$ax_tls_keyword],
                  [ac_cv_tls=none])
+
+	     # MPICH modification: Also test with the extern keyword.
+	     # The intel compiler on Darwin (at least as of 15.0.1)
+	     # seems to break with the above error when the extern
+	     # keyword is specified in shared library builds.
+	     PAC_PUSH_FLAG([LIBS])
+	     PAC_APPEND_FLAG([-shared],[LIBS])
+	     if test "$ac_cv_tls" != "none" ; then
+                AC_LINK_IFELSE(
+			[AC_LANG_PROGRAM(
+				[
+					extern $ax_tls_keyword int bar;
+					$ax_tls_keyword int bar = 0;
+				],[++bar;])],
+                        [ac_cv_tls=$ax_tls_keyword],
+                        [ac_cv_tls=none])
+	     fi
+	     PAC_POP_FLAG([LIBS])
+
+	     if test "$ac_cv_tls" != "none" ; then break ; fi
           esac
     done
 ])
 
   if test "$ac_cv_tls" != "none"; then
-    # MPICH modification: this was "TLS" before instead of
-    # "MPIU_TLS_SPECIFIER", but TLS had a reasonably high chance of conflicting
-    # with a system library.
-    AC_DEFINE_UNQUOTED([MPIU_TLS_SPECIFIER], $ac_cv_tls, [If the compiler supports a TLS storage class define it to that here])
+    AC_DEFINE_UNQUOTED([TLS_SPECIFIER], $ac_cv_tls, [If the compiler supports a TLS storage class define it to that here])
   fi
   AC_MSG_RESULT($ac_cv_tls)
 ])

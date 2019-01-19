@@ -10,6 +10,7 @@
 #ifdef HAVE_STRING_H
 #include <string.h>
 #endif
+#include "mpitest.h"
 
 #if !defined(USE_STRICT_MPI) && defined(MPICH)
 #define TEST_HINDEXED_BLOCK 1
@@ -30,7 +31,7 @@ int main(int argc, char **argv)
     int err, errs = 0;
     int rank;
 
-    MPI_Init(&argc, &argv);     /* MPI-1.2 doesn't allow for MPI_Init(0,0) */
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 #if defined(TEST_HINDEXED_BLOCK)
     parse_args(argc, argv);
@@ -49,19 +50,10 @@ int main(int argc, char **argv)
     if (err && verbose)
         fprintf(stderr, "%d errors in hindexed_block vector test.\n", err);
     errs += err;
-#endif /*defined(TEST_HINDEXED_BLOCK)*/
+#endif /*defined(TEST_HINDEXED_BLOCK) */
 
-    /* print message and exit */
-    if (rank == 0) {
-        if (errs) {
-            fprintf(stderr, "Found %d errors\n", errs);
-        }
-        else {
-            printf(" No Errors\n");
-        }
-    }
-    MPI_Finalize();
-    return 0;
+    MTest_Finalize(errs);
+    return MTestReturnValue(errs);
 }
 
 #if defined(TEST_HINDEXED_BLOCK)
@@ -139,12 +131,12 @@ int hindexed_block_contig_test(void)
         int goodval;
 
         switch (i) {
-        case 0:
-            goodval = 7;
-            break;
-        default:
-            goodval = 0;        /* pack_and_unpack() zeros before unpack */
-            break;
+            case 0:
+                goodval = 7;
+                break;
+            default:
+                goodval = 0;    /* pack_and_unpack() zeros before unpack */
+                break;
         }
         if (buf[i] != goodval) {
             errs++;
@@ -170,19 +162,19 @@ int hindexed_block_vector_test(void)
 #define NELT (18)
     int buf[NELT] = {
         -1, -1, -1,
-         1, -2,  2,
+        1, -2, 2,
         -3, -3, -3,
         -4, -4, -4,
-         3, -5,  4,
-         5, -6,  6
+        3, -5, 4,
+        5, -6, 6
     };
     int expected[NELT] = {
-         0,  0,  0,
-         1,  0,  2,
-         0,  0,  0,
-         0,  0,  0,
-         3,  0,  4,
-         5,  0,  6
+        0, 0, 0,
+        1, 0, 2,
+        0, 0, 0,
+        0, 0, 0,
+        3, 0, 4,
+        5, 0, 6
     };
     int err, errs = 0;
 
@@ -211,8 +203,7 @@ int hindexed_block_vector_test(void)
     err = MPI_Type_create_hindexed_block(count, 1, disp, vectype, &newtype);
     if (err != MPI_SUCCESS) {
         if (verbose) {
-            fprintf(stderr,
-                    "error creating hindexed_block type in hindexed_block_contig_test()\n");
+            fprintf(stderr, "error creating hindexed_block type in hindexed_block_contig_test()\n");
         }
         errs++;
     }
@@ -344,4 +335,4 @@ int parse_args(int argc, char **argv)
         verbose = 1;
     return 0;
 }
-#endif /*defined(TEST_HINDEXED_BLOCK)*/
+#endif /*defined(TEST_HINDEXED_BLOCK) */

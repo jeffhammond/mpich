@@ -20,7 +20,7 @@ program get_elem_d
   TYPE(MPI_Status) :: status
   integer :: i,ii,count,ka,j,jj,k,kj
   integer :: blklen(nb)=(/2,2/)
-  TYPE(MPI_Datatype) :: types(nb)=(/MPI_DOUBLE_PRECISION,MPI_INTEGER/)
+  TYPE(MPI_Datatype) :: types(nb)
   integer(kind=MPI_ADDRESS_KIND) :: disp(nb)
   integer :: ntlen,ians(20),ians0(0:3),ians1(24),ians2(20)
   TYPE(MPI_Datatype) :: newtype
@@ -28,8 +28,10 @@ program get_elem_d
   integer :: ibuff(imax)
   character :: cbuff(cmax)='X'
 
-  call MPI_Init(ierror)
+  call MTest_Init(ierror)
   comm=MPI_COMM_WORLD
+  types(1) = MPI_DOUBLE_PRECISION
+  types(2) = MPI_INTEGER
   call MPI_Comm_size(comm, size, ierror)
   dest=size-1
   call MPI_Comm_rank(comm, rank, ierror)
@@ -113,15 +115,7 @@ program get_elem_d
      endif
   enddo
 
-  if (rank .eq. dest) then
-     if (errs .eq. 0) then
-        write (*,*) " No Errors"
-     else
-        print *, 'errs=',errs
-     endif
-  endif
-
   call MPI_Type_free(newtype, ierror)
-  call MPI_Finalize(ierror)
+  call MTest_Finalize(errs)
 
 end program get_elem_d

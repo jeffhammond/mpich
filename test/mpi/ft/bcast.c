@@ -17,12 +17,12 @@
 int main(int argc, char **argv)
 {
     int rank, size, rc, errclass, toterrs, errs = 0;
-    int deadprocs[] = {1};
+    int deadprocs[] = { 1 };
     char buf[100000];
     MPI_Group world, newgroup;
     MPI_Comm newcomm;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
@@ -32,8 +32,8 @@ int main(int argc, char **argv)
     MPI_Comm_create_group(MPI_COMM_WORLD, newgroup, 0, &newcomm);
 
     if (size < 3) {
-        fprintf( stderr, "Must run with at least 3 processes\n" );
-        MPI_Abort( MPI_COMM_WORLD, 1 );
+        fprintf(stderr, "Must run with at least 3 processes\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     if (rank == 1) {
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     }
 
     if (rank == 0) {
-        strcpy(buf, "No Errors");
+        strcpy(buf, "a1b2c3d4e");
     }
 
     /* do a small bcast first */
@@ -50,7 +50,8 @@ int main(int argc, char **argv)
 #if defined (MPICH) && (MPICH_NUMVERSION >= 30100102)
     MPI_Error_class(rc, &errclass);
     if ((rc) && (errclass != MPIX_ERR_PROC_FAILED)) {
-        fprintf(stderr, "Wrong error code (%d) returned. Expected MPIX_ERR_PROC_FAILED\n", errclass);
+        fprintf(stderr, "Wrong error code (%d) returned. Expected MPIX_ERR_PROC_FAILED\n",
+                errclass);
         errs++;
     }
 #endif
@@ -65,30 +66,16 @@ int main(int argc, char **argv)
 #if defined (MPICH) && (MPICH_NUMVERSION >= 30100102)
     MPI_Error_class(rc, &errclass);
     if ((rc) && (errclass != MPIX_ERR_PROC_FAILED)) {
-        fprintf(stderr, "Wrong error code (%d) returned. Expected MPIX_ERR_PROC_FAILED\n", errclass);
+        fprintf(stderr, "Wrong error code (%d) returned. Expected MPIX_ERR_PROC_FAILED\n",
+                errclass);
         errs++;
     }
 #endif
 
-    rc = MPI_Reduce(&errs, &toterrs, 1, MPI_INT, MPI_SUM, 0, newcomm);
-    if(rc)
-        fprintf(stderr, "Failed to get errors from other processes\n");
-
-    if (rank == 0) {
-        if (toterrs) {
-            printf( " Found %d errors\n", toterrs );
-        }
-        else {
-            printf( " No Errors\n" );
-        }
-        fflush(stdout);
-    }
-
     MPI_Group_free(&world);
     MPI_Group_free(&newgroup);
     MPI_Comm_free(&newcomm);
-    MPI_Finalize();
+    MTest_Finalize(errs);
 
-    return 0;
-
+    return MTestReturnValue(errs);
 }

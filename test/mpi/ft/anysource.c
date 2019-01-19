@@ -58,7 +58,9 @@ int main(int argc, char **argv)
         err = MPI_Wait(&request, &status);
         MPI_Error_class(err, &ec);
         if (MPIX_ERR_PROC_FAILED_PENDING != ec) {
-            fprintf(stderr, "Expected a MPIX_ERR_PROC_FAILED_PENDING (%d) for receive from ANY_SOURCE: %d\n", MPIX_ERR_PROC_FAILED_PENDING, ec);
+            fprintf(stderr,
+                    "Expected a MPIX_ERR_PROC_FAILED_PENDING (%d) for receive from ANY_SOURCE: %d\n",
+                    MPIX_ERR_PROC_FAILED_PENDING, ec);
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
 

@@ -14,13 +14,14 @@
 
 #define ITER 100
 
-int main(int argc, char **argv) {
-    int       i, j, rank, nproc;
-    int       errors = 0, all_errors = 0;
-    int      *val_ptr;
-    MPI_Win   win;
+int main(int argc, char **argv)
+{
+    int i, rank, nproc;
+    int errors = 0;
+    int *val_ptr;
+    MPI_Win win;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
@@ -39,8 +40,8 @@ int main(int argc, char **argv) {
         MPI_Compare_and_swap(&next, &i, &result, MPI_INT, rank, 0, win);
         MPI_Win_unlock(rank, win);
         if (result != i) {
-            SQUELCH( printf("%d->%d -- Error: next=%d compare=%d result=%d val=%d\n", rank,
-                           rank, next, i, result, *val_ptr); );
+            SQUELCH(printf("%d->%d -- Error: next=%d compare=%d result=%d val=%d\n", rank,
+                           rank, next, i, result, *val_ptr););
             errors++;
         }
     }
@@ -55,12 +56,12 @@ int main(int argc, char **argv) {
 
     for (i = 0; i < ITER; i++) {
         int next = i + 1, result = -1;
-        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, (rank+1)%nproc, 0, win);
-        MPI_Compare_and_swap(&next, &i, &result, MPI_INT, (rank+1)%nproc, 0, win);
-        MPI_Win_unlock((rank+1)%nproc, win);
+        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, (rank + 1) % nproc, 0, win);
+        MPI_Compare_and_swap(&next, &i, &result, MPI_INT, (rank + 1) % nproc, 0, win);
+        MPI_Win_unlock((rank + 1) % nproc, win);
         if (result != i) {
-            SQUELCH( printf("%d->%d -- Error: next=%d compare=%d result=%d val=%d\n", rank,
-                           (rank+1)%nproc, next, i, result, *val_ptr); );
+            SQUELCH(printf("%d->%d -- Error: next=%d compare=%d result=%d val=%d\n", rank,
+                           (rank + 1) % nproc, next, i, result, *val_ptr););
             errors++;
         }
     }
@@ -89,20 +90,15 @@ int main(int argc, char **argv) {
 
     if (rank == 0 && nproc > 1) {
         if (*val_ptr != ITER) {
-            SQUELCH( printf("%d - Error: expected=%d val=%d\n", rank, ITER, *val_ptr); );
+            SQUELCH(printf("%d - Error: expected=%d val=%d\n", rank, ITER, *val_ptr););
             errors++;
         }
     }
 
     MPI_Win_free(&win);
 
-    MPI_Reduce(&errors, &all_errors, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    if (rank == 0 && all_errors == 0)
-        printf(" No Errors\n");
-
     free(val_ptr);
-    MPI_Finalize();
+    MTest_Finalize(errors);
 
-    return 0;
+    return MTestReturnValue(errors);
 }

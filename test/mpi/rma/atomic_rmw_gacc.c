@@ -18,6 +18,7 @@
 
 #include "mpi.h"
 #include <stdio.h>
+#include "mpitest.h"
 
 #define OP_COUNT 10
 #define AM_BUF_NUM  10
@@ -30,6 +31,7 @@
 int rank, size;
 int dest, origin_shm, origin_am;
 int *orig_buf = NULL, *result_buf = NULL, *target_buf = NULL, *check_buf = NULL;
+MPI_Win win;
 
 void checkResults(int loop_k, int *errors)
 {
@@ -41,8 +43,7 @@ void checkResults(int loop_k, int *errors)
         if (rank == origin_am) {
             MPI_Send(result_buf, AM_BUF_NUM * OP_COUNT, MPI_INT, origin_shm, CHECK_TAG,
                      MPI_COMM_WORLD);
-        }
-        else if (rank == origin_shm) {
+        } else if (rank == origin_shm) {
             MPI_Alloc_mem(sizeof(int) * AM_BUF_NUM * OP_COUNT, MPI_INFO_NULL, &check_buf);
             MPI_Recv(check_buf, AM_BUF_NUM * OP_COUNT, MPI_INT, origin_am, CHECK_TAG,
                      MPI_COMM_WORLD, &status);
@@ -61,8 +62,8 @@ void checkResults(int loop_k, int *errors)
             }
             MPI_Free_mem(check_buf);
         }
-    }
-    else {
+    } else {
+        MPI_Win_lock(MPI_LOCK_SHARED, rank, 0, win);
         /* check results on P1 */
         for (i = 0; i < OP_COUNT; i++) {
             if (target_buf[i] != AM_BUF_NUM + SHM_BUF_NUM) {
@@ -71,18 +72,18 @@ void checkResults(int loop_k, int *errors)
                 (*errors)++;
             }
         }
+        MPI_Win_unlock(rank, win);
     }
 }
 
 int main(int argc, char *argv[])
 {
-    int i, j, k;
-    int errors = 0, all_errors = 0;
+    int i, k;
+    int errors = 0;
     int my_buf_num;
-    MPI_Win win;
     MPI_Datatype origin_dtp, target_dtp;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -124,8 +125,7 @@ int main(int argc, char *argv[])
                 orig_buf[i] = 1;
                 result_buf[i] = 0;
             }
-        }
-        else {
+        } else {
             MPI_Win_lock(MPI_LOCK_SHARED, rank, 0, win);
             for (i = 0; i < WIN_BUF_NUM * OP_COUNT; i++) {
                 target_buf[i] = 0;
@@ -158,8 +158,7 @@ int main(int argc, char *argv[])
                 orig_buf[i] = 1;
                 result_buf[i] = 0;
             }
-        }
-        else {
+        } else {
             MPI_Win_lock(MPI_LOCK_SHARED, rank, 0, win);
             for (i = 0; i < WIN_BUF_NUM * OP_COUNT; i++) {
                 target_buf[i] = 0;
@@ -192,8 +191,7 @@ int main(int argc, char *argv[])
                 orig_buf[i] = 1;
                 result_buf[i] = 0;
             }
-        }
-        else {
+        } else {
             MPI_Win_lock(MPI_LOCK_SHARED, rank, 0, win);
             for (i = 0; i < WIN_BUF_NUM * OP_COUNT; i++) {
                 target_buf[i] = 0;
@@ -226,8 +224,7 @@ int main(int argc, char *argv[])
                 orig_buf[i] = 1;
                 result_buf[i] = 0;
             }
-        }
-        else {
+        } else {
             MPI_Win_lock(MPI_LOCK_SHARED, rank, 0, win);
             for (i = 0; i < WIN_BUF_NUM * OP_COUNT; i++) {
                 target_buf[i] = 0;
@@ -264,11 +261,6 @@ int main(int argc, char *argv[])
     MPI_Type_free(&target_dtp);
 
   exit_test:
-    MPI_Reduce(&errors, &all_errors, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    if (rank == 0 && all_errors == 0)
-        printf(" No Errors\n");
-
-    MPI_Finalize();
-    return 0;
+    MTest_Finalize(errors);
+    return MTestReturnValue(errors);
 }

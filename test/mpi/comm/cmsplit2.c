@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "mpi.h"
+#include "mpitest.h"
 
 #define ERRLIMIT (10)
 
@@ -39,7 +40,7 @@ int main(int argc, char **argv)
     MPI_Comm comm, splitcomm;
     MPI_Group wgroup, newgroup;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     if (getenv("MPITEST_VERBOSE"))
         verbose = 1;
@@ -105,11 +106,12 @@ int main(int argc, char **argv)
                         /* there's probably a better way to write these loop bounds and
                          * indices, but this is the first (correct) way that occurred to me */
                         for (j = 0; j < (size / modulus + (i < size % modulus ? 1 : 0)); ++j) {
-                            if (errs < ERRLIMIT && oldranks[pos] != i+modulus*j) {
-                                printf("size=%d i=%d j=%d modulus=%d pos=%d i+modulus*j=%d oldranks[pos]=%d\n",
-                                       size, i, j, modulus, pos, i+modulus*j, oldranks[pos]);
+                            if (errs < ERRLIMIT && oldranks[pos] != i + modulus * j) {
+                                printf
+                                    ("size=%d i=%d j=%d modulus=%d pos=%d i+modulus*j=%d oldranks[pos]=%d\n",
+                                     size, i, j, modulus, pos, i + modulus * j, oldranks[pos]);
                             }
-                            my_assert(oldranks[pos] == i+modulus*j);
+                            my_assert(oldranks[pos] == i + modulus * j);
                             ++pos;
                         }
                     }
@@ -124,14 +126,6 @@ int main(int argc, char **argv)
     if (identity != NULL)
         free(identity);
 
-    if (rank == 0) {
-        if (errs)
-            printf("found %d errors\n", errs);
-        else
-            printf(" No errors\n");
-    }
-
-    MPI_Finalize();
-    return 0;
+    MTest_Finalize(errs);
+    return MTestReturnValue(errs);
 }
-

@@ -12,6 +12,7 @@
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "mpitest.h"
 
 #define NUM_INTS (2)
 
@@ -34,14 +35,11 @@ int main(int argc, char **argv)
     int *rcounts = NULL;
     int *sdispls = NULL;
     int *rdispls = NULL;
-    int *types = NULL;
+    MPI_Datatype *types = NULL;
     MPI_Comm comm;
     MPI_Request req;
 
-    /* intentionally not using MTest_Init/MTest_Finalize in order to make it
-     * easy to take this test and use it as an NBC sanity test outside of the
-     * MPICH test suite */
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
 
     comm = MPI_COMM_WORLD;
 
@@ -50,31 +48,31 @@ int main(int argc, char **argv)
 
     /* enough space for every process to contribute at least NUM_INTS ints to any
      * collective operation */
-    sbuf = malloc(NUM_INTS*size*sizeof(int));
+    sbuf = malloc(NUM_INTS * size * sizeof(int));
     my_assert(sbuf);
-    rbuf = malloc(NUM_INTS*size*sizeof(int));
+    rbuf = malloc(NUM_INTS * size * sizeof(int));
     my_assert(rbuf);
-    scounts = malloc(size*sizeof(int));
+    scounts = malloc(size * sizeof(int));
     my_assert(scounts);
-    rcounts = malloc(size*sizeof(int));
+    rcounts = malloc(size * sizeof(int));
     my_assert(rcounts);
-    sdispls = malloc(size*sizeof(int));
+    sdispls = malloc(size * sizeof(int));
     my_assert(sdispls);
-    rdispls = malloc(size*sizeof(int));
+    rdispls = malloc(size * sizeof(int));
     my_assert(rdispls);
-    types = malloc(size*sizeof(int));
+    types = malloc(size * sizeof(MPI_Datatype));
     my_assert(types);
 
     for (i = 0; i < size; ++i) {
-        sbuf[2*i]   = i;
-        sbuf[2*i+1] = i;
-        rbuf[2*i]   = i;
-        rbuf[2*i+1] = i;
-        scounts[i]  = NUM_INTS;
-        rcounts[i]  = NUM_INTS;
-        sdispls[i]  = i * NUM_INTS;
-        rdispls[i]  = i * NUM_INTS;
-        types[i]    = MPI_INT;
+        sbuf[2 * i] = i;
+        sbuf[2 * i + 1] = i;
+        rbuf[2 * i] = i;
+        rbuf[2 * i + 1] = i;
+        scounts[i] = NUM_INTS;
+        rcounts[i] = NUM_INTS;
+        sdispls[i] = i * NUM_INTS;
+        rdispls[i] = i * NUM_INTS;
+        types[i] = MPI_INT;
     }
 
     MPI_Ibarrier(comm, &req);
@@ -96,7 +94,8 @@ int main(int argc, char **argv)
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
     if (0 == rank)
-        MPI_Igatherv(MPI_IN_PLACE, -1, MPI_DATATYPE_NULL, rbuf, rcounts, rdispls, MPI_INT, 0, comm, &req);
+        MPI_Igatherv(MPI_IN_PLACE, -1, MPI_DATATYPE_NULL, rbuf, rcounts, rdispls, MPI_INT, 0, comm,
+                     &req);
     else
         MPI_Igatherv(sbuf, NUM_INTS, MPI_INT, rbuf, rcounts, rdispls, MPI_INT, 0, comm, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
@@ -114,7 +113,8 @@ int main(int argc, char **argv)
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
     if (0 == rank)
-        MPI_Iscatterv(sbuf, scounts, sdispls, MPI_INT, MPI_IN_PLACE, -1, MPI_DATATYPE_NULL, 0, comm, &req);
+        MPI_Iscatterv(sbuf, scounts, sdispls, MPI_INT, MPI_IN_PLACE, -1, MPI_DATATYPE_NULL, 0, comm,
+                      &req);
     else
         MPI_Iscatterv(sbuf, scounts, sdispls, MPI_INT, rbuf, NUM_INTS, MPI_INT, 0, comm, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
@@ -128,7 +128,8 @@ int main(int argc, char **argv)
     MPI_Iallgatherv(sbuf, NUM_INTS, MPI_INT, rbuf, rcounts, rdispls, MPI_INT, comm, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
-    MPI_Iallgatherv(MPI_IN_PLACE, -1, MPI_DATATYPE_NULL, rbuf, rcounts, rdispls, MPI_INT, comm, &req);
+    MPI_Iallgatherv(MPI_IN_PLACE, -1, MPI_DATATYPE_NULL, rbuf, rcounts, rdispls, MPI_INT, comm,
+                    &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
     MPI_Ialltoall(sbuf, NUM_INTS, MPI_INT, rbuf, NUM_INTS, MPI_INT, comm, &req);
@@ -140,7 +141,8 @@ int main(int argc, char **argv)
     MPI_Ialltoallv(sbuf, scounts, sdispls, MPI_INT, rbuf, rcounts, rdispls, MPI_INT, comm, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
-    MPI_Ialltoallv(MPI_IN_PLACE, NULL, NULL, MPI_DATATYPE_NULL, rbuf, rcounts, rdispls, MPI_INT, comm, &req);
+    MPI_Ialltoallv(MPI_IN_PLACE, NULL, NULL, MPI_DATATYPE_NULL, rbuf, rcounts, rdispls, MPI_INT,
+                   comm, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
     MPI_Ialltoallw(sbuf, scounts, sdispls, types, rbuf, rcounts, rdispls, types, comm, &req);
@@ -188,20 +190,21 @@ int main(int argc, char **argv)
     MPI_Iexscan(MPI_IN_PLACE, rbuf, NUM_INTS, MPI_INT, MPI_SUM, comm, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
 
-    if (sbuf) free(sbuf);
-    if (rbuf) free(rbuf);
-    if (scounts) free(scounts);
-    if (rcounts) free(rcounts);
-    if (sdispls) free(sdispls);
-    if (rdispls) free(rdispls);
+    if (sbuf)
+        free(sbuf);
+    if (rbuf)
+        free(rbuf);
+    if (scounts)
+        free(scounts);
+    if (rcounts)
+        free(rcounts);
+    if (sdispls)
+        free(sdispls);
+    if (rdispls)
+        free(rdispls);
+    if (types)
+        free(types);
 
-    if (rank == 0) {
-        if (errs)
-            fprintf(stderr, "Found %d errors\n", errs);
-        else
-            printf(" No errors\n");
-    }
-    MPI_Finalize();
-    return 0;
+    MTest_Finalize(errs);
+    return MTestReturnValue(errs);
 }
-

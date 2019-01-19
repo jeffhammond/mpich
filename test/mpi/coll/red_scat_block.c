@@ -20,12 +20,12 @@
 int main(int argc, char **argv)
 {
     int err = 0;
-    int toterr, size, rank, i, sumval;
+    int size, rank, i, sumval;
     int *sendbuf;
     int *recvbuf;
     MPI_Comm comm;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     comm = MPI_COMM_WORLD;
 
     MPI_Comm_size(comm, &size);
@@ -40,12 +40,12 @@ int main(int argc, char **argv)
         fprintf(stderr, "unable to allocate send/recv buffers, aborting");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    for (i=0; i<size; i++)
+    for (i = 0; i < size; i++)
         sendbuf[i] = rank + i;
 
     MPI_Reduce_scatter_block(sendbuf, recvbuf, 1, MPI_INT, MPI_SUM, comm);
 
-    sumval = size * rank + ((size - 1) * size)/2;
+    sumval = size * rank + ((size - 1) * size) / 2;
     if (recvbuf[0] != sumval) {
         err++;
         fprintf(stdout, "Did not get expected value for reduce scatter block\n");
@@ -55,12 +55,12 @@ int main(int argc, char **argv)
     free(sendbuf);
 
     /* let's try it again with MPI_IN_PLACE this time */
-    for (i=0; i<size; i++)
+    for (i = 0; i < size; i++)
         recvbuf[i] = rank + i;
 
     MPI_Reduce_scatter_block(MPI_IN_PLACE, recvbuf, 1, MPI_INT, MPI_SUM, comm);
 
-    sumval = size * rank + ((size - 1) * size)/2;
+    sumval = size * rank + ((size - 1) * size) / 2;
     if (recvbuf[0] != sumval) {
         err++;
         fprintf(stdout, "Did not get expected value for reduce scatter block\n");
@@ -68,12 +68,7 @@ int main(int argc, char **argv)
     }
     free(recvbuf);
 #endif
+    MTest_Finalize(err);
 
-    MPI_Allreduce(&err, &toterr, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-    if (rank == 0 && toterr == 0) {
-        printf(" No Errors\n");
-    }
-    MPI_Finalize();
-
-    return toterr;
+    return MTestReturnValue(err);
 }

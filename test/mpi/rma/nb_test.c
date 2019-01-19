@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     int base[1024], errs = 0;
     MPI_Request req;
 
-    MTest_Init(&argc,&argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     MPI_Win_create(base, 1024 * sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &win);
@@ -24,8 +24,7 @@ int main(int argc, char *argv[])
         MPI_Barrier(MPI_COMM_WORLD);
         MPI_Barrier(MPI_COMM_WORLD);
         MPI_Win_unlock(0, win);
-    }
-    else {
+    } else {
         MPI_Barrier(MPI_COMM_WORLD);
         MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, win);
         MPI_Rput(&tmp, 1, MPI_INT, 0, 0, 1, MPI_INT, win, &req);
@@ -37,6 +36,5 @@ int main(int argc, char *argv[])
     MPI_Win_free(&win);
 
     MTest_Finalize(errs);
-    MPI_Finalize();
-    return 0;
+    return MTestReturnValue(errs);
 }

@@ -12,17 +12,16 @@
 
 int main(int argc, char *argv[])
 {
-    int          rank, nproc;
-    int          errors = 0, all_errors = 0;
-    int          buf, my_buf;
-    MPI_Win      win;
+    int rank, nproc;
+    int errors = 0, errs = 0;
+    int buf = 0, my_buf;
+    MPI_Win win;
 
-    MPI_Init(&argc, &argv);
+    MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
-    MPI_Win_create(&buf, sizeof(int), sizeof(int),
-                    MPI_INFO_NULL, MPI_COMM_WORLD, &win);
+    MPI_Win_create(&buf, sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &win);
 
     MPI_Win_set_errhandler(win, MPI_ERRORS_RETURN);
 
@@ -38,10 +37,7 @@ int main(int argc, char *argv[])
     MPI_Win_fence(0, win);
     MPI_Win_free(&win);
 
-    MPI_Reduce(&errors, &all_errors, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    MTest_Finalize(errors);
 
-    if (rank == 0 && all_errors == 0) printf(" No Errors\n");
-    MPI_Finalize();
-
-    return 0;
+    return MTestReturnValue(errs);
 }
