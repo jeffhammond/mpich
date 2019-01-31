@@ -76,20 +76,26 @@ static inline int MPL_shm_seg_create_attach_templ(MPL_shm_hnd_t hnd, intptr_t se
     int rc = MPL_SHM_SUCCESS, rc_close = MPL_SHM_SUCCESS;
 
     if (flag & MPLI_SHM_FLAG_SHM_CREATE) {
+        char pmem_shm_fname[] = "/pmem/mpich_shar_tmpXXXXXX";
         char dev_shm_fname[] = "/dev/shm/mpich_shar_tmpXXXXXX";
         char tmp_fname[] = "/tmp/mpich_shar_tmpXXXXXX";
         char *chosen_fname = NULL;
 
-        chosen_fname = dev_shm_fname;
+        chosen_fname = pmem_shm_fname;
         lhnd = mkstemp(chosen_fname);
         if (lhnd == -1) {
-            chosen_fname = tmp_fname;
+            chosen_fname = dev_shm_fname;
             lhnd = mkstemp(chosen_fname);
             if (lhnd == -1) {
-                rc = MPL_SHM_EINTERN;
-                goto fn_fail;
+                chosen_fname = tmp_fname;
+                lhnd = mkstemp(chosen_fname);
+                if (lhnd == -1) {
+                    rc = MPL_SHM_EINTERN;
+                    goto fn_fail;
+                }
             }
         }
+        fprintf(stderr,"JEFF chosen_fname=%d\n", chosen_fname);
 
         MPLI_shm_lhnd_set(hnd, lhnd);
         rc = (MPLI_shm_lhnd_t) lseek(lhnd, seg_sz - 1, SEEK_SET);
