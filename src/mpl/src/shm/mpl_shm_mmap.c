@@ -95,7 +95,7 @@ static inline int MPL_shm_seg_create_attach_templ(MPL_shm_hnd_t hnd, intptr_t se
                 }
             }
         }
-        fprintf(stderr,"JEFF chosen_fname=%d\n", chosen_fname);
+        fprintf(stderr,"JEFF chosen_fname=%s\n", chosen_fname);
 
         MPLI_shm_lhnd_set(hnd, lhnd);
         rc = (MPLI_shm_lhnd_t) lseek(lhnd, seg_sz - 1, SEEK_SET);
