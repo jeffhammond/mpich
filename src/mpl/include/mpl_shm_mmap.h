@@ -19,6 +19,7 @@ typedef struct MPLI_shm_lghnd_t {
     MPLI_shm_lhnd_t lhnd;
     MPLI_shm_ghnd_t ghnd;
     int flag;
+    char * shm_fpath;
 } MPLI_shm_lghnd_t;
 
 typedef MPLI_shm_lghnd_t *MPL_shm_hnd_t;

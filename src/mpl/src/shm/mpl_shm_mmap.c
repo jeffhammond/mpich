@@ -70,6 +70,7 @@ static inline int check_valid_fixed_mmap_range(void *shm_addr, intptr_t seg_sz)
 #define FCNAME MPL_QUOTE(FUNCNAME)
 static inline int MPL_shm_seg_create_attach_templ(MPL_shm_hnd_t hnd, intptr_t seg_sz,
                                                   void **shm_addr_ptr, int offset, int flag,
+                                                  char * shm_fpath,
                                                   MPL_memory_class class)
 {
     MPLI_shm_lhnd_t lhnd = -1;
@@ -78,18 +79,29 @@ static inline int MPL_shm_seg_create_attach_templ(MPL_shm_hnd_t hnd, intptr_t se
     if (flag & MPLI_SHM_FLAG_SHM_CREATE) {
         char dev_shm_fname[] = "/dev/shm/mpich_shar_tmpXXXXXX";
         char tmp_fname[] = "/tmp/mpich_shar_tmpXXXXXX";
+        char opt_shm_fname[MPL_SHM_FNAME_LEN];
         char *chosen_fname = NULL;
 
-        chosen_fname = dev_shm_fname;
-        lhnd = mkstemp(chosen_fname);
+        if (shm_fpath != NULL) {
+            strncpy(opt_shm_fname, shm_fpath, MPL_SHM_FNAME_LEN);
+            strncat(opt_shm_fname, "/mpich_shar_tmpXXXXXX",MPL_SHM_FNAME_LEN);
+            chosen_fname = opt_shm_fname;
+            lhnd = mkstemp(chosen_fname);
+        }
+
         if (lhnd == -1) {
-            chosen_fname = tmp_fname;
+            chosen_fname = dev_shm_fname;
             lhnd = mkstemp(chosen_fname);
             if (lhnd == -1) {
-                rc = MPL_SHM_EINTERN;
-                goto fn_fail;
+                chosen_fname = tmp_fname;
+                lhnd = mkstemp(chosen_fname);
+                if (lhnd == -1) {
+                    rc = MPL_SHM_EINTERN;
+                    goto fn_fail;
+                }
             }
         }
+        fprintf(stderr,"JEFF chosen_fname=%s\n", chosen_fname);
 
         MPLI_shm_lhnd_set(hnd, lhnd);
         rc = (MPLI_shm_lhnd_t) lseek(lhnd, seg_sz - 1, SEEK_SET);
@@ -157,7 +169,7 @@ int MPL_shm_seg_create(MPL_shm_hnd_t hnd, intptr_t seg_sz)
 {
     int rc = MPL_SHM_SUCCESS;
     rc = MPL_shm_seg_create_attach_templ(hnd, seg_sz, NULL, 0,
-                                         MPLI_SHM_FLAG_SHM_CREATE, MPL_MEM_SHM);
+                                         MPLI_SHM_FLAG_SHM_CREATE, hnd->shm_fpath, MPL_MEM_SHM);
     return rc;
 }
 
@@ -169,7 +181,8 @@ int MPL_shm_seg_create(MPL_shm_hnd_t hnd, intptr_t seg_sz)
 int MPL_shm_seg_open(MPL_shm_hnd_t hnd, intptr_t seg_sz)
 {
     int rc = MPL_SHM_SUCCESS;
-    rc = MPL_shm_seg_create_attach_templ(hnd, seg_sz, NULL, 0, MPLI_SHM_FLAG_CLR, MPL_MEM_SHM);
+    rc = MPL_shm_seg_create_attach_templ(hnd, seg_sz, NULL, 0,
+                                         MPLI_SHM_FLAG_CLR, hnd->shm_fpath, MPL_MEM_SHM);
     return rc;
 }
 
@@ -185,7 +198,7 @@ int MPL_shm_seg_create_and_attach(MPL_shm_hnd_t hnd, intptr_t seg_sz,
 {
     return MPL_shm_seg_create_attach_templ(hnd, seg_sz, shm_addr_ptr, offset,
                                            MPLI_SHM_FLAG_SHM_CREATE | MPLI_SHM_FLAG_SHM_ATTACH,
-                                           MPL_MEM_SHM);
+                                           hnd->shm_fpath, MPL_MEM_SHM);
 }
 
 /* Attach to an existing SHM segment
@@ -198,7 +211,7 @@ int MPL_shm_seg_create_and_attach(MPL_shm_hnd_t hnd, intptr_t seg_sz,
 int MPL_shm_seg_attach(MPL_shm_hnd_t hnd, intptr_t seg_sz, void **shm_addr_ptr, int offset)
 {
     return MPL_shm_seg_create_attach_templ(hnd, seg_sz, shm_addr_ptr, offset,
-                                           MPLI_SHM_FLAG_SHM_ATTACH, MPL_MEM_SHM);
+                                           MPLI_SHM_FLAG_SHM_ATTACH, hnd->shm_fpath, MPL_MEM_SHM);
 }
 
 /* Create new SHM segment and attach to it with specified starting address
@@ -213,7 +226,7 @@ int MPL_shm_fixed_seg_create_and_attach(MPL_shm_hnd_t hnd, intptr_t seg_sz,
 {
     return MPL_shm_seg_create_attach_templ(hnd, seg_sz, shm_addr_ptr, offset,
                                            MPLI_SHM_FLAG_SHM_CREATE | MPLI_SHM_FLAG_SHM_ATTACH |
-                                           MPLI_SHM_FLAG_FIXED_ADDR, MPL_MEM_SHM);
+                                           MPLI_SHM_FLAG_FIXED_ADDR, hnd->shm_fpath, MPL_MEM_SHM);
 }
 
 /* Attach to an existing SHM segment with specified starting address
@@ -227,7 +240,7 @@ int MPL_shm_fixed_seg_attach(MPL_shm_hnd_t hnd, intptr_t seg_sz, void **shm_addr
 {
     return MPL_shm_seg_create_attach_templ(hnd, seg_sz, shm_addr_ptr, offset,
                                            MPLI_SHM_FLAG_SHM_ATTACH | MPLI_SHM_FLAG_FIXED_ADDR,
-                                           MPL_MEM_SHM);
+                                           hnd->shm_fpath, MPL_MEM_SHM);
 }
 
 /* Detach from an attached SHM segment */
