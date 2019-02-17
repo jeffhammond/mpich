@@ -81,9 +81,19 @@ static inline int MPL_shm_seg_create_attach_templ(MPL_shm_hnd_t hnd, intptr_t se
         char tmp_fname[] = "/tmp/mpich_shar_tmpXXXXXX";
         char *chosen_fname = NULL;
 
-        chosen_fname = pmem_shm_fname;
-        lhnd = mkstemp(chosen_fname);
-        if (lhnd == -1) {
+        char * env_pmem = getenv("MPICH_RMA_USE_PMEM");
+        int    use_pmem = (env_pmem==NULL) ? 0 : atoi(env_pmem);
+        //printf("use_pmem=%d\n", use_pmem);
+        if (use_pmem) {
+            chosen_fname = pmem_shm_fname;
+            lhnd = mkstemp(chosen_fname);
+            //printf("lhnd=%d\n", lhnd);
+            if (lhnd == -1) {
+                //fprintf(stderr,"errno=%d EEXIST=%d EINVAL=%d\n", errno, EEXIST, EINVAL);
+                rc = MPL_SHM_EINTERN;
+                goto fn_fail;
+            }
+        } else {
             chosen_fname = dev_shm_fname;
             lhnd = mkstemp(chosen_fname);
             if (lhnd == -1) {
@@ -115,6 +125,7 @@ static inline int MPL_shm_seg_create_attach_templ(MPL_shm_hnd_t hnd, intptr_t se
         /* Open an existing shared memory seg */
         if (!MPLI_shm_lhnd_is_valid(hnd)) {
             lhnd = open(MPLI_shm_ghnd_get_by_ref(hnd), O_RDWR);
+            //printf("open(%s,%s)\n", MPLI_shm_ghnd_get_by_ref(hnd), "O_RDWR");
             if (lhnd == -1) {
                 rc = MPL_SHM_EINTERN;
                 goto fn_fail;
@@ -132,11 +143,15 @@ static inline int MPL_shm_seg_create_attach_templ(MPL_shm_hnd_t hnd, intptr_t se
                 *shm_addr_ptr = MPL_mmap(start_addr, seg_sz, PROT_READ | PROT_WRITE,
                                          MAP_SHARED | MAP_FIXED, MPLI_shm_lhnd_get(hnd), 0,
                                          MPL_MEM_SHM);
+                //printf("MPL_mmap(%p,%zu,%s,%s,%d,%d,%zu)\n",
+                //        start_addr, seg_sz, "PROT_READ | PROT_WRITE", "MAP_SHARED | MAP_FIXED", MPLI_shm_lhnd_get(hnd), 0);
             } else
                 rc = MPL_SHM_EINVAL;
         } else {
             *shm_addr_ptr = MPL_mmap(NULL, seg_sz, PROT_READ | PROT_WRITE,
                                      MAP_SHARED, MPLI_shm_lhnd_get(hnd), 0, MPL_MEM_SHM);
+            //printf("MPL_mmap(%p,%zu,%s,%s,%d,%d,%zu)\n",
+            //        NULL, seg_sz, "PROT_READ | PROT_WRITE", "MAP_SHARED", MPLI_shm_lhnd_get(hnd), 0);
         }
 
         if (*shm_addr_ptr == MAP_FAILED || *shm_addr_ptr == NULL) {
