@@ -95,7 +95,7 @@ int MPI_File_read_all_begin_c(MPI_File fh, void *buf, MPI_Count count, MPI_Datat
 int MPIOI_File_read_all_begin(MPI_File fh,
                               MPI_Offset offset,
                               int file_ptr_type,
-                              void *buf, int count, MPI_Datatype datatype, char *myname)
+                              void *buf, MPI_Count count, MPI_Datatype datatype, char *myname)
 {
 
     int error_code;

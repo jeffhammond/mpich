@@ -89,7 +89,7 @@ int MPI_File_iread_shared_c(MPI_File fh, void *buf, MPI_Count count,
 }
 
 #ifdef MPIO_BUILD_PROFILING
-int MPIOI_File_iread_shared(MPI_File fh, void *buf, int count,
+int MPIOI_File_iread_shared(MPI_File fh, void *buf, MPI_Count count,
                             MPI_Datatype datatype, MPI_Request * request)
 {
 

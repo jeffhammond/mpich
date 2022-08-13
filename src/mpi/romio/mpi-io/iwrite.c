@@ -138,7 +138,7 @@ int MPIOI_File_iwrite(MPI_File fh,
                       MPI_Offset offset,
                       int file_ptr_type,
                       const void *buf,
-                      int count, MPI_Datatype datatype, char *myname, MPI_Request * request)
+                      MPI_Count count, MPI_Datatype datatype, char *myname, MPI_Request * request)
 {
 
     int error_code, buftype_is_contig, filetype_is_contig;

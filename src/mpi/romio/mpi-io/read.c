@@ -121,7 +121,7 @@ int MPI_File_read_c(MPI_File fh, void *buf, MPI_Count count, MPI_Datatype dataty
 int MPIOI_File_read(MPI_File fh,
                     MPI_Offset offset,
                     int file_ptr_type,
-                    void *buf, int count, MPI_Datatype datatype, char *myname, MPI_Status * status)
+                    void *buf, MPI_Count count, MPI_Datatype datatype, char *myname, MPI_Status * status)
 {
 
     int error_code, buftype_is_contig, filetype_is_contig;

@@ -82,7 +82,7 @@ int MPI_File_write_ordered_begin_c(MPI_File fh, ROMIO_CONST void *buf, MPI_Count
 }
 
 #ifdef MPIO_BUILD_PROFILING
-int MPIOI_File_write_ordered_begin(MPI_File fh, const void *buf, int count, MPI_Datatype datatype)
+int MPIOI_File_write_ordered_begin(MPI_File fh, const void *buf, MPI_Count count, MPI_Datatype datatype)
 {
 
     int error_code, nprocs, myrank;
