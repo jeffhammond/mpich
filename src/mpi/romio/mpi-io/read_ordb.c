@@ -74,7 +74,7 @@ Output Parameters:
 @*/
 int MPI_File_read_ordered_begin_c(MPI_File fh, void *buf, MPI_Count count, MPI_Datatype datatype)
 {
-    assert(count <= INT_MAX);
+
     return MPIOI_File_read_ordered_begin(fh, buf, count, datatype);
 }
 

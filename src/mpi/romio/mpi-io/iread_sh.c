@@ -84,7 +84,7 @@ Output Parameters:
 int MPI_File_iread_shared_c(MPI_File fh, void *buf, MPI_Count count,
                             MPI_Datatype datatype, MPI_Request * request)
 {
-    assert(count <= INT_MAX);
+
     return MPIOI_File_iread_shared(fh, buf, count, datatype, request);
 }
 
@@ -92,7 +92,7 @@ int MPI_File_iread_shared_c(MPI_File fh, void *buf, MPI_Count count,
 int MPIOI_File_iread_shared(MPI_File fh, void *buf, int count,
                             MPI_Datatype datatype, MPI_Request * request)
 {
-    assert(count <= INT_MAX);
+
     int error_code, buftype_is_contig, filetype_is_contig;
     ADIO_Offset bufsize;
     ADIO_File adio_fh;

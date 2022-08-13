@@ -83,7 +83,7 @@ Output Parameters:
 int MPI_File_write_ordered_c(MPI_File fh, ROMIO_CONST void *buf, MPI_Count count,
                              MPI_Datatype datatype, MPI_Status * status)
 {
-    assert(count <= INT_MAX);
+
     return MPIOI_File_write_ordered(fh, buf, count, datatype, status);
 }
 
@@ -91,7 +91,7 @@ int MPI_File_write_ordered_c(MPI_File fh, ROMIO_CONST void *buf, MPI_Count count
 int MPIOI_File_write_ordered(MPI_File fh, const void *buf, int count,
                              MPI_Datatype datatype, MPI_Status * status)
 {
-    assert(count <= INT_MAX);
+
     int error_code, nprocs, myrank;
     ADIO_Offset incr;
     MPI_Count datatype_size;
