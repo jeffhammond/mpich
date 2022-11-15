@@ -220,8 +220,13 @@ static int custom_hvector(DTP_pool_s dtp, DTPI_Attr_s * attr, MPI_Datatype * new
     n = sscanf(s, "numblks %d, blklen %d, stride %zd", &attr->u.hvector.numblks,
                &attr->u.hvector.blklen, &attr->u.hvector.stride);
     DTPI_ERR_ASSERT(n == 3, rc);
+#if MPI_VERSION < 3
     rc = MPI_Type_hvector(attr->u.hvector.numblks, attr->u.hvector.blklen, attr->u.hvector.stride,
                           type, newtype);
+#else
+    rc = MPI_Type_create_hvector(attr->u.hvector.numblks, attr->u.hvector.blklen, attr->u.hvector.stride,
+                                 type, newtype);
+#endif
     DTPI_ERR_CHK_MPI_RC(rc);
     DTPI_ERR_ASSERT(count % (attr->u.hvector.numblks * attr->u.hvector.blklen) == 0, rc);
     count /= attr->u.hvector.numblks * attr->u.hvector.blklen;
@@ -438,8 +443,13 @@ static int custom_hindexed(DTP_pool_s dtp, DTPI_Attr_s * attr, MPI_Datatype * ne
         SKIP_DIGIT;
     }
 
+#if MPI_VERSION < 3
     rc = MPI_Type_hindexed(attr->u.hindexed.numblks, attr->u.hindexed.array_of_blklens,
                            attr->u.hindexed.array_of_displs, type, newtype);
+#else
+    rc = MPI_Type_create_hindexed(attr->u.hindexed.numblks, attr->u.hindexed.array_of_blklens,
+                                  attr->u.hindexed.array_of_displs, type, newtype);
+#endif
     DTPI_ERR_CHK_MPI_RC(rc);
 
     int total_blklen = 0;

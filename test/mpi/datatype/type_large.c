@@ -8,6 +8,8 @@
 #include <mpi.h>
 #include "mpitest.h"
 
+#if MPI_VERSION >= 4
+
 /* Basic test to test MPI 4.0 large API */
 
 static MPI_Datatype make_large_contig(MPI_Count nbytes)
@@ -136,3 +138,9 @@ int main(int argc, char **argv)
 
     return MTestReturnValue(errs);
 }
+
+#else
+
+int main(int argc, char **argv) { return -1; }
+
+#endif
