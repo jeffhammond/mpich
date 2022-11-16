@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include "mpitest.h"
 
+#if MPI_VERSION >= 4
+
 static int run_tests(MPI_Comm comm)
 {
     int rank, size, wrank, wsize, dest, a, b, errs = 0;
@@ -135,3 +137,9 @@ int main(int argc, char **argv)
     MTest_Finalize(errs);
     return MTestReturnValue(errs);
 }
+
+#else
+
+int main(int argc, char **argv) { return -1; }
+
+#endif
