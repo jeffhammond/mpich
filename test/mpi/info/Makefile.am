@@ -11,7 +11,6 @@ EXTRA_DIST = testlist
 ## file, we don't need per-target _SOURCES rules, automake will infer them
 ## correctly
 noinst_PROGRAMS = \
-    infocreateenv \
     infodup       \
     infodel       \
     infovallen    \
@@ -19,7 +18,12 @@ noinst_PROGRAMS = \
     infomany      \
     infomany2     \
     infotest      \
-    infoget       \
-    infogetstring \
-    infoenv       \
+    infoget
+
+if BUILD_MPI4_TESTS
+noinst_PROGRAMS +=  \
+    infocreateenv   \
+    infogetstring   \
+    infoenv         \
     info_no_init
+endif

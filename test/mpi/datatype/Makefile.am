@@ -31,11 +31,6 @@ noinst_PROGRAMS =             \
     hindexed_block_contents   \
     hvecblklen                \
     indexed_misc              \
-    large_count               \
-    large_type                \
-    large_type_sendrec        \
-    large_vec                 \
-    type_large	              \
     lbub                      \
     localpack                 \
     longdouble                \
@@ -81,6 +76,15 @@ noinst_PROGRAMS =             \
     vecblklen                 \
     zeroblks                  \
     zeroparms
+
+if BUILD_LARGECOUNT_TESTS
+noinst_PROGRAMS +=            \
+    large_count               \
+    large_type                \
+    large_type_sendrec        \
+    large_vec                 \
+    type_large
+endif
 
 if BUILD_MPI3_DELETED_TESTS
 noinst_PROGRAMS += \
