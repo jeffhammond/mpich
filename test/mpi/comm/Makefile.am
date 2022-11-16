@@ -15,7 +15,6 @@ noinst_PROGRAMS =     \
     dup               \
     dupic             \
     dup_with_info     \
-    idup_with_info    \
     ic1               \
     ic2               \
     commname          \
@@ -45,3 +44,8 @@ noinst_PROGRAMS =     \
     comm_create_group_idup \
     comm_info \
     comm_info2
+
+if BUILD_MPI4_TESTS
+noinst_PROGRAMS +=    \
+    idup_with_info
+endif
