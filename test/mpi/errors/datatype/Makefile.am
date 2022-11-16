@@ -12,12 +12,17 @@ EXTRA_DIST = testlist
 ## correctly
 noinst_PROGRAMS = getcnterr \
                   type_contiguous_nullarg \
-                  type_extent_nullarg \
                   type_get_extent_nullarg \
                   type_get_true_extent_nullarg \
                   type_get_true_extent_x_nullarg \
-                  type_lb_nullarg \
-                  type_ub_nullarg \
                   type_size_x_nullarg \
                   type_vector_nullarg
 
+if BUILD_MPI3_DELETED_TESTS
+noinst_PROGRAMS += \
+                  type_extent_nullarg \
+                  type_lb_nullarg \
+                  type_ub_nullarg
+endif
+
+# Some of the tests use a more comprehensive set of datatype tests.
