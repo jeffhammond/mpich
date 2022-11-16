@@ -65,7 +65,6 @@ noinst_PROGRAMS =  \
     pingping_barrier  \
     sendrecv1 \
     sendself \
-    pt2pt_large \
     precv_anysrc \
     precv_anysrc_exp \
     mprobe_self_free
@@ -73,7 +72,8 @@ noinst_PROGRAMS =  \
 if BUILD_MPI4_TESTS
 noinst_PROGRAMS +=    \
     isendrecv         \
-    isendrecv_replace
+    isendrecv_replace \
+    pt2pt_large
 endif
 
 irecv_any_CPPFLAGS = -DTEST_NB $(AM_CPPFLAGS)
