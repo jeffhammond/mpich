@@ -15,5 +15,9 @@ noinst_PROGRAMS =     \
     mpit_isendirecv \
     mpit_vars   \
     cvarwrite   \
-    getindex    \
+    getindex
+
+if BUILD_MPI4_TESTS
+noinst_PROGRAMS += \
     qmpi_test
+endif
