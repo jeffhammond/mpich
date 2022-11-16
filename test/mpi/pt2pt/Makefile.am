@@ -24,8 +24,6 @@ noinst_PROGRAMS =  \
     isendself      \
     issendselfcancel \
     isendirecv     \
-    isendrecv      \
-    isendrecv_replace \
     eagerdt        \
     isendselfprobe \
     bsendfrag      \
@@ -71,6 +69,12 @@ noinst_PROGRAMS =  \
     precv_anysrc \
     precv_anysrc_exp \
     mprobe_self_free
+
+if BUILD_MPI4_TESTS
+noinst_PROGRAMS +=    \
+    isendrecv         \
+    isendrecv_replace
+endif
 
 irecv_any_CPPFLAGS = -DTEST_NB $(AM_CPPFLAGS)
 irecv_any_SOURCES  = recv_any.c
