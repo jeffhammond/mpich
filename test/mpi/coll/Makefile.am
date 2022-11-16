@@ -82,30 +82,6 @@ noinst_PROGRAMS =      \
     opminloc           \
     opprod             \
     opsum              \
-    p_allred           \
-    p_bcast            \
-    p_bcast2           \
-    p_red              \
-    p_alltoall         \
-    p_allgather        \
-    p_allgatherv       \
-    p_red_scat_block   \
-    p_redscat          \
-    p_scan             \
-    p_gather           \
-    p_gatherv          \
-    p_scatter          \
-    p_scatterv         \
-    p_alltoallv        \
-    p_alltoallw        \
-    p_exscan           \
-    p_barrier          \
-    p_neighb_allgather \
-    p_neighb_allgatherv\
-    p_neighb_alltoall  \
-    p_neighb_alltoallv \
-    p_neighb_alltoallw \
-    p_order            \
     red3               \
     red4               \
     red_scat_block     \
@@ -124,7 +100,6 @@ noinst_PROGRAMS =      \
     scattern           \
     scatterv           \
     uoplong            \
-    uoplong_large      \
     uop_equal	       \
     nballtoall1        \
     nbredscat          \
@@ -152,8 +127,41 @@ noinst_PROGRAMS =      \
     neighb_alltoallw2  \
     bcast              \
     bcast_comm_world_only \
-    coll_large	       \
     ring_neighbor_alltoall
+
+if BUILD_LARGECOUNT_TESTS
+noinst_PROGRAMS +=     \
+    coll_large	       \
+    uoplong_large
+endif
+
+if BUILD_PERSISTENT_TESTS
+noinst_PROGRAMS +=     \
+    p_allred           \
+    p_bcast            \
+    p_bcast2           \
+    p_red              \
+    p_alltoall         \
+    p_allgather        \
+    p_allgatherv       \
+    p_red_scat_block   \
+    p_redscat          \
+    p_scan             \
+    p_gather           \
+    p_gatherv          \
+    p_scatter          \
+    p_scatterv         \
+    p_alltoallv        \
+    p_alltoallw        \
+    p_exscan           \
+    p_barrier          \
+    p_neighb_allgather \
+    p_neighb_allgatherv\
+    p_neighb_alltoall  \
+    p_neighb_alltoallv \
+    p_neighb_alltoallw \
+    p_order
+endif
 
 allgatherv4_LDADD = $(LDADD) -lm
 

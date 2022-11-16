@@ -640,6 +640,10 @@ AC_SUBST(MPI_HAS_MPI3_DELETED)
 # to noninst_PROGRAMS to skip building the tests when we do strict MPI test
 AM_CONDITIONAL([BUILD_MPI3_DELETED_TESTS], [test "$enable_strictmpi" = "no"])
 
+# FIXME
+AM_CONDITIONAL([BUILD_PERSISTENT_TESTS], [test "yes" = "no"])
+AM_CONDITIONAL([BUILD_LARGECOUNT_TESTS], [test "yes" = "no"])
+
 dnl We cannot use AC_C_LONG_DOUBLE
 dnl because it does not support cross-compilation.  Instead, we use the
 dnl same test in the MPICH configure.
