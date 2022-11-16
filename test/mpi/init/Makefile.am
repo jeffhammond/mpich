@@ -16,14 +16,18 @@ noinst_PROGRAMS = \
     exitst2       \
     exitst3       \
     initstat      \
-    session       \
-    session_mult_init \
-    session_psets \
-    session_self  \
     version       \
     library_version \
     timeout       \
     finalized
+
+if BUILD_MPI4_TESTS
+noinst_PROGRAMS +=    \
+    session           \
+    session_mult_init \
+    session_psets     \
+    session_self
+endif
 
 session_mult_init_SOURCES = session.c
 session_mult_init_CPPFLAGS = -DMULT_INIT $(AM_CPPFLAGS)
