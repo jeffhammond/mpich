@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   Copyright (C) 2003 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_pvfs2.h"
@@ -58,7 +57,7 @@ void ADIOI_PVFS2_Init(int *error_code)
     }
 
     /* for consistency, we should disable the pvfs2 ncache.  If the
-     * environtment variable is already set, assume a  user knows it
+     * environment variable is already set, assume a  user knows it
      * won't be a problem */
     ncache_timeout = getenv("PVFS2_NCACHE_TIMEOUT");
     if (ncache_timeout == NULL)
@@ -140,7 +139,3 @@ int ADIOI_PVFS2_error_convert(int pvfs_error)
     }
 
 }
-
-/*
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */

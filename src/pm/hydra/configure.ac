@@ -1,43 +1,39 @@
-AC_PREREQ(2.62)
-#
-# (C) 2008 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
+AC_PREREQ(2.62)
+
+m4_define([HYDRA_CONFIGURE], 1)
 m4_include([version.m4])
 AC_INIT([Hydra], MPICH_VERSION_m4)
 
 AC_CONFIG_AUX_DIR(confdb)
 AC_CONFIG_MACRO_DIR(confdb)
 
-# needed by hwloc in embedded mode.  Must come very early to avoid
-# bizarre expansion ordering warnings
-AC_CANONICAL_TARGET
+if test "$FROM_MPICH" != "yes" ; then
+    PAC_PREFIX_ALL_FLAGS(USER)
+fi
+
 AC_ARG_PROGRAM
 
 dnl must come before LT_INIT, which AC_REQUIREs AC_PROG_CC
 dnl must also come before AC_USE_SYSTEM_EXTENSIONS
-PAC_PROG_CC
+AC_PROG_CC
+AC_PROG_CC_C99
 AM_PROG_CC_C_O
 
 # also needed by hwloc in embedded mode, must also come early for expansion
 # ordering reasons
 AC_USE_SYSTEM_EXTENSIONS
+PAC_C_NO_COMMON
 
-# Define -D_DARWIN_C_SOURCE on OS/X to ensure that hwloc will build even if we
-# are building under MPICH with --enable-strict that defined _POSIX_C_SOURCE.
-# Some standard Darwin headers don't build correctly under a strict posix
-# environment.
-AS_CASE([$host],
-    [*-*-darwin*], [PAC_APPEND_FLAG([-D_DARWIN_C_SOURCE],[CPPFLAGS])]
-)
-
-
-AM_INIT_AUTOMAKE([-Wall -Wno-portability-recursive -Werror foreign 1.12.3 subdir-objects])
+AM_INIT_AUTOMAKE([-Wall -Wno-portability-recursive -Werror foreign 1.12.3 subdir-objects no-dist])
 
 AM_PROG_AR
 
-AC_CONFIG_HEADER(include/hydra_config.h)
+AC_CONFIG_HEADERS([hydra_config.h])
 
 # Non-verbose make
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -48,7 +44,8 @@ WRAPPER_LIBS=""
 export WRAPPER_LIBS
 AC_SUBST(WRAPPER_LIBS)
 
-PAC_ARG_STRICT
+# let confdb macro know that we are using WRAPPER FLAGS
+m4_define([use_wrapper_flags], [1])
 
 # Look for perl.  The absolute path of perl is required in hydra-doxygen.cfg.
 AC_PATH_PROG(PERL,perl)
@@ -81,7 +78,6 @@ AC_PROG_INSTALL
 PAC_ARG_CACHING
 PAC_C_MACRO_VA_ARGS
 PAC_C_GNU_ATTRIBUTE
-PAC_CC_FUNCTION_NAME_SYMBOL
 
 # Build information
 # these values come from the m4_include above
@@ -113,37 +109,16 @@ if test "$CC" != "" ; then
 else
    AC_DEFINE_UNQUOTED(HYDRA_CC,"",[C compiler])
 fi
-if test "$CXX" != "" ; then
-   AC_DEFINE_UNQUOTED(HYDRA_CXX,"$CXX $CPPFLAGS $CXXFLAGS $LDFLAGS $LIBS",[C++ compiler])
-else
-   AC_DEFINE_UNQUOTED(HYDRA_CXX,"",[C++ compiler])
-fi
-if test "$F77" != "" ; then
-   AC_DEFINE_UNQUOTED(HYDRA_F77,"$F77 $FFLAGS $LDFLAGS $LIBS",[Fortran 77 compiler])
-else
-   AC_DEFINE_UNQUOTED(HYDRA_F77,"",[Fortran 77 compiler])
-fi
-if test "$FC" != "" ; then
-   AC_DEFINE_UNQUOTED(HYDRA_F90,"$FC $FCFLAGS $LDFLAGS $LIBS",[Fortran 90 compiler])
-else
-   AC_DEFINE_UNQUOTED(HYDRA_F90,"",[Fortran 90 compiler])
-fi
 PAC_POP_ALL_FLAGS
 
 AC_DEFINE_UNQUOTED(HYDRA_CONFIGURE_ARGS_CLEAN,"`echo $ac_configure_args`",[Configure arguments])
 
+if test -z "$FROM_MPICH" ; then
+    FROM_HYDRA=yes
+    export FROM_HYDRA
+fi
+
 # MPL
-AC_ARG_VAR([MPLLIBNAME],[can be used to override the name of the MPL library (default: "mpl")])
-MPLLIBNAME=${MPLLIBNAME:-"mpl"}
-export MPLLIBNAME
-AC_SUBST(MPLLIBNAME)
-AC_ARG_WITH([mpl-prefix],
-            [AS_HELP_STRING([[--with-mpl-prefix[=DIR]]],
-                            [use the MPL library installed in DIR. Pass
-                             "embedded" to force usage of the MPL source
-                             distributed with Hydra.])],
-            [],dnl action-if-given
-            [with_mpl_prefix=embedded]) dnl action-if-not-given
 mpl_srcdir=""
 AC_SUBST([mpl_srcdir])
 # Controls whether we recurse into the MPL dir when running "dist" rules like
@@ -152,25 +127,31 @@ AC_SUBST([mpl_srcdir])
 AC_SUBST(mpl_dist_srcdir)
 mpl_includedir=""
 AC_SUBST([mpl_includedir])
-mpl_libdir=""
-AC_SUBST([mpl_libdir])
 mpl_lib=""
 AC_SUBST([mpl_lib])
-if test "$with_mpl_prefix" = "embedded" ; then
-    mpl_srcdir="mpl"
-    mpl_dist_srcdir="mpl"
-    mpl_lib="mpl/lib${MPLLIBNAME}.la"
-    mpl_subdir_args="--disable-versioning --enable-embedded"
-    PAC_CONFIG_SUBDIR_ARGS([mpl],[$mpl_subdir_args],[],[AC_MSG_ERROR(MPL configure failed)])
-    mpl_includedir='-I$(top_builddir)/mpl/include -I$(top_srcdir)/mpl/include'
+m4_define([mpl_embedded_dir],[modules/mpl])
+PAC_CONFIG_MPL
+
+# PMI
+pmi_srcdir=""
+pmi_includedir=""
+pmi_lib=""
+AC_SUBST([pmi_srcdir])
+AC_SUBST([pmi_includedir])
+AC_SUBST([pmi_lib])
+m4_define([pmi_embedded_dir],[modules/pmi])
+# NOTE: we do not need the public pmi include dir (where pmi.h and pmi2.h are contained)
+#       we need the "pmi/src" path for accessing internal headers such as pmi_wire.h
+if test "$FROM_MPICH" = "yes"; then
+    pmi_includedir="-I$main_top_srcdir/src/pmi/src"
+    pmi_lib="$main_top_builddir/src/pmi/libpmi.la"
 else
-    # The user specified an already-installed MPL; just sanity check, don't
-    # subconfigure it
-    AS_IF([test -s "${with_mpl_prefix}/include/mplconfig.h"],
-          [:],[AC_MSG_ERROR([the MPL installation in "${with_mpl_prefix}" appears broken])])
-    mpl_includedir="-I${with_mpl_prefix}/include"
-    mpl_libdir="-L${with_mpl_prefix}/lib"
-    mpl_lib="-l${MPLLIBNAME}"
+    # TODO: option for --with-pmilib=xxx
+    pmi_srcdir=pmi_embedded_dir
+    pmi_includedir='-I$(top_srcdir)/pmi_embedded_dir/src'
+    pmi_subdir_args="--enable-embedded"
+    PAC_CONFIG_SUBDIR_ARGS(pmi_embedded_dir, [$pmi_subdir_args])
+    pmi_lib='$(top_builddir)/pmi_embedded_dir/libpmi.la'
 fi
 
 # Documentation
@@ -182,7 +163,6 @@ AC_SUBST(top_srcdir)
 PAC_ENABLE_COVERAGE
 
 # Check if the necessary headers are available
-AC_HEADER_STDC
 AC_CHECK_HEADERS(unistd.h strings.h sys/types.h sys/socket.h sched.h sys/stat.h sys/param.h \
 		 netinet/in.h netinet/tcp.h sys/un.h sys/time.h time.h ifaddrs.h arpa/inet.h \
 		 poll.h fcntl.h netdb.h winsock2.h windows.h)
@@ -214,26 +194,30 @@ if test "$ac_cv_func_killpg" = "yes" ; then
    PAC_FUNC_NEEDS_DECL([#include <signal.h>],killpg)
 fi
 
-AC_TRY_LINK([
-	#include <stdio.h>
-	#include <sys/types.h>
-	#include <ifaddrs.h>
-	],
-	[return getifaddrs(NULL);],
-	[AC_DEFINE([HAVE_GETIFADDRS],1,[Define to '1' if getifaddrs is present and usable])])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+    #include <stdio.h>
+    #include <sys/types.h>
+    #include <ifaddrs.h>
+    ]],[[
+    return getifaddrs(NULL);
+    ]])],[
+    AC_DEFINE([HAVE_GETIFADDRS],1,[Define to '1' if getifaddrs is present and usable])
+])
 
 # Check what we need to do about the environ extern
-AC_CACHE_CHECK([for environ in unistd.h],pac_cv_environ_in_unistd,
-	[AC_TRY_COMPILE([#include <unistd.h>],[char **x = environ;],
-	pac_cv_environ_in_unistd=yes,pac_cv_environ_in_unistd=no)])
+AC_CACHE_CHECK([for environ in unistd.h],pac_cv_environ_in_unistd, [
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <unistd.h>]],[[char **x = environ;]])],
+	pac_cv_environ_in_unistd=yes,pac_cv_environ_in_unistd=no)
+])
 if test "$pac_cv_environ_in_unistd" = "yes" ; then
     # We have environ defined in unistd.h; we are done
     AC_DEFINE(HAVE_EXTERN_ENVIRON,1,[Define if environ extern is available])
 else
     # See if we can declare it
-    AC_CACHE_CHECK([for manually declared extern environ], pac_cv_manual_extern_environ,
-   	[AC_TRY_LINK([#include <unistd.h>],[extern char ** environ; char **x = environ;],
-	pac_cv_manual_extern_environ=yes,pac_cv_manual_extern_environ=no)])
+    AC_CACHE_CHECK([for manually declared extern environ], pac_cv_manual_extern_environ, [
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <unistd.h>]],[[extern char ** environ; char **x = environ;]])],
+            pac_cv_manual_extern_environ=yes,pac_cv_manual_extern_environ=no)
+    ])
     if test "$pac_cv_manual_extern_environ" = "yes" ; then
         # We can manually declare the extern
         AC_DEFINE(MANUAL_EXTERN_ENVIRON,1,[Define if environ decl needed])
@@ -245,7 +229,7 @@ fi
 # Check what bootstrap server we should use
 #########################################################################
 AC_ARG_WITH(hydra-bss,
-	[AC_HELP_STRING([--with-hydra-bss=name],
+	[AS_HELP_STRING([--with-hydra-bss=name],
 		[Bootstrap Server (user,ssh,rsh,fork,slurm,ll,lsf,sge,pbs,cobalt,manual,persist)])],
 	[ hydra_bss=$withval ],
 	[ hydra_bss="user,ssh,rsh,fork,slurm,ll,lsf,sge,pbs,cobalt,manual,persist" ])
@@ -297,14 +281,9 @@ for hydra_bss_name in ${hydra_bss_names}; do
 	pbs)
 		hydra_bss_external=true
 		# Check if TM library support is available
-		PAC_SET_HEADER_LIB_PATH(pbs)
-		PAC_PUSH_FLAG(LIBS)
-		PAC_CHECK_HEADER_LIB(tm.h, torque, tm_init, have_pbs_launcher=yes,
-					   have_pbs_launcher=no)
-		PAC_POP_FLAG(LIBS)
-                if test "$have_pbs_launcher" = "yes" ; then
+		PAC_CHECK_HEADER_LIB_OPTIONAL(pbs, tm.h, [torque pbs], tm_init)
+                if test "$pac_have_pbs" = "yes" ; then
 		    available_launchers="$available_launchers pbs"
-		    PAC_APPEND_FLAG([-ltorque],[WRAPPER_LIBS])
                 fi
 		available_rmks="$available_rmks pbs"
 		;;
@@ -336,10 +315,10 @@ if test "$hydra_bss_persist" ; then
 fi
 
 ## Launchers
-if test "$have_pbs_launcher" = "yes" ; then
+if test "$pac_have_pbs" = "yes" ; then
    AC_DEFINE(HAVE_TM_H, 1, [Define if tm.h and library are usable.])
 fi
-AM_CONDITIONAL([hydra_pbs_launcher], [test "$have_pbs_launcher" = "yes"])
+AM_CONDITIONAL([hydra_pbs_launcher], [test "$pac_have_pbs" = "yes"])
 
 tmp_list=
 for hydra_launcher in ${available_launchers} ; do
@@ -403,24 +382,6 @@ AM_CONDITIONAL([hydra_pm_pmiserv], [test $hydra_pm = "pmiserv"])
 
 
 #########################################################################
-# Check what UI we should use
-#########################################################################
-AC_ARG_WITH(hydra-ui, [  --with-hydra-ui=name - User Interface (mpich)],
-		[ hydra_ui=$withval ],
-		[ hydra_ui=mpich ])
-AC_MSG_CHECKING(user interface)
-AC_MSG_RESULT($hydra_ui)
-AC_SUBST(hydra_ui)
-AM_CONDITIONAL([hydra_ui_mpich], [test $hydra_ui = "mpich"])
-
-
-#########################################################################
-# System hwloc
-#########################################################################
-PAC_CHECK_PREFIX(hwloc)
-
-
-#########################################################################
 # Processor Topology
 #########################################################################
 AC_ARG_WITH(hydra-topolib, [  --with-hydra-topolib=name - Processor Topology Library (hwloc)],
@@ -431,33 +392,20 @@ AC_MSG_RESULT([$hydra_topolib_list])
 
 hydra_topolibs="`echo $hydra_topolib_list | sed -e 's/:/ /g' -e 's/,/ /g'`"
 
-have_hwloc=no
+hwloc_srcdir=""
+hwloc_includedir=""
+hwloc_lib=""
+AC_SUBST([hwloc_srcdir])
+AC_SUBST([hwloc_includedir])
+AC_SUBST([hwloc_lib])
+
 for hydra_topolib in ${hydra_topolibs}; do
     case "$hydra_topolib" in
 	hwloc)
-		if test "$with_hwloc_prefix" = "embedded" ; then
-		   HWLOC_SETUP_CORE([tools/topo/hwloc/hwloc],[have_hwloc=yes],[have_hwloc=no],[1])
-		   # Only build hwloc in embedded mode
-		   if test "$have_hwloc" = "yes" ; then
-		      hydra_use_embedded_hwloc=yes
-		   fi
-                else
-                    AC_CHECK_HEADERS([hwloc.h])
-                    # hwloc_topology_set_pid was added in hwloc-1.0.0, which is our minimum
-                    # required version
-                    AC_CHECK_LIB([hwloc],[hwloc_topology_set_pid])
-                    AC_MSG_CHECKING([if non-embedded hwloc works])
-                    if test "$ac_cv_header_hwloc_h" = "yes" -a "$ac_cv_lib_hwloc_hwloc_topology_set_pid" = "yes" ; then
-                        have_hwloc=yes
-                    fi
-                    AC_MSG_RESULT([$have_hwloc])
-                fi
+                m4_define([hwloc_embedded_dir],[modules/hwloc])
+                PAC_CONFIG_HWLOC
 
-                # FIXME: Disable hwloc on Cygwin for now. The hwloc package, atleast as of 1.0.2,
-                # does not install correctly on Cygwin
-                AS_CASE([$host], [*-*-cygwin], [have_hwloc=no])
-
-		if test "$have_hwloc" = "yes" ; then
+		if test "$pac_have_hwloc" = "yes" ; then
 		   AC_DEFINE(HAVE_HWLOC,1,[Define if hwloc is available])
 		   available_topolibs="$available_topolibs hwloc"
 		fi
@@ -487,9 +435,7 @@ else
    AC_DEFINE(HYDRA_DEFAULT_TOPOLIB,NULL,[Default processor topology library])
 fi
 
-HWLOC_DO_AM_CONDITIONALS
-AM_CONDITIONAL([hydra_have_hwloc], [test "${have_hwloc}" = "yes"])
-AM_CONDITIONAL([hydra_use_embedded_hwloc], [test "${hydra_use_embedded_hwloc}" = "yes"])
+AM_CONDITIONAL([HYDRA_HAVE_HWLOC], [test "${pac_have_hwloc}" = "yes"])
 
 AC_MSG_CHECKING([available processor topology libraries])
 AC_MSG_RESULT([$available_topolibs])
@@ -497,82 +443,15 @@ AC_MSG_RESULT([$available_topolibs])
 #########################################################################
 # Slurm hostlist parsing
 #########################################################################
-AC_CHECK_HEADERS(slurm/slurm.h)
-AC_CHECK_LIB([slurm],[slurm_hostlist_create],have_libslurm=yes)
-if test "$have_libslurm" = "yes" -a "$ac_cv_header_slurm_slurm_h" = "yes" ; then
-    PAC_PREPEND_FLAG([-lslurm],[LIBS])
-    AC_DEFINE(HAVE_LIBSLURM,1,[Define if libslurm is available])
+PAC_CHECK_HEADER_LIB_OPTIONAL([slurm],[slurm/slurm.h],[slurm],[slurm_hostlist_create])
+if test "$pac_have_slurm" = "yes" ; then
+    AC_DEFINE(HAVE_SLURM,1,[Define if slurm is available])
 fi
 
 #########################################################################
 # POSIX Regcomp
 #########################################################################
 AX_CHECK_POSIX_REGCOMP
-
-#########################################################################
-# Checkpoint/Restart
-#########################################################################
-
-# checkpoint requires pthreads
-AC_CHECK_HEADERS(pthread.h)
-AC_CHECK_LIB([pthread],[pthread_key_create],have_pthreads=yes)
-if test "$have_pthreads" = "yes" ; then
-    PAC_PREPEND_FLAG([-lpthread],[LIBS])
-    AC_DEFINE(HAVE_PTHREADS,1,[Define if pthreads is available])
-fi
-
-AC_ARG_WITH(hydra-ckpointlib, [  --with-hydra-ckpointlib=name - Checkpointing Library (blcr)],
-			   [ hydra_ckpointlib_list=$withval ],
-			   [ hydra_ckpointlib_list=blcr ])
-AC_MSG_CHECKING(checkpointing library)
-
-if test "$have_pthreads" != "yes" -a "$hydra_ckpointlib_list" != "none" ; then
-    AC_MSG_ERROR([pthreads is required for checkpointing, but was not found])
-else
-    AC_MSG_RESULT($hydra_ckpointlib_list)
-fi
-
-hydra_ckpointlibs="`echo $hydra_ckpointlib_list | sed -e 's/:/ /g' -e 's/,/ /g'`"
-
-have_blcr=no
-for hydra_ckpointlib in ${hydra_ckpointlibs}; do
-    case "$hydra_ckpointlib" in
-    	blcr)
-	    PAC_SET_HEADER_LIB_PATH(blcr)
-	    PAC_PUSH_FLAG(LIBS)
-	    PAC_CHECK_HEADER_LIB(libcr.h, cr, cr_init, have_blcr=yes, have_blcr=no)
-	    PAC_POP_FLAG(LIBS)
-	    # BLCR works
-	    if test "$have_blcr" = "yes" ; then
-	       AC_DEFINE(HAVE_BLCR,1,[Define if blcr is available])
-	       available_ckpointlibs="$available_ckpointlibs blcr"
-	       PAC_APPEND_FLAG([-lcr],[WRAPPER_LIBS])
-	    fi
-	    ;;		
-	*)
-	    ;;
-    esac
-done
-
-tmp_list=
-for hydra_ckpointlib in ${available_ckpointlibs}; do
-    if test -z "$hydra_default_ckpointlib" ; then
-       hydra_default_ckpointlib=${hydra_ckpointlib}
-       tmp_list="${hydra_ckpointlib}"
-    else
-       tmp_list="$tmp_list ${hydra_ckpointlib}"
-    fi
-done
-available_ckpointlibs=$tmp_list
-
-AC_DEFINE_UNQUOTED(HYDRA_AVAILABLE_CKPOINTLIBS,"$available_ckpointlibs",
-		[Definition of enabled checkpointing libraries])
-if test "$hydra_default_ckpointlib" != "" ; then
-   AC_DEFINE_UNQUOTED(HYDRA_DEFAULT_CKPOINTLIB,"$hydra_default_ckpointlib",
-		[Default checkpointing library])
-fi
-AM_CONDITIONAL([hydra_have_blcr], [test "${have_blcr}" = "yes"])
-
 
 #########################################################################
 # Demux engine
@@ -656,7 +535,7 @@ for option in $enable_g ; do
         mem)
 		AC_DEFINE(USE_MEMORY_TRACING,1,[Define if memory tracing is enabled])
 		;;
-        all)
+        yes|all)
 		PAC_APPEND_FLAG(-g, CFLAGS)
 		AC_DEFINE(USE_MEMORY_TRACING,1,[Define if memory tracing is enabled])
 		AC_DEFINE(PMI_KEY_CHECK,1,[Define if we should check for PMI key collisions])
@@ -718,22 +597,28 @@ AC_CHECK_FUNCS(sigaction signal sigset)
 sigaction_ok=no
 if test "$ac_cv_func_sigaction" = "yes" ; then
     # Make sure that the fields that we need in sigaction are defined
-    AC_CACHE_CHECK([for struct sigaction and sa_handler],
-    pac_cv_struct_sigaction_with_sa_handler,[
-    AC_TRY_COMPILE([#include <signal.h>],[
-struct sigaction act; sigaddset( &act.sa_mask, SIGINT );
-act.sa_handler = SIG_IGN;],
-    pac_cv_struct_sigaction_with_sa_handler=yes,
-    pac_cv_struct_sigaction_with_sa_handler=no)])
+    AC_CACHE_CHECK([for struct sigaction and sa_handler], pac_cv_struct_sigaction_with_sa_handler,[
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+            #include <signal.h>
+            ]],[[
+            struct sigaction act; sigaddset( &act.sa_mask, SIGINT );
+            act.sa_handler = SIG_IGN;
+            ]])],
+            pac_cv_struct_sigaction_with_sa_handler=yes,
+            pac_cv_struct_sigaction_with_sa_handler=no)
+    ])
     if test "$pac_cv_struct_sigaction_with_sa_handler" = "no" ; then
-        AC_CACHE_CHECK([for struct sigaction and sa_handler with _POSIX_SOURCE],
-	pac_cv_struct_sigaction_with_sa_handler_needs_posix,[
-        AC_TRY_COMPILE([#define _POSIX_SOURCE
-#include <signal.h>],[
-struct sigaction act; sigaddset( &act.sa_mask, SIGINT );
-act.sa_handler = SIG_IGN;],
-	pac_cv_struct_sigaction_with_sa_handler_needs_posix=yes,
-	pac_cv_struct_sigaction_with_sa_handler_needs_posix=no)])
+        AC_CACHE_CHECK([for struct sigaction and sa_handler with _POSIX_SOURCE], pac_cv_struct_sigaction_with_sa_handler_needs_posix,[
+            AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+                #define _POSIX_SOURCE
+                #include <signal.h>
+                ]],[[
+                struct sigaction act; sigaddset( &act.sa_mask, SIGINT );
+                act.sa_handler = SIG_IGN;
+                ]])],
+                pac_cv_struct_sigaction_with_sa_handler_needs_posix=yes,
+                pac_cv_struct_sigaction_with_sa_handler_needs_posix=no)
+        ])
         if test "$pac_cv_struct_sigaction_with_sa_handler_needs_posix" = "yes" ; then
             sigaction_ok=yes
 	fi
@@ -760,7 +645,8 @@ if test "$ac_cv_func_gethostname" = "yes" ; then
 fi
 
 # Final output
-AC_OUTPUT(Makefile
-	tools/bootstrap/src/bsci_init.c
+AC_CONFIG_FILES([Makefile
+	lib/tools/bootstrap/src/bsci_init.c
 	hydra-doxygen.cfg
-)
+])
+AC_OUTPUT

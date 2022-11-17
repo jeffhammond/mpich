@@ -1,18 +1,15 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   ad_panfs.h
- *
- *   Copyright (C) 2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef AD_PANFS_H_INCLUDED
 #define AD_PANFS_H_INCLUDED
 
+#include "adio.h"
 #include <unistd.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#include "adio.h"
 
 #ifndef NO_AIO
 #ifdef AIO_SUN
@@ -35,11 +32,11 @@ void ADIOI_PANFS_Open(ADIO_File fd, int *error_code);
 /* Panasas 6 introduced some new features */
 void ADIOI_PANFS_Open6(ADIO_File fd, int *error_code);
 void ADIOI_PANFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code);
-void ADIOI_PANFS_ReadContig(ADIO_File fd, void *buf, int count,
+void ADIOI_PANFS_ReadContig(ADIO_File fd, void *buf, MPI_Aint count,
                             MPI_Datatype datatype, int file_ptr_type,
                             ADIO_Offset offset, ADIO_Status * status, int *error_code);
 void ADIOI_PANFS_Resize(ADIO_File fd, ADIO_Offset size, int *error_code);
-void ADIOI_PANFS_WriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_PANFS_WriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                              MPI_Datatype datatype, int file_ptr_type,
                              ADIO_Offset offset, ADIO_Status * status, int *error_code);
 

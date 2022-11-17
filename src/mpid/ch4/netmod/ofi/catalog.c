@@ -1,11 +1,15 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
-static inline void MPIDI_OFI_unused_gen_catalog()
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
+static void MPIDI_OFI_unused_gen_catalog()
 {
 #if 0
     char *a;
     int b, e;
     MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_pmi", "**ofid_pmi %s %d %s %s", a, b, a, a);
-    MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_addrinfo", "**ofid_addrinfo %s %d %s %s", a, b, a, a);
+    MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_getinfo", "**ofid_getinfo %s %d %s %s", a, b, a, a);
     MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_opendomain", "**ofid_opendomain %s %d %s %s", a, b, a,
                   a);
     MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_bind", "**ofid_bind %s %d %s %s", a, b, a, a);
@@ -37,6 +41,7 @@ static inline void MPIDI_OFI_unused_gen_catalog()
     MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_poll", "**ofid_poll %s %d %s %s", a, b, a, a);
     MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_peek", "**ofid_peek %s %d %s %s", a, b, a, a);
     MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_send", "**ofid_send %s %d %s %s", a, b, a, a);
+    MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_sendv", "**ofid_sendv %s %d %s %s", a, b, a, a);
     MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_inject", "**ofid_inject %s %d %s %s", a, b, a, a);
     MPIR_ERR_SET2(e, MPI_ERR_OTHER, "**ofid_rdma_write", "**ofid_rdma_write %s %d %s %s", a, b, a,
                   a);

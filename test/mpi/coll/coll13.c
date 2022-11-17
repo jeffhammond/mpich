@@ -1,13 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  Changes to the original code
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 
 /*
-From: hook@nas.nasa.gov (Edward C. Hook)
+ * Adapted from the code provided by hook@nas.nasa.gov (Edward C. Hook)
  */
 
 #include <stdlib.h>
@@ -28,7 +27,7 @@ int main(int argc, char *argv[])
     int i;
     int *sb;
     int *rb;
-    int status, gstatus;
+    int status;
 
     MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

@@ -1,9 +1,8 @@
 !
-! -*- Mode: Fortran; -*-
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
 !
-!  (C) 2012 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
-!
+
 !
 ! In MPI 2.2, the behavior of attributes set in one language and retrieved
 ! from another was defined.  There are three types of attribute values:
@@ -75,7 +74,7 @@
 !
 ! For X->Y tests:
 !    Using X, store into key created in all three.
-!    Using Y, retrive all attributes.  See above for handling of
+!    Using Y, retrieve all attributes.  See above for handling of
 !     truncated or sign-extended
 !
 ! Use Fortran to drive tests (Fortran main program).  Call C for
@@ -895,7 +894,7 @@
 
         fwin2attr = -(bigaint()-9)
         attrval    = fwin2attr
-        call csetmpiwin( win, fwin2_key, fwin2attr, errs )
+        call csetmpiwin( win%MPI_VAL, fwin2_key, fwin2attr, errs )
         call fmpi2readwin( win, fwin2_key, attrval, "c win to F2",&
              & errs )
 

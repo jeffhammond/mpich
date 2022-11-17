@@ -1,15 +1,11 @@
-/* ---------------------------------------------------------------- */
-/* (C)Copyright IBM Corp.  2007, 2008                               */
-/* ---------------------------------------------------------------- */
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 /**
  * \file ad_pe_aggrs.c
  * \brief The externally used function from this file is is declared in ad_pe_aggrs.h
- */
-
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
-/*
- *   Copyright (C) 1997-2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
  */
 
 /*#define TRACE_ON */
@@ -40,7 +36,7 @@
  *  . the ranks of the aggregators :        fd->hints->ranklist
  * If MP_IONODEFILE is defined, POE determines all tasks on every node listed
  * in the node file and defines MP_IOTASKLIST with them, making them all
- * aggregators.  Alternatively, the user can explictly set MP_IOTASKLIST
+ * aggregators.  Alternatively, the user can explicitly set MP_IOTASKLIST
  * themselves.  The format of the MP_IOTASKLIST is a colon-delimited list of
  * task ids, the first entry being the total number of aggregators, for example
  * to specify 4 aggregators on task ids 0,8,16,24  the value would be:

@@ -1,5 +1,9 @@
 #! /usr/bin/env perl
-# -*- Mode: perl; -*-
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
+
 # Tested with -w 10/28/05
 # 
 # Find the parse.sub routine.
@@ -114,7 +118,7 @@ sub ExpandDir {
     my @otherdirs = ();
     my @files = ();
     opendir DIR, "$dir";
-    while ($filename = readdir DIR) {
+    for $filename (sort readdir DIR) {
 	if ($filename =~ /^\./ || $filename eq ".svn") {
 	    next;
 	}

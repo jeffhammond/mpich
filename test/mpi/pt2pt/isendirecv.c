@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpi.h"
@@ -14,7 +12,7 @@ int main(int argc, char *argv[])
 {
     int errs = 0;
     int elems = 20;
-    int rank, nproc, dest, i;
+    int rank, nproc, i;
     float *in_buf, *out_buf;
     MPI_Comm comm;
     MPI_Request *reqs;

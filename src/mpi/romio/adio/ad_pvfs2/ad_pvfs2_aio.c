@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*-
- *     vim: ts=8 sts=4 sw=4 noexpandtab
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -22,7 +20,7 @@ int ADIOI_PVFS2_aio_free_fn(void *extra_state);
 int ADIOI_PVFS2_aio_poll_fn(void *extra_state, MPI_Status * status);
 int ADIOI_PVFS2_aio_wait_fn(int count, void **array_of_states, double timeout, MPI_Status * status);
 
-void ADIOI_PVFS2_IReadContig(ADIO_File fd, void *buf, int count,
+void ADIOI_PVFS2_IReadContig(ADIO_File fd, void *buf, MPI_Aint count,
                              MPI_Datatype datatype, int file_ptr_type,
                              ADIO_Offset offset, MPI_Request * request, int *error_code)
 {
@@ -30,7 +28,7 @@ void ADIOI_PVFS2_IReadContig(ADIO_File fd, void *buf, int count,
                            offset, request, READ, error_code);
 }
 
-void ADIOI_PVFS2_IWriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_PVFS2_IWriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, MPI_Request * request, int *error_code)
 {
@@ -38,7 +36,7 @@ void ADIOI_PVFS2_IWriteContig(ADIO_File fd, const void *buf, int count,
                            offset, request, WRITE, error_code);
 }
 
-void ADIOI_PVFS2_AIO_contig(ADIO_File fd, void *buf, int count,
+void ADIOI_PVFS2_AIO_contig(ADIO_File fd, void *buf, MPI_Aint count,
                             MPI_Datatype datatype, int file_ptr_type,
                             ADIO_Offset offset, MPI_Request * request, int flag, int *error_code)
 {
@@ -117,7 +115,7 @@ void ADIOI_PVFS2_AIO_contig(ADIO_File fd, void *buf, int count,
     }
     /* --END ERROR HANDLING-- */
 
-    /* posted. defered completion */
+    /* posted. deferred completion */
     if (ret == 0) {
         if (ADIOI_PVFS2_greq_class == 0) {
             MPIX_Grequest_class_create(ADIOI_GEN_aio_query_fn,
@@ -207,8 +205,3 @@ int ADIOI_PVFS2_aio_wait_fn(int count, void **array_of_states, double timeout, M
     }
     return MPI_SUCCESS; /* TODO: no idea how to deal with errors */
 }
-
-
-/*
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */

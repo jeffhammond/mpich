@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2013 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -10,8 +9,7 @@
 
 int main(int argc, char **argv)
 {
-    int i, rank, size, color;
-    MPI_Group group;
+    int i, rank, size;
     MPI_Comm primary[2], secondary[2], tmp;
     MPI_Request req[2];
 

@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2017 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -29,7 +27,7 @@ int main(int argc, char **argv)
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     MPI_Win_allocate(2 * sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &baseptr, &win);
 
@@ -38,6 +36,9 @@ int main(int argc, char **argv)
     baseptr[0] = 1;
     baseptr[1] = 2;
     MPI_Win_unlock(rank, win);
+
+    /* Synchronize the processes before starting the second access epoch */
+    MPI_Barrier(MPI_COMM_WORLD);
 
     /* Issue request-based get with testall. */
     MPI_Win_lock_all(0, win);

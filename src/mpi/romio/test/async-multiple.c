@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*-
- * vim: ts=8 sts=4 sw=4 noexpandtab
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <string.h>
@@ -80,7 +79,10 @@ int main(int argc, char **argv)
     if (errcode != MPI_SUCCESS) {
         handle_error(errcode, "MPI_File_open");
     }
-    MPI_File_set_view(fh, 0, MPI_INT, MPI_INT, "native", MPI_INFO_NULL);
+    errcode = MPI_File_set_view(fh, 0, MPI_INT, MPI_INT, "native", MPI_INFO_NULL);
+    if (errcode != MPI_SUCCESS) {
+        handle_error(errcode, "MPI_File_set_view");
+    }
     for (i = 0; i < NR_NBOPS; i++) {
         errcode = MPI_File_iwrite_at(fh, nints / NR_NBOPS * i,
                                      buf + (nints / NR_NBOPS * i), nints / NR_NBOPS, MPI_INT,
@@ -103,7 +105,10 @@ int main(int argc, char **argv)
         handle_error(errcode, "MPI_File_open");
     }
 
-    MPI_File_set_view(fh, 0, MPI_INT, MPI_INT, "native", MPI_INFO_NULL);
+    errcode = MPI_File_set_view(fh, 0, MPI_INT, MPI_INT, "native", MPI_INFO_NULL);
+    if (errcode != MPI_SUCCESS) {
+        handle_error(errcode, "MPI_File_set_view");
+    }
     for (i = 0; i < NR_NBOPS; i++) {
         errcode = MPI_File_iread_at(fh, nints / NR_NBOPS * i,
                                     buf + (nints / NR_NBOPS * i), nints / NR_NBOPS, MPI_INT,

@@ -1,14 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
 #include "adio_extern.h"
 
-void ADIOI_GEN_ReadStrided_naive(ADIO_File fd, void *buf, int count,
+void ADIOI_GEN_ReadStrided_naive(ADIO_File fd, void *buf, MPI_Aint count,
                                  MPI_Datatype buftype, int file_ptr_type,
                                  ADIO_Offset offset, ADIO_Status * status, int
                                  *error_code)
@@ -23,7 +21,7 @@ void ADIOI_GEN_ReadStrided_naive(ADIO_File fd, void *buf, int count,
     ADIO_Offset abs_off_in_filetype = 0;
     MPI_Count bufsize, filetype_size, buftype_size, size_in_filetype;
     ADIO_Offset etype_size;
-    MPI_Aint filetype_extent, buftype_extent;
+    MPI_Aint lb, filetype_extent, buftype_extent;
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset userbuf_off;
     ADIO_Offset off, req_off, disp, end_offset = 0, start_off;
@@ -43,9 +41,9 @@ void ADIOI_GEN_ReadStrided_naive(ADIO_File fd, void *buf, int count,
         return;
     }
 
-    MPI_Type_extent(fd->filetype, &filetype_extent);
+    MPI_Type_get_extent(fd->filetype, &lb, &filetype_extent);
     MPI_Type_size_x(buftype, &buftype_size);
-    MPI_Type_extent(buftype, &buftype_extent);
+    MPI_Type_get_extent(buftype, &lb, &buftype_extent);
     etype_size = fd->etype_size;
 
     ADIOI_Assert((buftype_size * count) == ((ADIO_Offset) buftype_size * (ADIO_Offset) count));
@@ -112,7 +110,7 @@ void ADIOI_GEN_ReadStrided_naive(ADIO_File fd, void *buf, int count,
         /* First we're going to calculate a set of values for use in all
          * the noncontiguous in file cases:
          * start_off - starting byte position of data in file
-         * end_offset - last byte offset to be acessed in the file
+         * end_offset - last byte offset to be accessed in the file
          * st_n_filetypes - how far into the file we start in terms of
          *                  whole filetypes
          * st_index - index of block in first filetype that we will be

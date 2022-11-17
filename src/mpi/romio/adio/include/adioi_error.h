@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef ADIOI_ERROR_H_INCLUDED
@@ -51,7 +50,7 @@
     }
 
 #define MPIO_CHECK_COUNT_SIZE(fh, count, datatype_size, myname, error_code) \
-    if (count*datatype_size != (ADIO_Offset)(unsigned)count*(ADIO_Offset)datatype_size) { \
+    if (count*datatype_size != (ADIO_Offset)count*(ADIO_Offset)datatype_size) { \
         error_code = MPIO_Err_create_code(MPI_SUCCESS,                  \
                                           MPIR_ERR_RECOVERABLE,         \
                                           myname, __LINE__,             \

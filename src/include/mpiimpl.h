@@ -1,40 +1,62 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
- * Portions of this code were written by Microsoft. Those portions are
- * Copyright (c) 2007 Microsoft Corporation. Microsoft grants
- * permission to use, reproduce, prepare derivative works, and to
- * redistribute to others. The code is licensed "as is." The User
- * bears the risk of using it. Microsoft gives no express warranties,
- * guarantees or conditions. To the extent permitted by law, Microsoft
- * excludes the implied warranties of merchantability, fitness for a
- * particular purpose and non-infringement.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIIMPL_H_INCLUDED
 #define MPIIMPL_H_INCLUDED
 
+/*****************************************************************************
+ * We use the following ordering of information in this file:
+ *
+ *   1. Start with independent headers that do not have any
+ *      dependencies on the rest of the MPICH implementation (e.g.,
+ *      mpl, opa, mpi.h).
+ *
+ *   2. Next is forward declarations of MPIR structures (MPIR_Comm,
+ *      MPIR_Win, etc.).
+ *
+ *   3. After that we have device-independent headers (MPIR
+ *      functionality that does not have any dependency on MPID).
+ *
+ *   4. Next is the device "pre" header that defines device-level
+ *      initial objects that would be used by the MPIR structures.
+ *
+ *   5. Then comes the device-dependent MPIR functionality, with the
+ *      actual definitions of structures, function prototypes, etc.
+ *      This functionality can only rely on the device "pre"
+ *      functionality.
+ *
+ *   6. Finally, we'll add the device "post" header that is allowed to
+ *      use anything from the MPIR layer.
+ *****************************************************************************/
+
+
+/*****************************************************************************/
+/*********************** PART 1: INDEPENDENT HEADERS *************************/
+/*****************************************************************************/
+
 #include "mpichconfconst.h"
 #include "mpichconf.h"
 
+/* pmix.h contains inline functions that calls malloc, calloc, and free,
+   and it will break with MPL's memory tracing when enabled.
+   Make sure it is included *before* mpl.h.
+*/
+#include "mpir_pmi.h"
+
+/* if we are defining this, we must define it before including mpl.h */
+#if defined(MPICH_DEBUG_MEMINIT)
+#define MPL_VG_ENABLED 1
+#endif
+
+#include "mpl.h"
+#include "mpi.h"
+
 #include <stdio.h>
-#ifdef STDC_HEADERS
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#else
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-#ifdef HAVE_STDARG_H
-#include <stdarg.h>
-#endif
-#ifdef HAVE_STRING_H
-#include <string.h>
-#endif
-#endif
 
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
@@ -83,59 +105,19 @@ int usleep(useconds_t usec);
 #define PMPI_LOCAL
 #endif
 
-/* Fix for universal endianess added in autoconf 2.62 */
+/* Fix for universal endianness added in autoconf 2.62 */
 #ifdef WORDS_UNIVERSAL_ENDIAN
 #if defined(__BIG_ENDIAN__)
 #elif defined(__LITTLE_ENDIAN__)
 #define WORDS_LITTLEENDIAN
 #else
-#error 'Universal endianess defined without __BIG_ENDIAN__ or __LITTLE_ENDIAN__'
+#error 'Universal endianness defined without __BIG_ENDIAN__ or __LITTLE_ENDIAN__'
 #endif
 #endif
 
 #if defined(HAVE_VSNPRINTF) && defined(NEEDS_VSNPRINTF_DECL) && !defined(vsnprintf)
 int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 #endif
-
-
-/*****************************************************************************
- * We use the following ordering of information in this file:
- *
- *   1. Start with independent headers that do not have any
- *      dependencies on the rest of the MPICH implementation (e.g.,
- *      mpl, opa, mpi.h).
- *
- *   2. Next is forward declarations of MPIR structures (MPIR_Comm,
- *      MPIR_Win, etc.).
- *
- *   3. After that we have device-independent headers (MPIR
- *      functionality that does not have any dependency on MPID).
- *
- *   4. Next is the device "pre" header that defines device-level
- *      initial objects that would be used by the MPIR structures.
- *
- *   5. Then comes the device-dependent MPIR functionality, with the
- *      actual definitions of structures, function prototypes, etc.
- *      This functionality can only rely on the device "pre"
- *      functionality.
- *
- *   6. Finally, we'll add the device "post" header that is allowed to
- *      use anything from the MPIR layer.
- *****************************************************************************/
-
-
-/*****************************************************************************/
-/*********************** PART 1: INDEPENDENT HEADERS *************************/
-/*****************************************************************************/
-
-/* if we are defining this, we must define it before including mpl.h */
-#if defined(MPICH_DEBUG_MEMINIT)
-#define MPL_VG_ENABLED 1
-#endif
-
-#include "mpl.h"
-#include "opa_primitives.h"
-#include "mpi.h"
 
 
 /*****************************************************************************/
@@ -163,6 +145,11 @@ typedef struct MPIR_Group MPIR_Group;
 struct MPIR_Topology;
 typedef struct MPIR_Topology MPIR_Topology;
 
+struct MPIR_Session;
+typedef struct MPIR_Session MPIR_Session;
+
+struct MPIR_Stream;
+typedef struct MPIR_Stream MPIR_Stream;
 
 /*****************************************************************************/
 /******************* PART 3: DEVICE INDEPENDENT HEADERS **********************/
@@ -178,6 +165,7 @@ typedef struct MPIR_Topology MPIR_Topology;
 #include "mpir_refcount.h"
 #include "mpir_mem.h"
 #include "mpir_info.h"
+#include "mpir_errcodes.h"
 #include "mpir_errhandler.h"
 #include "mpir_attr_generic.h"
 #include "mpir_contextid.h"
@@ -188,6 +176,7 @@ typedef struct MPIR_Topology MPIR_Topology;
 #include "mpir_tags.h"
 #include "mpir_pt2pt.h"
 #include "mpir_ext.h"
+#include "mpir_gpu.h"
 
 #ifdef HAVE_CXX_BINDING
 #include "mpii_cxxinterface.h"
@@ -211,23 +200,32 @@ typedef struct MPIR_Topology MPIR_Topology;
 /********************* PART 5: DEVICE DEPENDENT HEADERS **********************/
 /*****************************************************************************/
 
-#include "mpir_thread.h"
+#include "mpir_thread.h"        /* come first as mutexes are often depended on, e.g. request */
+#include "mpir_stream.h"
+#include "mpir_err.h"
 #include "mpir_attr.h"
 #include "mpir_group.h"
 #include "mpir_comm.h"
 #include "mpir_request.h"
+#include "mpir_progress_hook.h"
 #include "mpir_win.h"
 #include "mpir_coll.h"
+#include "mpir_csel.h"
 #include "mpir_func.h"
-#include "mpir_err.h"
 #include "mpir_nbc.h"
+#include "mpir_bsend.h"
 #include "mpir_process.h"
-#include "mpir_dataloop.h"
+#include "mpir_typerep.h"
 #include "mpir_datatype.h"
 #include "mpir_cvars.h"
 #include "mpir_misc_post.h"
 #include "mpit.h"
 #include "mpir_handlemem.h"
+#include "mpir_hwtopo.h"
+#include "mpir_nettopo.h"
+#include "mpir_impl.h"
+
+#include "mpir_gpu_util.h"
 
 /*****************************************************************************/
 /******************** PART 6: DEVICE "POST" FUNCTIONALITY ********************/
@@ -235,8 +233,6 @@ typedef struct MPIR_Topology MPIR_Topology;
 
 #include "mpidpost.h"
 
-/* avoid conflicts in source files with old-style "char FCNAME[]" vars */
-#undef FUNCNAME
-#undef FCNAME
+/* avoid conflicts in source files with old-style "char __func__[]" vars */
 
 #endif /* MPIIMPL_H_INCLUDED */

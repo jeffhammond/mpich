@@ -1,20 +1,17 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi_fortimpl.h"
 
 
 #ifdef F77_NAME_UPPER
 #define mpirinitc_ MPIRINITC
-#define mpirinitc2_ MPIRINITC2
 #elif defined(F77_NAME_LOWER_2USCORE) || defined(F77_NAME_LOWER_USCORE)
 /* leave name alone */
 #else
 #define mpirinitc_ mpirinitc
-#define mpirinitc2_ mpirinitc2
 #endif
 /* These functions are called from Fortran so only need prototypes in
    this file.  Note that the second-to-last argument is a character array, so
@@ -23,26 +20,9 @@
 FORT_DLL_SPEC void FORT_CALL mpirinitc_(void *si, void *ssi,
                                         void *bt, void *ip,
                                         void *uw, void *ecsi,
-                                        void *asn FORT_MIXED_LEN(d1), void *we FORT_END_LEN(d1));
-FORT_DLL_SPEC void FORT_CALL mpirinitc2_(char *FORT_MIXED_LEN_DECL FORT_END_LEN_DECL);
-
-/*
-    # These are here rather than in initf.c to solve some link order
-    # problems for Windows when separate libraries are used for the C and
-    # Fortran routines.
-    # Note that the global variables have values.  This is to work around
-    # a bug in some C environments (e.g., Mac OS/X) that don't load
-    # external symbols that don't have a value assigned at compile time
-    # (so called common symbols)
-*/
-#ifndef F77_USE_BOOLEAN_LITERALS
-#if defined(F77_RUNTIME_VALUES) || !defined(F77_TRUE_VALUE_SET)
-MPI_Fint MPII_F_TRUE = 1, MPII_F_FALSE = 0;
-#else
-const MPI_Fint MPII_F_TRUE = F77_TRUE_VALUE;
-const MPI_Fint MPII_F_FALSE = F77_FALSE_VALUE;
-#endif
-#endif
+                                        void *an FORT_MIXED_LEN(d1),
+                                        void *asn FORT_MIXED_LEN(d1),
+                                        void *we FORT_END_LEN(d1) FORT_END_LEN(d2));
 
 /*
     # MPI-2, section 4.12.5, on the declaration of MPI_F_STATUS_IGNORE
@@ -59,13 +39,16 @@ void *MPI_F_STATUS_IGNORE   = 0;
 void *MPI_F_STATUSES_IGNORE = 0;
 */
 MPI_Fint *MPI_F_ERRCODES_IGNORE = 0;
+void *MPI_F_ARGV_NULL = 0;
 void *MPI_F_ARGVS_NULL = 0;
 void *MPIR_F_MPI_WEIGHTS_EMPTY = 0;
 
 FORT_DLL_SPEC void FORT_CALL mpirinitc_(void *si, void *ssi,
                                         void *bt, void *ip,
                                         void *uw, void *ecsi,
-                                        void *asn FORT_MIXED_LEN(d1), void *we FORT_END_LEN(d1))
+                                        void *an FORT_MIXED_LEN(d1),
+                                        void *asn FORT_MIXED_LEN(d1),
+                                        void *we FORT_END_LEN(d1) FORT_END_LEN(d2))
 {
     MPI_F_STATUS_IGNORE = (MPI_Fint *) si;
     MPI_F_STATUSES_IGNORE = (MPI_Fint *) ssi;
@@ -73,19 +56,10 @@ FORT_DLL_SPEC void FORT_CALL mpirinitc_(void *si, void *ssi,
     MPIR_F_MPI_IN_PLACE = ip;
     MPIR_F_MPI_UNWEIGHTED = uw;
     MPI_F_ERRCODES_IGNORE = (MPI_Fint *) ecsi;
+    MPI_F_ARGV_NULL = an;
     MPI_F_ARGVS_NULL = asn;
     MPIR_F_MPI_WEIGHTS_EMPTY = we;
 }
-
-/* Initialize the Fortran ARGV_NULL to a blank.  Using this routine
-   avoids potential problems with string manipulation routines that
-   exist in the Fortran runtime but not in the C runtime libraries */
-FORT_DLL_SPEC void FORT_CALL mpirinitc2_(char *an FORT_MIXED_LEN(d1) FORT_END_LEN(d1))
-{
-    *an = ' ';
-}
-
-
 
 /*
    Enable all known common block symbols mangling to be alias to each other,
@@ -95,13 +69,16 @@ FORT_DLL_SPEC void FORT_CALL mpirinitc2_(char *an FORT_MIXED_LEN(d1) FORT_END_LE
 */
 
 #if defined(HAVE_C_MULTI_ATTR_ALIAS)
-#define MPIF_STATUS_SIZE @MPI_STATUS_SIZE@
 
 struct mpif_cmblk1_t_ {
-    MPI_Fint MPIF_STATUS_IGNORE[MPIF_STATUS_SIZE];
+    MPI_Fint MPIF_STATUS_IGNORE[MPI_F_STATUS_SIZE];
 };
 typedef struct mpif_cmblk1_t_ mpif_cmblk1_t;
 /* *INDENT-OFF* */
+/* The initializer is necessary for the alias to work -- cannot alias to a common symbol.
+ * The ugly double braces are necessary to silence warnings (due to the first element in
+ * the struct is of a compound type).
+ */
 mpif_cmblk1_t mpifcmb1r @CMB_STATUS_ALIGNMENT@ = {{0}};
 /* *INDENT-ON* */
 extern mpif_cmblk1_t _CMPIFCMB1 __attribute__ ((alias("mpifcmb1r")));
@@ -112,7 +89,7 @@ extern mpif_cmblk1_t mpifcmb1 __attribute__ ((alias("mpifcmb1r")));
 extern mpif_cmblk1_t mpifcmb1_ __attribute__ ((alias("mpifcmb1r")));
 
 struct mpif_cmblk2_t_ {
-    MPI_Fint MPIF_STATUSES_IGNORE[1][MPIF_STATUS_SIZE];
+    MPI_Fint MPIF_STATUSES_IGNORE[1][MPI_F_STATUS_SIZE];
 };
 typedef struct mpif_cmblk2_t_ mpif_cmblk2_t;
 /* *INDENT-OFF* */
@@ -187,7 +164,7 @@ struct mpif_cmblk7_t_ {
 };
 typedef struct mpif_cmblk7_t_ mpif_cmblk7_t;
 /* *INDENT-OFF* */
-mpif_cmblk7_t mpifcmb7r @CMB_1INT_ALIGNMENT@ = {{{0}}};
+mpif_cmblk7_t mpifcmb7r @CMB_1INT_ALIGNMENT@ = {{{0}},{0}};
 /* *INDENT-ON* */
 extern mpif_cmblk7_t _CMPIFCMB7 __attribute__ ((alias("mpifcmb7r")));
 extern mpif_cmblk7_t MPIFCMB7 __attribute__ ((alias("mpifcmb7r")));
@@ -202,7 +179,7 @@ struct mpif_cmblk8_t_ {
 };
 typedef struct mpif_cmblk8_t_ mpif_cmblk8_t;
 /* *INDENT-OFF* */
-mpif_cmblk8_t mpifcmb8r @CMB_1INT_ALIGNMENT@ = {{0}};
+mpif_cmblk8_t mpifcmb8r @CMB_1INT_ALIGNMENT@ = {{0},{0}};
 /* *INDENT-ON* */
 extern mpif_cmblk8_t _CMPIFCMB8 __attribute__ ((alias("mpifcmb8r")));
 extern mpif_cmblk8_t MPIFCMB8 __attribute__ ((alias("mpifcmb8r")));

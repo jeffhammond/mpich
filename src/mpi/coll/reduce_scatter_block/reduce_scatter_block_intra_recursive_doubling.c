@@ -1,22 +1,16 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2017 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 
 /* This implementation of MPI_Reduce_scatter_block was obtained by taking
    the implementation of MPI_Reduce_scatter from reduce_scatter.c and replacing
-   recvcnts[i] with recvcount everywhere. */
+   recvcounts[i] with recvcount everywhere. */
 
 
 #include "mpiimpl.h"
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Reduce_scatter_block_intra_recursive_doubling
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 
 /* Algorithm: Recursive Doubling
  *
@@ -28,7 +22,7 @@
  */
 int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
                                                        void *recvbuf,
-                                                       int recvcount,
+                                                       MPI_Aint recvcount,
                                                        MPI_Datatype datatype,
                                                        MPI_Op op,
                                                        MPIR_Comm * comm_ptr,
@@ -36,11 +30,10 @@ int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
 {
     int rank, comm_size, i;
     MPI_Aint extent, true_extent, true_lb;
-    int *disps;
     void *tmp_recvbuf, *tmp_results;
     int mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
-    int dis[2], blklens[2], total_count, dst;
+    int dst;
     int mask, dst_tree_root, my_tree_root, j, k;
     int received;
     MPI_Datatype sendtype, recvtype;
@@ -50,36 +43,20 @@ int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
     comm_size = comm_ptr->local_size;
     rank = comm_ptr->rank;
 
-    /* set op_errno to 0. stored in perthread structure */
-    {
-        MPIR_Per_thread_t *per_thread = NULL;
-        int err = 0;
-
-        MPID_THREADPRIV_KEY_GET_ADDR(MPIR_ThreadInfo.isThreaded, MPIR_Per_thread_key,
-                                     MPIR_Per_thread, per_thread, &err);
-        MPIR_Assert(err == 0);
-        per_thread->op_errno = 0;
-    }
-
-    if (recvcount == 0) {
-        goto fn_exit;
-    }
-
     MPIR_Datatype_get_extent_macro(datatype, extent);
     MPIR_Type_get_true_extent_impl(datatype, &true_lb, &true_extent);
 
     is_commutative = MPIR_Op_is_commutative(op);
 
-    MPIR_CHKLMEM_MALLOC(disps, int *, comm_size * sizeof(int), mpi_errno, "disps", MPL_MEM_BUFFER);
+    MPI_Aint *disps;
+    MPIR_CHKLMEM_MALLOC(disps, MPI_Aint *, comm_size * sizeof(MPI_Aint), mpi_errno, "disps",
+                        MPL_MEM_BUFFER);
 
+    MPI_Aint total_count;
     total_count = comm_size * recvcount;
     for (i = 0; i < comm_size; i++) {
         disps[i] = i * recvcount;
     }
-
-    /* total_count*extent eventually gets malloced. it isn't added to
-     * a user-passed in buffer */
-    MPIR_Ensure_Aint_fits_in_pointer(total_count * MPL_MAX(true_extent, extent));
 
     /* need to allocate temporary buffer to receive incoming data */
     MPIR_CHKLMEM_MALLOC(tmp_recvbuf, void *, total_count * (MPL_MAX(true_extent, extent)),
@@ -102,8 +79,7 @@ int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
         mpi_errno = MPIR_Localcopy(recvbuf, total_count, datatype,
                                    tmp_results, total_count, datatype);
 
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
     mask = 0x1;
     i = 0;
@@ -126,6 +102,7 @@ int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
          * data indexed from dst_tree_root to dst_tree_root+mask-1. */
 
         /* calculate sendtype */
+        MPI_Aint dis[2], blklens[2];
         blklens[0] = blklens[1] = 0;
         for (j = 0; j < my_tree_root; j++)
             blklens[0] += recvcount;
@@ -137,13 +114,11 @@ int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
         for (j = my_tree_root; (j < my_tree_root + mask) && (j < comm_size); j++)
             dis[1] += recvcount;
 
-        mpi_errno = MPIR_Type_indexed_impl(2, blklens, dis, datatype, &sendtype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        mpi_errno = MPIR_Type_indexed_large_impl(2, blklens, dis, datatype, &sendtype);
+        MPIR_ERR_CHECK(mpi_errno);
 
         mpi_errno = MPIR_Type_commit_impl(&sendtype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         /* calculate recvtype */
         blklens[0] = blklens[1] = 0;
@@ -157,13 +132,11 @@ int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
         for (j = dst_tree_root; (j < dst_tree_root + mask) && (j < comm_size); j++)
             dis[1] += recvcount;
 
-        mpi_errno = MPIR_Type_indexed_impl(2, blklens, dis, datatype, &recvtype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        mpi_errno = MPIR_Type_indexed_large_impl(2, blklens, dis, datatype, &recvtype);
+        MPIR_ERR_CHECK(mpi_errno);
 
         mpi_errno = MPIR_Type_commit_impl(&recvtype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         received = 0;
         if (dst < comm_size) {
@@ -267,29 +240,24 @@ int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
         if (received) {
             if (is_commutative || (dst_tree_root < my_tree_root)) {
                 mpi_errno = MPIR_Reduce_local(tmp_recvbuf, tmp_results, blklens[0], datatype, op);
-                if (mpi_errno)
-                    MPIR_ERR_POP(mpi_errno);
+                MPIR_ERR_CHECK(mpi_errno);
 
                 mpi_errno = MPIR_Reduce_local(((char *) tmp_recvbuf + dis[1] * extent),
                                               ((char *) tmp_results + dis[1] * extent),
                                               blklens[1], datatype, op);
-                if (mpi_errno)
-                    MPIR_ERR_POP(mpi_errno);
+                MPIR_ERR_CHECK(mpi_errno);
             } else {
                 mpi_errno = MPIR_Reduce_local(tmp_results, tmp_recvbuf, blklens[0], datatype, op);
-                if (mpi_errno)
-                    MPIR_ERR_POP(mpi_errno);
+                MPIR_ERR_CHECK(mpi_errno);
 
                 mpi_errno = MPIR_Reduce_local(((char *) tmp_results + dis[1] * extent),
                                               ((char *) tmp_recvbuf + dis[1] * extent),
                                               blklens[1], datatype, op);
-                if (mpi_errno)
-                    MPIR_ERR_POP(mpi_errno);
+                MPIR_ERR_CHECK(mpi_errno);
 
                 /* copy result back into tmp_results */
                 mpi_errno = MPIR_Localcopy(tmp_recvbuf, 1, recvtype, tmp_results, 1, recvtype);
-                if (mpi_errno)
-                    MPIR_ERR_POP(mpi_errno);
+                MPIR_ERR_CHECK(mpi_errno);
             }
         }
 
@@ -303,24 +271,11 @@ int MPIR_Reduce_scatter_block_intra_recursive_doubling(const void *sendbuf,
     /* now copy final results from tmp_results to recvbuf */
     mpi_errno = MPIR_Localcopy(((char *) tmp_results + disps[rank] * extent),
                                recvcount, datatype, recvbuf, recvcount, datatype);
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
   fn_exit:
     MPIR_CHKLMEM_FREEALL();
 
-    {
-        MPIR_Per_thread_t *per_thread = NULL;
-        int err = 0;
-
-        MPID_THREADPRIV_KEY_GET_ADDR(MPIR_ThreadInfo.isThreaded, MPIR_Per_thread_key,
-                                     MPIR_Per_thread, per_thread, &err);
-        MPIR_Assert(err == 0);
-        if (per_thread->op_errno)
-            mpi_errno = per_thread->op_errno;
-    }
-
-    /* --BEGIN ERROR HANDLING-- */
     if (mpi_errno_ret)
         mpi_errno = mpi_errno_ret;
     else if (*errflag != MPIR_ERR_NONE)

@@ -1,8 +1,8 @@
-#!/usr/bin/env perl
-#
-# (C) 2008 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+#! /usr/bin/env perl
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
 use strict;
 use warnings;
@@ -14,6 +14,7 @@ use File::Temp qw( tempdir );
 my $arg = 0;
 my $branch = "";
 my $version = "";
+my $so_version = "";
 my $append_commit_id;
 my $root = cwd();
 my $with_autoconf = "";
@@ -46,23 +47,24 @@ sub check_package
         # the user specified a dir where autoconf can be found
         if (not -x "$with_autoconf/$pack") {
             print "not found\n";
-            exit;
+            return 0;
         }
     }
     if ($with_automake and ($pack eq "automake")) {
         # the user specified a dir where automake can be found
         if (not -x "$with_automake/$pack") {
             print "not found\n";
-            exit;
+            return 0;
         }
     }
     else {
         if (`which $pack` eq "") {
             print "not found\n";
-            exit;
+            return 0;
         }
     }
     print "done\n";
+    return 1;
 }
 
 sub check_autotools_version
@@ -122,6 +124,7 @@ sub run_cmd
 GetOptions(
     "branch=s" => \$branch,
     "version=s" => \$version,
+    "so-version=s" => \$so_version,
     "append-commit-id!" => \$append_commit_id,
     "with-autoconf" => \$with_autoconf,
     "with-automake" => \$with_automake,
@@ -141,21 +144,24 @@ if (!$branch || !$version) {
     usage();
 }
 
-check_package("doctext");
-check_package("txt2man");
-check_package("git");
-check_package("latex");
-check_package("autoconf");
-check_package("automake");
+my $has_doctext = check_package("doctext");
+my $has_git = check_package("git");
+my $has_latex = check_package("latex");
+my $has_autoconf = check_package("autoconf");
+my $has_automake = check_package("automake");
+if (!$has_git || !$has_autoconf || !$has_automake) {
+    die "\tFATAL: git, autoconf, and automake are required.\n";
+}
+if (!$has_doctext || !$has_latex) {
+    print("\tWARNING: doctext or latex not found. Man pages and documentations\n");
+    print("\t         will be skipped in the release package.\n\n");
+    print("\tdoctext is available on http://wgropp.cs.illinois.edu/projects/software/sowing/\n");
+}
 print("\n");
 
-## IMPORTANT: Changing the autotools versions can result in ABI
-## breakage. So make sure the ABI string in the release tarball is
-## updated when you do that.
-check_autotools_version("autoconf", "2.69");
-check_autotools_version("automake", "1.15");
-check_autotools_version("libtool", "2.4.6");
-print("\n");
+## NOTE: Different autotools versions may result in accidental ABI chanages.
+## For flexibility, we no longer enforce the check for specific versions.
+## Always double check using the ABI compatibility tool before the final release.
 
 
 my $tdir = tempdir(CLEANUP => 1);
@@ -208,26 +214,28 @@ chdir($expdir);
 my $date = `date`;
 chomp $date;
 system(qq(perl -p -i -e 's/\\[MPICH_RELEASE_DATE_m4\\],\\[unreleased development copy\\]/[MPICH_RELEASE_DATE_m4],[$date]/g' ./maint/version.m4));
+
+if ($so_version) {
+    system(qq(perl -p -i -e 's/\\[libmpi_so_version_m4\\],\\[0:0:0\\]/[libmpi_so_version_m4],[$so_version]/g' ./maint/version.m4));
+}
 # the main version.m4 file will be copied to hydra's version.m4, including the
 # above modifications
-print("done\n");
-
-# Remove content that is not being released
-print("===> Removing content that is not being released... ");
-chdir($expdir);
-
-chdir("${expdir}/src/mpid/ch3/channels/nemesis/netmod");
-my @nem_modules = qw(elan);
-run_cmd("rm -rf ".join(' ', @nem_modules));
-for my $module (@nem_modules) {
-    run_cmd("rm -rf $module");
-    run_cmd(q{perl -p -i -e '$_="" if m|^\s*include \$.*netmod/}.${module}.q{/Makefile.mk|' Makefile.mk});
-}
 print("done\n");
 
 # Create configure
 print("===> Creating configure in the main codebase... ");
 chdir($expdir);
+{
+    my $cmd = "./autogen.sh --with-doc";
+    $cmd .= " --with-autoconf=$with_autoconf" if $with_autoconf;
+    $cmd .= " --with-automake=$with_automake" if $with_automake;
+    run_cmd($cmd);
+}
+print("done\n");
+
+# Create test/mpi/configure
+print("===> Creating configure in the test/mpi... ");
+chdir("$expdir/test/mpi");
 {
     my $cmd = "./autogen.sh";
     $cmd .= " --with-autoconf=$with_autoconf" if $with_autoconf;
@@ -253,27 +261,28 @@ run_cmd("find . -name autom4te.cache | xargs rm -rf");
 print("done\n");
 
 # Get docs
-print("===> Creating secondary codebase for the docs... ");
-run_cmd("mkdir ${expdir}-build");
-chdir("${expdir}-build");
-run_cmd("${expdir}/configure --disable-fortran --disable-cxx");
-run_cmd("(make mandoc && make htmldoc && make latexdoc)");
-print("done\n");
+if ($has_doctext and $has_latex) {
+    print("===> Creating secondary codebase for the docs... ");
+    run_cmd("mkdir ${expdir}-build");
+    chdir("${expdir}-build");
+    run_cmd("${expdir}/configure --with-device=ch4:stubnm --disable-fortran --disable-cxx");
+    run_cmd("(make mandoc && make htmldoc && make latexdoc)");
+    print("done\n");
 
-print("===> Copying docs over... ");
-run_cmd("cp -a man ${expdir}");
-run_cmd("cp -a www ${expdir}");
-run_cmd("cp -a doc/userguide/user.pdf ${expdir}/doc/userguide");
-run_cmd("cp -a doc/installguide/install.pdf ${expdir}/doc/installguide");
-run_cmd("cp -a doc/logging/logging.pdf ${expdir}/doc/logging");
-print("done\n");
+    print("===> Copying docs over... ");
+    run_cmd("cp -a man ${expdir}");
+    run_cmd("cp -a www ${expdir}");
+    run_cmd("cp -a doc/userguide/user.pdf ${expdir}/doc/userguide");
+    run_cmd("cp -a doc/installguide/install.pdf ${expdir}/doc/installguide");
+    print("done\n");
 
-print("===> Creating ROMIO docs... ");
-chdir("${expdir}/src/mpi");
-chdir("romio/doc");
-run_cmd("make");
-run_cmd("rm -f users-guide.blg users-guide.toc users-guide.aux users-guide.bbl users-guide.log users-guide.dvi");
-print("done\n");
+    print("===> Creating ROMIO docs... ");
+    chdir("${expdir}/src/mpi");
+    chdir("romio/doc");
+    run_cmd("make");
+    run_cmd("rm -f users-guide.blg users-guide.toc users-guide.aux users-guide.bbl users-guide.log users-guide.dvi");
+    print("done\n");
+}
 
 # Create the main tarball
 print("===> Creating the final mpich tarball... ");
@@ -287,6 +296,21 @@ print("===> Creating the final hydra tarball... ");
 run_cmd("cp -a ${expdir}/src/pm/hydra hydra-${version}");
 run_cmd("tar -czvf hydra-${version}.tar.gz hydra-${version}");
 run_cmd("cp -a hydra-${version}.tar.gz ${root}/");
+print("done\n");
+
+# Create the pmi tarball
+print("===> Creating the final libpmi tarball... ");
+run_cmd("cp -a ${expdir}/src/pmi libpmi-${version}");
+run_cmd("tar -czvf libpmi-${version}.tar.gz libpmi-${version}");
+run_cmd("cp -a libpmi-${version}.tar.gz ${root}/");
+print("done\n");
+
+# Create the testsuite tarball
+print("===> Creating the final mpich-testsuite tarball... ");
+my $target = "mpich-testsuite-$version";
+run_cmd("cp -a ${expdir}/test/mpi $target");
+run_cmd("tar -czvf $target.tar.gz $target");
+run_cmd("cp -a $target.tar.gz ${root}/");
 print("done\n\n");
 
 # make sure we are outside of the tempdir so that the CLEANUP logic can run

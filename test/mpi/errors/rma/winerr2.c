@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include "mpitest.h"
@@ -58,7 +57,6 @@ void weh2(MPI_Win * win, int *err, ...)
 
 int main(int argc, char *argv[])
 {
-    int err;
     int buf[2];
     MPI_Win win;
     MPI_Comm comm;
@@ -86,7 +84,7 @@ int main(int argc, char *argv[])
     MPI_Errhandler_free(&newerr1);
 
     expected_err_class = MPI_ERR_RANK;
-    err = MPI_Put(buf, 1, MPI_INT, -5, 0, 1, MPI_INT, win);
+    MPI_Put(buf, 1, MPI_INT, -5, 0, 1, MPI_INT, win);
     if (w1Called != 1) {
         errs++;
         printf("newerr1 not called\n");
@@ -110,7 +108,7 @@ int main(int argc, char *argv[])
     MPI_Errhandler_free(&newerr2);
 
     expected_err_class = MPI_ERR_RANK;
-    err = MPI_Put(buf, 1, MPI_INT, -5, 0, 1, MPI_INT, win);
+    MPI_Put(buf, 1, MPI_INT, -5, 0, 1, MPI_INT, win);
     if (w2Called != 1) {
         errs++;
         printf("newerr2 not called\n");

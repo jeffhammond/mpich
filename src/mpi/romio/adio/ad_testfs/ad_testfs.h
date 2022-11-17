@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef AD_TESTFS_H_INCLUDED
@@ -16,19 +14,19 @@
 
 void ADIOI_TESTFS_Open(ADIO_File fd, int *error_code);
 void ADIOI_TESTFS_Close(ADIO_File fd, int *error_code);
-void ADIOI_TESTFS_ReadContig(ADIO_File fd, void *buf, int count,
+void ADIOI_TESTFS_ReadContig(ADIO_File fd, void *buf, MPI_Aint count,
                              MPI_Datatype datatype, int file_ptr_type,
                              ADIO_Offset offset, ADIO_Status * status, int
                              *error_code);
-void ADIOI_TESTFS_WriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_TESTFS_WriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, ADIO_Status * status, int
                               *error_code);
-void ADIOI_TESTFS_IwriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_TESTFS_IwriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                                MPI_Datatype datatype, int file_ptr_type,
                                ADIO_Offset offset, ADIO_Request * request, int
                                *error_code);
-void ADIOI_TESTFS_IreadContig(ADIO_File fd, void *buf, int count,
+void ADIOI_TESTFS_IreadContig(ADIO_File fd, void *buf, MPI_Aint count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, ADIO_Request * request, int
                               *error_code);
@@ -40,26 +38,26 @@ void ADIOI_TESTFS_ReadComplete(ADIO_Request * request, ADIO_Status * status, int
                                *error_code);
 void ADIOI_TESTFS_WriteComplete(ADIO_Request * request, ADIO_Status * status, int *error_code);
 void ADIOI_TESTFS_Fcntl(ADIO_File fd, int flag, ADIO_Fcntl_t * fcntl_struct, int *error_code);
-void ADIOI_TESTFS_WriteStrided(ADIO_File fd, const void *buf, int count,
+void ADIOI_TESTFS_WriteStrided(ADIO_File fd, const void *buf, MPI_Aint count,
                                MPI_Datatype datatype, int file_ptr_type,
                                ADIO_Offset offset, ADIO_Status * status, int *error_code);
-void ADIOI_TESTFS_ReadStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_TESTFS_ReadStrided(ADIO_File fd, void *buf, MPI_Aint count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, ADIO_Status * status, int
                               *error_code);
-void ADIOI_TESTFS_WriteStridedColl(ADIO_File fd, const void *buf, int count,
+void ADIOI_TESTFS_WriteStridedColl(ADIO_File fd, const void *buf, MPI_Aint count,
                                    MPI_Datatype datatype, int file_ptr_type,
                                    ADIO_Offset offset, ADIO_Status * status, int
                                    *error_code);
-void ADIOI_TESTFS_ReadStridedColl(ADIO_File fd, void *buf, int count,
+void ADIOI_TESTFS_ReadStridedColl(ADIO_File fd, void *buf, MPI_Aint count,
                                   MPI_Datatype datatype, int file_ptr_type,
                                   ADIO_Offset offset, ADIO_Status * status, int
                                   *error_code);
-void ADIOI_TESTFS_IreadStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_TESTFS_IreadStrided(ADIO_File fd, void *buf, MPI_Aint count,
                                MPI_Datatype datatype, int file_ptr_type,
                                ADIO_Offset offset, ADIO_Request * request, int
                                *error_code);
-void ADIOI_TESTFS_IwriteStrided(ADIO_File fd, const void *buf, int count,
+void ADIOI_TESTFS_IwriteStrided(ADIO_File fd, const void *buf, MPI_Aint count,
                                 MPI_Datatype datatype, int file_ptr_type,
                                 ADIO_Offset offset, ADIO_Request * request, int
                                 *error_code);

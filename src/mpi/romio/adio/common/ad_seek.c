@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -27,7 +26,7 @@ ADIO_Offset ADIOI_GEN_SeekIndividual(ADIO_File fd, ADIO_Offset offset, int whenc
     ADIO_Offset size_in_filetype, sum;
     MPI_Count filetype_size, etype_size;
     int filetype_is_contig;
-    MPI_Aint filetype_extent;
+    MPI_Aint lb, filetype_extent;
 
     MPL_UNREFERENCED_ARG(whence);
 
@@ -39,7 +38,7 @@ ADIO_Offset ADIOI_GEN_SeekIndividual(ADIO_File fd, ADIO_Offset offset, int whenc
     else {
         flat_file = ADIOI_Flatten_and_find(fd->filetype);
 
-        MPI_Type_extent(fd->filetype, &filetype_extent);
+        MPI_Type_get_extent(fd->filetype, &lb, &filetype_extent);
         MPI_Type_size_x(fd->filetype, &filetype_size);
         if (!filetype_size) {
             /* Since offset relative to the filetype size, we can't

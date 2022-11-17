@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -42,14 +41,14 @@ int main(int argc, char *argv[])
         }
     }
     MPI_Cancel(&cRequest);
-    MPI_Test(&cRequest, &tFlag, &st);
+    MPI_Wait(&cRequest, &st);
     MPI_Test_cancelled(&st, &tFlag);
     if (!tFlag) {
         errs++;
         printf("Unable to cancel MPI_Irecv request\n");
     }
     /* Using MPI_Request_free should be ok, but some MPI implementations
-     * object to it imediately after the cancel and that isn't essential to
+     * object to it immediately after the cancel and that isn't essential to
      * this test */
 
     MTest_Finalize(errs);

@@ -1,13 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /** Contended RMA put/get test -- James Dinan <dinan@mcs.anl.gov>
   *
   * Each process issues COUNT put and get operations to non-overlapping
-  * locations on every other processs.
+  * locations on every other process.
   */
 
 #include <stdio.h>

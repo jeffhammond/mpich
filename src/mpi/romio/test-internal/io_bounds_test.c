@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   Copyright (C) 2008 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "../adio/include/adio.h"
@@ -103,8 +102,8 @@ int run_test(test_param_t * test)
 
     MPI_Datatype filetype;
 
-    MPI_Type_struct(test->type_count, test->type_blocklens,
-                    test->type_indices, test->type_oldtypes, &filetype);
+    MPI_Type_create_struct(test->type_count, test->type_blocklens,
+                           test->type_indices, test->type_oldtypes, &filetype);
     MPI_Type_commit(&filetype);
 
     MPI_File_open(MPI_COMM_WORLD, "test_file.txt", MPI_MODE_RDWR, MPI_INFO_NULL, &fh);

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
@@ -10,19 +9,14 @@
    cancel message, once the code decides that the request can still
    be cancelled */
 
-#undef FUNCNAME
-#define FUNCNAME MPID_Cancel_send
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_Cancel_send(MPIR_Request * sreq)
 {
     MPIDI_VC_t * vc;
     int proto;
     int flag;
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_CANCEL_SEND);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_CANCEL_SEND);
+    MPIR_FUNC_ENTER;
     
     MPIR_Assert(sreq->kind == MPIR_REQUEST_KIND__SEND);
 
@@ -77,9 +71,7 @@ int MPID_Cancel_send(MPIR_Request * sreq)
 
 	    MPIR_STATUS_SET_CANCEL_BIT(sreq->status, TRUE);
             mpi_errno = MPID_Request_complete(sreq);
-            if (mpi_errno != MPI_SUCCESS) {
-                MPIR_ERR_POP(mpi_errno);
-            }
+            MPIR_ERR_CHECK(mpi_errno);
 	}
 	else
 	{
@@ -117,7 +109,7 @@ int MPID_Cancel_send(MPIR_Request * sreq)
                conflict with release of the RTS request if the CTS is received
 	       (see handling of a rendezvous CTS packet in
                MPIDI_CH3U_Handle_recv_pkt()).  
-	       MPID_Request_fetch_and_clear_rts_sreq() is used to gurantee 
+	       MPID_Request_fetch_and_clear_rts_sreq() is used to guarantee 
 	       that atomicity. */
 	    MPIDI_Request_fetch_and_clear_rts_sreq(sreq, &rts_sreq);
 	    if (rts_sreq != NULL) 
@@ -131,7 +123,7 @@ int MPID_Cancel_send(MPIR_Request * sreq)
 		/* --BEGIN ERROR HANDLING-- */
 		if (mpi_errno != MPI_SUCCESS)
 		{
-		    mpi_errno = MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
+		    mpi_errno = MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, __func__, __LINE__, MPI_ERR_OTHER,
 						     "**ch3|cancelrndv", 0);
 		    goto fn_exit;
 		}
@@ -218,7 +210,7 @@ int MPID_Cancel_send(MPIR_Request * sreq)
        should be adequate. */
  fn_fail:
  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_CANCEL_SEND);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }
 
@@ -312,11 +304,9 @@ int MPIDI_CH3_PktHandler_CancelSendResp( MPIDI_VC_t *vc ATTRIBUTE((unused)),
 	if (MPIDI_Request_get_msg_type(sreq) == MPIDI_REQUEST_RNDV_MSG ||
 	    MPIDI_Request_get_type(sreq) == MPIDI_REQUEST_TYPE_SSEND)
 	{
-	    int cc;
-	    
 	    /* decrement the CC one additional time for the CTS/sync ack that 
 	       is never going to arrive */
-	    MPIDI_CH3U_Request_decrement_cc(sreq, &cc);
+	    MPIDI_CH3U_Request_dec_cc(sreq);
 	}
 		
 	MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,TYPICAL,"message cancelled");
@@ -328,9 +318,7 @@ int MPIDI_CH3_PktHandler_CancelSendResp( MPIDI_VC_t *vc ATTRIBUTE((unused)),
     }
     
     mpi_errno = MPID_Request_complete(sreq);
-    if (mpi_errno != MPI_SUCCESS) {
-        MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
 
     *rreqp = NULL;
 

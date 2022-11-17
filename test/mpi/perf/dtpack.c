@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2008 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 /*
  * This code may be used to test the performance of some of the
  * noncontiguous datatype operations, including vector and indexed
@@ -433,7 +433,7 @@ int Report(const char *name, const char *packname, double avgTimeMPI, double avg
 /* Finally, here's the main program */
 int main(int argc, char *argv[])
 {
-    int n, stride, err, errs = 0;
+    int n, stride, errs = 0;
     void *dest, *src;
     double avgTimeUser, avgTimeMPI;
 
@@ -449,13 +449,13 @@ int main(int argc, char *argv[])
     memset(src, 0, n * (1 + stride) * sizeof(double));
     memset(dest, 0, n * sizeof(double));
 
-    err = TestVecPackDouble(n, stride, &avgTimeUser, &avgTimeMPI, dest, src);
+    TestVecPackDouble(n, stride, &avgTimeUser, &avgTimeMPI, dest, src);
     errs += Report("VecPackDouble", "Pack", avgTimeMPI, avgTimeUser);
 
-    err = TestVecUnPackDouble(n, stride, &avgTimeUser, &avgTimeMPI, src, dest);
+    TestVecUnPackDouble(n, stride, &avgTimeUser, &avgTimeMPI, src, dest);
     errs += Report("VecUnPackDouble", "Unpack", avgTimeMPI, avgTimeUser);
 
-    err = TestIndexPackDouble(n, stride, &avgTimeUser, &avgTimeMPI, dest, src);
+    TestIndexPackDouble(n, stride, &avgTimeUser, &avgTimeMPI, dest, src);
     errs += Report("VecIndexDouble", "Pack", avgTimeMPI, avgTimeUser);
 
     free(dest);
@@ -465,7 +465,7 @@ int main(int argc, char *argv[])
     src = (void *) malloc((1 + n) * ((1 + stride) * sizeof(double)));
     memset(dest, 0, 2 * n * sizeof(double));
     memset(src, 0, (1 + n) * (1 + stride) * sizeof(double));
-    err = TestVecPack2Double(n, stride, &avgTimeUser, &avgTimeMPI, dest, src);
+    TestVecPack2Double(n, stride, &avgTimeUser, &avgTimeMPI, dest, src);
     errs += Report("VecPack2Double", "Pack", avgTimeMPI, avgTimeUser);
 
     free(dest);

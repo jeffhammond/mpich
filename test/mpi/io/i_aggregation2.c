@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* Look for regressions in aggregator code.  A more simple access pattern than
@@ -41,7 +40,7 @@ int main(int argc, char **argv)
     int errcode;
     int i, rank, errs = 0, buffer[BUFSIZE], buf2[BUFSIZE];
     MPI_Request request;
-    char *filename = NULL;
+    const char *filename = NULL;
 
     filename = (argc > 1) ? argv[1] : "testfile";
 

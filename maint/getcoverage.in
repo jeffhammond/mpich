@@ -1,6 +1,9 @@
 #! /usr/bin/env perl
-# -*- Mode: perl; -*-
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
+
 # This script extracts information from files produced by gcov showing what
 # parts of each file have *not* been executed by the test programs.
 # 
@@ -57,13 +60,13 @@ $annoteFiles = 0;
 $annoteBaseDir = "";
 %AnnoteFilesMap = ();   # Clear the list of files 
 %AnnoteMissed   = ();   # Clear the mapping of filenames to "missed;total" lines
-%AnnoteFilesToOrig = (); # Map from annoted file key to original name (used for
+%AnnoteFilesToOrig = (); # Map from annotated file key to original name (used for
                          # indexing into AnnoteMissed)
 $gDebug = 0;
 $gDebugDetail = 0;
 
 # The line leaders are used to provide a common set of expressions to match
-# the begining of a line.  This matches the output from the gcov tools.
+# the beginning of a line.  This matches the output from the gcov tools.
 # There are two of these because the output from the tools associtated with
 # gcc version 2.x and 3.x are different.
 # As, apparently is 4.x.
@@ -293,7 +296,7 @@ L:  while (<FD>) {
 	# and nothing else.
 	if ($skipErrExits && 
 	    (/FUNC_EXIT.*STATE/ || /MPIR_Err_return_/ || 
-	     /MPIR_ERR_SET/ || /MPIR_ERR_POP/ || /goto\s+fn_fail/ ||
+	     /MPIR_ERR_SET/ || /MPIR_ERR_POP/ || /MPIR_ERR_CHECK/ || /goto\s+fn_fail/ ||
 	     /MPIR_ERR_ADD/ || /\*errflag\s*=\s*[^;]*;\s*$/ || 
 	     /fn_fail:/ || /MPIR_Err_create_code/)) {
 	    next;
@@ -312,12 +315,6 @@ L:  while (<FD>) {
 	    $missed_lines++;
 	    $executableLines++;  # This missed line is executable 
 		
-	    # The char\s+.* allows char or const char (or other 
-	    # things, but nothing else should use FCNAME).
-	    if (/static\s+char\s+.*FCNAME\[\]\s*=\s*\"(.*)\"/) {
-		# Add this to a list of functions never called.
-		$UnCalled[$#UnCalled + 1] = $1;
-	    }
 	    if ($outputUncovered) {
 		if (!$headerOutput) {
 		    print "\nUncovered lines in $filename\n";
@@ -407,7 +404,7 @@ L2: while (<FD>) {
 	# The format of the line also changed
 	if ($skipErrExits && 
 	    (/FUNC_EXIT.*STATE/ || /MPIR_Err_return_/ || 
-	     /MPIR_ERR_SET/ || /MPIR_ERR_POP/ || /goto\s+fn_fail/ ||
+	     /MPIR_ERR_SET/ || /MPIR_ERR_POP/ || /MPIR_ERR_CHECK/ || /goto\s+fn_fail/ ||
 	     /MPIR_ERR_ADD/ || /\*errflag\s*=\s*[^;]*;\s*$/ || 
             /fn_fail:/ || /MPIR_Err_create_code/)) {
 	    # If requested, skip obvious error checking lines
@@ -774,7 +771,7 @@ sub ExpandDir {
     my @otherdirs = ();
     my @files = ();
     opendir DIR, "$dir";
-    while ($filename = readdir DIR) {
+    for $filename (sort readdir DIR) {
 	if ($filename =~ /^\./ || $filename eq ".svn") {
 	    next;
 	}
@@ -786,7 +783,7 @@ sub ExpandDir {
 	    $otherdirs[$#otherdirs+1] = "$dir/$filename";
 	}
 	elsif ($filename =~ /(.*\.gcov)$/) {
-	    # Check for the presense of a "merged" gcov file and use instead
+	    # Check for the presence of a "merged" gcov file and use instead
 	    if (-f "$dir/$filename.merge") {
 		$files[$#files + 1] = "$dir/$filename.merge";
 	    }
@@ -982,7 +979,7 @@ sub skipBlock {
 	    /^$lineLeader4\/\*\s+--END $blockName--\s+\*\//) {
 	    last; 
 	}
-	# If we match the following but not the preceeding, there are extra 
+	# If we match the following but not the preceding, there are extra 
 	# spaces in the comment
 	if (/^\s*\/\*\s*--\s*END\s+$blockName\s*--\s*\*\/\s*/ ||
 	    /^\s*-:\s*\d+:\s*\/\*\s*--\s*END\s+$blockName\s*--\s*\*\/\s*/) {

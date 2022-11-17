@@ -3,20 +3,20 @@ dnl MPICH_SUBCFG_BEFORE=src/mpid/common/shm
 dnl MPICH_SUBCFG_AFTER=src/mpid/ch4
 
 AC_DEFUN([PAC_SUBCFG_PREREQ_]PAC_SUBCFG_AUTO_SUFFIX,[
-    for shm in $ch4_shm ; do
-        AS_CASE([$shm],[posix],[build_ch4_shm_posix=yes])
-    done
-
+    AM_COND_IF([BUILD_CH4], [
+    # always enable POSIX
+    build_ch4_shm_posix=yes
+    
     AC_ARG_WITH(ch4-posix-eager-modules,
     [  --with-ch4-posix-eager-modules=module-list
     CH4 POSIX eager arguments:
-            fbox - Use Fast Box module for eager transport
+            iqueue - Use Inverted Queue module for eager transport
             ],
             [posix_eager_modules=$withval],
             [posix_eager_modules=])
 
     if test -z "${posix_eager_modules}" ; then
-        ch4_posix_eager_modules="fbox"
+        ch4_posix_eager_modules="iqueue"
     else
         ch4_posix_eager_modules=`echo ${posix_eager_modules} | sed -e 's/,/ /g'`
     fi
@@ -108,6 +108,7 @@ MPIDI_POSIX_eager_${posix_eager}_recv_transaction_t ${posix_eager};"
 
     # the POSIX shmmod depends on the common shm code
     build_mpid_common_shm=yes
+    ])
     AM_CONDITIONAL([BUILD_SHM_POSIX],[test "X$build_ch4_shm_posix" = "Xyes"])
 ])dnl
 

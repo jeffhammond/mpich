@@ -1,48 +1,3 @@
-dnl PAC_FC_SEARCH_LIST - expands to a whitespace separated list of modern
-dnl fortran compilers for use with AC_PROG_FC that is more suitable for HPC
-dnl software packages
-AC_DEFUN([PAC_FC_SEARCH_LIST],
-         [ifort pgf90 pathf90 pathf95 xlf90 xlf95 xlf2003 gfortran f90 epcf90 f95 fort lf95 g95 ifc efc gfc])
-dnl /*D
-dnl PAC_PROG_FC([COMPILERS])
-dnl
-dnl COMPILERS is a space separated list of Fortran 77 compilers to search
-dnl for.  Fortran 95 isn't strictly backwards-compatible with Fortran 77,
-dnl but `f95' is worth trying.
-dnl
-dnl Compilers are ordered by
-dnl  1. F77, F90, F95
-dnl  2. Good/tested native compilers, bad/untested native compilers
-dnl  3. Wrappers around f2c go last.
-dnl
-dnl `fort77' is a wrapper around `f2c'.
-dnl It is believed that under HP-UX `fort77' is the name of the native
-dnl compiler.  On some Cray systems, fort77 is a native compiler.
-dnl frt is the Fujitsu F77 compiler.
-dnl pgf77 and pgf90 are the Portland Group F77 and F90 compilers.
-dnl xlf/xlf90/xlf95/xlf2003 are IBM (AIX) F77/F90/F95/F2003 compilers.
-dnl lf95 is the Lahey-Fujitsu compiler.
-dnl fl32 is the Microsoft Fortran "PowerStation" compiler.
-dnl af77 is the Apogee F77 compiler for Intergraph hardware running CLIX.
-dnl epcf90 is the "Edinburgh Portable Compiler" F90.
-dnl fort is the Compaq Fortran 90 (now 95) compiler for Tru64 and Linux/Alpha.
-dnl pathf90 is the Pathscale Fortran 90 compiler
-dnl ifort is another name for the Intel f90 compiler
-dnl efc - An older Intel compiler (?)
-dnl ifc - An older Intel compiler
-dnl fc  - A compiler on some unknown system.  This has been removed because
-dnl       it may also be the name of a command for something other than
-dnl       the Fortran compiler (e.g., fc=file system check!)
-dnl gfortran - The GNU Fortran compiler (not the same as g95) 
-dnl gfc - An alias for gfortran recommended in cygwin installations
-dnl NOTE: this macro suffers from a basically intractable "expanded before it
-dnl was required" problem when libtool is also used
-dnl D*/
-AC_DEFUN([PAC_PROG_FC],[
-PAC_PUSH_FLAG([FCFLAGS])
-AC_PROG_FC([m4_default([$1],[PAC_FC_SEARCH_LIST])])
-PAC_POP_FLAG([FCFLAGS])
-])
 dnl
 dnl PAC_FC_EXT checks for the default Fortran 90 program extension, f90 then f.
 dnl This could be replaced by AC_FC_SRCEXT but since AC_FC_SRCEXT
@@ -168,7 +123,7 @@ fi # is not cross compiling
 dnl
 dnl ------------------------------------------------------------------------
 dnl Special characteristics that have no autoconf counterpart but that
-dnl we need as part of the Fortran 90 support.  To distinquish these, they
+dnl we need as part of the Fortran 90 support.  To distinguish these, they
 dnl have a [PAC] prefix.
 dnl 
 dnl At least one version of the Cray compiler needs the option -em to
@@ -319,7 +274,7 @@ AC_COMPILE_IFELSE([],[
 rm -rf conftest.dSYM
 rm -f conftest.$ac_ext
 
-dnl Create the conftest here so the test isn't created everytime inside loop.
+dnl Create the conftest here so the test isn't created every time inside loop.
 AC_LANG_CONFTEST([AC_LANG_PROGRAM([],[use conf])])
 
 # Save the original FCFLAGS
@@ -357,7 +312,7 @@ if test "X$pac_cv_fc_module_incflag" = "X" ; then
         #     fullpathname.pc
         # The "fullpathname.pc" is generated, I believe, when a module is 
         # compiled.  
-        # Intel compilers use a wierd system: -cl,filename.pcl .  If no file is
+        # Intel compilers use a weird system: -cl,filename.pcl .  If no file is
         # specified, work.pcl and work.pc are created.  However, if you specify
         # a file, it must contain the name of a file ending in .pc .  Ugh!
         pac_cv_fc_module_incflag="unknown"
@@ -598,7 +553,6 @@ dnl
 dnl
 dnl
 AC_DEFUN([PAC_PROG_FC_AND_C_STDIO_LIBS],[
-AC_REQUIRE([AC_HEADER_STDC])
 # To simply the code in the cache_check macro, chose the routine name
 # first, in case we need it
 confname=conf1_
@@ -618,9 +572,7 @@ pac_cv_prog_fc_and_c_stdio_libs=unknown
 AC_LANG_PUSH(C)
 AC_COMPILE_IFELSE([
     AC_LANG_SOURCE([
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
 int $confname( int a )
 { printf( "The answer is %d\n", a ); fflush(stdout); return 0; }
     ])
@@ -1188,7 +1140,7 @@ END INTERFACE TEST_ASSUMED_RANK_ASYNC
 
 CONTAINS
 
-! Test TS 29113 asychronous attribute and optional
+! Test TS 29113 asynchronous attribute and optional
 SUBROUTINE test1(buf, count, ierr)
     INTEGER, ASYNCHRONOUS :: buf(*)
     INTEGER               :: count
@@ -1239,4 +1191,79 @@ else
 fi
 rm -f conftest1.$OBJEXT F08TS_MODULE.* f08ts_module.*
 AC_MSG_RESULT([$f08_works])
+])
+
+dnl
+dnl PAC_FC_CHECK_REAL128 check whether real128 is supported (for use_mpi_f08)
+dnl set pac_fc_has_real128 to yes if it's supported, otherwise, no.
+dnl
+AC_DEFUN([PAC_FC_CHECK_REAL128],[
+    AC_LANG_PUSH(Fortran)
+    AC_MSG_CHECKING([for Fortran 90 real128])
+    AC_COMPILE_IFELSE([AC_LANG_SOURCE([
+        program main
+            use iso_fortran_env
+            real(real128) x
+            x = 1.0
+        end
+    ])],[pac_fc_has_real128=yes],[pac_fc_has_real128=no])
+    AC_MSG_RESULT([$pac_fc_has_real128])
+    AC_LANG_POP(Fortran)
+])
+
+dnl
+dnl PAC_FC_CHECK_IGNORE_TKR check directives to ignore type-kind-rank checks
+dnl set pac_fc_ignore_tkr to a type if supported, otherwise, no.
+dnl
+AC_DEFUN([PAC_FC_CHECK_IGNORE_TKR],[
+    AC_LANG_PUSH(Fortran)
+    AC_MSG_CHECKING([directives for Fortran compiler to ignore TKR check])
+    pac_fc_ignore_tkr=no
+    for a in gcc dec pragma dir ibm assumed; do
+        case $a in
+            gcc)
+                # gfortran since 4.9
+                decl='!GCC$ ATTRIBUTES NO_ARG_CHECK :: buf'
+                ;;
+            dec)
+                # ifort
+                decl='!DEC$ ATTRIBUTES NO_ARG_CHECK :: buf'
+                ;;
+            pragma)
+                # sunfort
+                decl='!$PRAGMA IGNORE_TKR buf'
+                ;;
+            dir)
+                # flang
+                decl='!DIR$ IGNORE_TKR buf'
+                ;;
+            ibm)
+                # ibm
+                decl='!IBM* IGNORE_TKR buf'
+                ;;
+            assumed)
+                decl='TYPE(*), DIMENSION(..) :: buf'
+                ;;
+        esac
+
+        AC_COMPILE_IFELSE([AC_LANG_SOURCE([
+            program main
+                IMPLICIT NONE
+                INTERFACE
+                  SUBROUTINE FUNC_A(buf)
+                    REAL buf
+                    $decl
+                  END SUBROUTINE
+                END INTERFACE
+
+                INTEGER A(10)
+                CALL FUNC_A(A)
+            end
+        ])],[pac_fc_ignore_tkr=$a],[])
+        if test $pac_fc_ignore_tkr != no ; then
+            break
+        fi
+    done
+    AC_MSG_RESULT([$pac_fc_ignore_tkr])
+    AC_LANG_POP(Fortran)
 ])

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <mpi.h>
@@ -16,7 +15,7 @@
 #define HEADER 144
 #define BLK_COUNT 3
 
-static void handle_error(int errcode, char *str)
+static void handle_error(int errcode, const char *str)
 {
     char msg[MPI_MAX_ERROR_STRING];
     int resultlen;
@@ -37,7 +36,7 @@ int main(int argc, char **argv)
     int data_size = DATA_SIZE;
     int i, j, k, errs = 0;
     MPI_Aint disp[BLK_COUNT];
-    char *filename = "unnamed.dat";
+    const char *filename = "unnamed.dat";
 
     MTest_Init(&argc, &argv);
     disp[0] = (MPI_Aint) (PAD);
@@ -84,7 +83,7 @@ int main(int argc, char **argv)
         for (k = 0; k < (DATA_SIZE / sizeof(int)); k++) {
             if (verify[(HEADER + PAD) / sizeof(int) + k + j * (DATA_SIZE / sizeof(int))] != data[k]) {
                 errs++;
-                fprintf(stderr, "expcted %d, read %d\n", data[k],
+                fprintf(stderr, "expected %d, read %d\n", data[k],
                         verify[(HEADER + PAD) / sizeof(int) + k + j * (DATA_SIZE / sizeof(int))]);
             }
             i++;

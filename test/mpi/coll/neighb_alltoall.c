@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,13 +30,14 @@ int main(int argc, char *argv[])
     int errs = 0;
     int wrank, wsize;
     int periods[1] = { 0 };
-    MPI_Comm cart, dgraph, graph;
-    int sendbuf[2] = { -(wrank + 1), wrank + 1 };
-    int recvbuf[2] = { 0xdeadbeef, 0xdeadbeef };
+    MPI_Comm cart;
 
     MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &wrank);
     MPI_Comm_size(MPI_COMM_WORLD, &wsize);
+
+    int sendbuf[2] = { -(wrank + 1), wrank + 1 };
+    int recvbuf[2] = { 0xdeadbeef, 0xdeadbeef };
 
 #if defined(TEST_NEIGHB_COLL)
     /* (wrap)--> 0 <--> 1 <--> ... <--> p-1 <--(wrap) */

@@ -1,7 +1,6 @@
-/* -*- Mode: c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2011 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_NBC_H_INCLUDED
@@ -47,20 +46,26 @@
  * separate potentially allows more parallelism in the future, but it also
  * pushes more work onto the clients of this interface. */
 int MPIR_Sched_next_tag(MPIR_Comm * comm_ptr, int *tag);
+void MPIR_Sched_set_tag(MPIR_Sched_t s, int tag);
 
 /* the device must provide a typedef for MPIR_Sched_t in mpidpre.h */
 
 /* creates a new opaque schedule object and returns a handle to it in (*sp) */
-int MPIR_Sched_create(MPIR_Sched_t * sp);
+int MPIR_Sched_create(MPIR_Sched_t * sp, enum MPIR_Sched_kind kind);
 /* clones orig and returns a handle to the new schedule in (*cloned) */
 int MPIR_Sched_clone(MPIR_Sched_t orig, MPIR_Sched_t * cloned);
-/* sets (*sp) to MPIR_SCHED_NULL and gives you back a request pointer in (*req).
- * The caller is giving up ownership of the opaque schedule object.
+/* free the handle. The handle should not be used afterwards */
+int MPIR_Sched_free(MPIR_Sched_t s);
+/* reset a completed persistent collective sched so it can be started again */
+int MPIR_Sched_reset(MPIR_Sched_t s);
+/* allocate the state buffer associated with the sched. It will be freed by MPIR_Sched_free */
+void *MPIR_Sched_alloc_state(MPIR_Sched_t s, MPI_Aint size);
+/* starts the sched and gives you back a request pointer in (*req).
  *
  * comm should be the primary (user) communicator with which this collective is
  * associated, even if other hidden communicators are used for a subset of the
  * operations.  It will be used for error handling and similar operations. */
-int MPIR_Sched_start(MPIR_Sched_t * sp, MPIR_Comm * comm, int tag, MPIR_Request ** req);
+int MPIR_Sched_start(MPIR_Sched_t s, MPIR_Comm * comm, MPIR_Request ** req);
 
 /* send and recv take a comm ptr to enable hierarchical collectives */
 int MPIR_Sched_send(const void *buf, MPI_Aint count, MPI_Datatype datatype, int dest,
@@ -88,7 +93,7 @@ int MPIR_Sched_barrier(MPIR_Sched_t s);
 #define MPIR_SCHED_BARRIER(sched_)              \
     do {                                        \
         mpi_errno = MPIR_Sched_barrier(sched_); \
-        if (mpi_errno) MPIR_ERR_POP(mpi_errno); \
+        MPIR_ERR_CHECK(mpi_errno);              \
     } while (0)
 
 /* Defers evaluating (*count) until the entry actually begins to execute.  This
@@ -153,7 +158,7 @@ int MPIR_Sched_cb_free_buf(MPIR_Comm * comm, int tag, void *state);
             mpi_errno = MPIR_Sched_cb(&MPIR_Sched_cb_free_buf,                                 \
                                       (mpir_sched_chkpmem_stk_[--mpir_sched_chkpmem_stk_sp_]), \
                                       (sched_));                                               \
-            if (mpi_errno) MPIR_ERR_POP(mpi_errno);                                            \
+            MPIR_ERR_CHECK(mpi_errno);                                                         \
         }                                                                                      \
     } while (0)
 

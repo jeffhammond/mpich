@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* style: allow:fprintf:10 sig:0 */
@@ -58,7 +56,7 @@ int chkcomm2inc_(int *keyval, const int *expected, int *ierr)
             *ierr = *ierr + 1;
         }
     }
-    return MTestReturnValue(errs);
+    return 0;
 }
 
 /* Attribute delete and copy functions for each type */
@@ -116,5 +114,5 @@ int chkckeyvals_(int *comm_keyval, int *type_keyval, int *win_keyval)
     MPI_Comm_create_keyval(myCommCopyfn, myCommDelfn, comm_keyval, 0);
     MPI_Type_create_keyval(myTypeCopyfn, myTypeDelfn, type_keyval, 0);
     MPI_Win_create_keyval(myWinCopyfn, myWinDelfn, win_keyval, 0);
-    return MTestReturnValue(errs);
+    return 0;
 }

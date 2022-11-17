@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpi.h"
@@ -45,7 +43,6 @@ MTEST_THREAD_RETURN_TYPE run_test(void *arg)
     MPI_Request req[WINDOW];
     double start, end;
     int err;
-    int local_num_threads = -1;
 
     if (tp[thread_id].use_proc_null)
         peer = MPI_PROC_NULL;
@@ -55,7 +52,6 @@ MTEST_THREAD_RETURN_TYPE run_test(void *arg)
     err = MTest_thread_lock(&num_threads_lock);
     if (err)
         ABORT_MSG("unable to acquire lock, aborting\n");
-    local_num_threads = num_threads;
     err = MTest_thread_unlock(&num_threads_lock);
     if (err)
         ABORT_MSG("unable to release lock, aborting\n");

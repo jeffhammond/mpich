@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test tests the overlapping of MPI_Comm_idup with other nonblocking calls
@@ -43,10 +42,9 @@ int verbose = 0;
    is overlapped with other non-blocking operations on the same communicator or
    on a different communicator.
 */
-MTEST_THREAD_RETURN_TYPE test_intracomm(void *arg)
+static MTEST_THREAD_RETURN_TYPE test_intracomm(void *arg)
 {
     int i, j;
-    int root, bcastbuf;
     int rank, size;
     int ans[4], expected[4];
     MPI_Request reqs[NUM_IDUPS1 + NUM_IDUPS2 + 10] = { MPI_REQUEST_NULL };      /* Preallocate enough reqs */
@@ -124,7 +122,7 @@ MTEST_THREAD_RETURN_TYPE test_intracomm(void *arg)
    is overlapped with other non-blocking operations on the same communicator or
    on a different communicator.
 */
-MTEST_THREAD_RETURN_TYPE test_intercomm(void *arg)
+static MTEST_THREAD_RETURN_TYPE test_intercomm(void *arg)
 {
     int rank, rsize, root;
     int i, j;
@@ -139,6 +137,9 @@ MTEST_THREAD_RETURN_TYPE test_intercomm(void *arg)
 
     for (i = 0; i < NUM_ITER; i++) {
         cnt = 0;
+        MPI_Comm_rank(parentcomm, &rank);
+        MPI_Comm_remote_size(parentcomm, &rsize);
+
         if (*(int *) arg == rank)
             MTestSleep(1);
 
@@ -150,8 +151,6 @@ MTEST_THREAD_RETURN_TYPE test_intercomm(void *arg)
             MPI_Comm_idup(parentcomm, &comms[j], &reqs[cnt++]);
 
         /* Issue an Iallreduce on parentcomm */
-        MPI_Comm_rank(parentcomm, &rank);
-        MPI_Comm_remote_size(parentcomm, &rsize);
         MPI_Iallreduce(&rank, &ans[0], 1, MPI_INT, MPI_SUM, parentcomm, &reqs[cnt++]);
         expected[0] = (rsize - 1) * rsize / 2;
         /* Wait for the first child comm to be ready */

@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpi.h"
@@ -22,7 +20,7 @@ int main(int argc, char *argv[])
     char name[MPI_MAX_OBJECT_NAME], nameout[MPI_MAX_OBJECT_NAME];
     MTest_Init(&argc, &argv);
 
-    /* Check world and self firt */
+    /* Check world and self first */
     nameout[0] = 0;
     MPI_Comm_get_name(MPI_COMM_WORLD, nameout, &rlen);
     if (strcmp(nameout, "MPI_COMM_WORLD")) {

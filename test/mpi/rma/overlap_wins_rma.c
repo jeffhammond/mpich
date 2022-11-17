@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2016 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -160,7 +158,7 @@ static void print_target_data(void)
     fflush(stdout);
 }
 
-static int run_test()
+static int run_test(void)
 {
     int errors = 0;
     int i, x;

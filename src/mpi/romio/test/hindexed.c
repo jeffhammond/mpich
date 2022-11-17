@@ -1,14 +1,25 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2008 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 /* Wei-keng Liao (wkliao@ece.northwestern.edu) September 8, 2008 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
+
+static void handle_error(int errcode, const char *str)
+{
+    char msg[MPI_MAX_ERROR_STRING];
+    int resultlen;
+    MPI_Error_string(errcode, msg, &resultlen);
+    fprintf(stderr, "%s: %s\n", str, msg);
+    MPI_Abort(MPI_COMM_WORLD, 1);
+}
+
+#define MPI_CHECK(fn) { int errcode; errcode = (fn); if (errcode != MPI_SUCCESS) handle_error(errcode, #fn); }
+
 
 #define YLEN 5
 #define XLEN 10
@@ -143,10 +154,10 @@ int main(int argc, char **argv)
     /* zero file contents --------------------------------------------------- */
     if (rank == 0) {
         char *wr_buf = (char *) calloc(num_io * global_array_size, 1);
-        MPI_File_open(MPI_COMM_SELF, filename,
-                      MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
-        MPI_File_write(fh, wr_buf, num_io * global_array_size, MPI_CHAR, &status);
-        MPI_File_close(&fh);
+        MPI_CHECK(MPI_File_open(MPI_COMM_SELF, filename,
+                                MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
+        MPI_CHECK(MPI_File_write(fh, wr_buf, num_io * global_array_size, MPI_CHAR, &status));
+        MPI_CHECK(MPI_File_close(&fh));
         free(wr_buf);
     }
     /* open the file -------------------------------------------------------- */
@@ -162,18 +173,18 @@ int main(int argc, char **argv)
     for (i = 0; i < num_io; i++) {
         offset = i * global_array_size;
         /* set the file view */
-        MPI_File_set_view(fh, offset, MPI_BYTE, ftype, "native", MPI_INFO_NULL);
-        MPI_File_write_all(fh, buf, ftype_size, MPI_CHAR, &status);
+        MPI_CHECK(MPI_File_set_view(fh, offset, MPI_BYTE, ftype, "native", MPI_INFO_NULL));
+        MPI_CHECK(MPI_File_write_all(fh, buf, ftype_size, MPI_CHAR, &status));
     }
-    MPI_File_close(&fh);
+    MPI_CHECK(MPI_File_close(&fh));
 
     /* read and print file contents ----------------------------------------- */
     if (rank == 0) {
         char *ptr;
         char *rd_buf = (char *) calloc(num_io * global_array_size, 1);
-        MPI_File_open(MPI_COMM_SELF, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
-        MPI_File_read(fh, rd_buf, num_io * global_array_size, MPI_CHAR, &status);
-        MPI_File_close(&fh);
+        MPI_CHECK(MPI_File_open(MPI_COMM_SELF, filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh));
+        MPI_CHECK(MPI_File_read(fh, rd_buf, num_io * global_array_size, MPI_CHAR, &status));
+        MPI_CHECK(MPI_File_close(&fh));
 
 #ifdef VERBOSE
         printf("-------------------------------------------------------\n");

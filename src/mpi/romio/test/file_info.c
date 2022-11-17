@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* Change for BG/L made by Hao Yu, yuh@us.ibm.com
@@ -57,7 +56,7 @@ hint_defaults BLUEGENE_DEFAULTS = {
 
 /* Test will print out information about unexpected hint keys or values that
  * differ from the default.  Since this is often interesting but rarely an
- * error, default will be to increment errror cound for true error conditions
+ * error, default will be to increment error count for true error conditions
  * but not print out these "interesting" non-error cases. */
 
 static int verbose = 0;
@@ -120,7 +119,6 @@ int main(int argc, char **argv)
     } else {
         defaults = NULL;
     }
-
 
 /* open the file with MPI_INFO_NULL */
     ret = MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
@@ -412,6 +410,12 @@ int main(int argc, char **argv)
     }
 
     MPI_File_close(&fh);
+
+    /* delete the file */
+    if (!mynod)
+        MPI_File_delete(filename, MPI_INFO_NULL);
+    MPI_Barrier(MPI_COMM_WORLD);
+
     free(filename);
     MPI_Info_free(&info_used);
     MPI_Info_free(&info);

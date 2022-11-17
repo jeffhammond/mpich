@@ -1,18 +1,16 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test is going to test the atomicity for "read-modify-write" in GACC
  * operations */
 
-/* This test is similiar with atomic_rmw_fop.c.
+/* This test is similar with atomic_rmw_fop.c.
  * There are three processes involved in this test: P0 (origin_shm), P1 (origin_am),
  * and P2 (dest). P0 and P1 issues multiple GACC with MPI_SUM and OP_COUNT integers
  * (value 1) to P2 via SHM and AM respectively. The correct results should be that the
- * results on P0 and P1 never be the same for intergers on the corresponding index
+ * results on P0 and P1 never be the same for integers on the corresponding index
  * in [0...OP_COUNT-1].
  */
 
@@ -33,7 +31,7 @@ int dest, origin_shm, origin_am;
 int *orig_buf = NULL, *result_buf = NULL, *target_buf = NULL, *check_buf = NULL;
 MPI_Win win;
 
-void checkResults(int loop_k, int *errors)
+static void checkResults(int loop_k, int *errors)
 {
     int i, j, m;
     MPI_Status status;
@@ -52,7 +50,7 @@ void checkResults(int loop_k, int *errors)
                     for (m = 0; m < OP_COUNT; m++) {
                         if (check_buf[i * OP_COUNT + m] == result_buf[j * OP_COUNT + m]) {
                             printf
-                                ("LOOP=%d, rank=%d, FOP, both check_buf[%d] and result_buf[%d] equal to %d, expected to be different. \n",
+                                ("LOOP=%d, rank=%d, GACC, both check_buf[%d] and result_buf[%d] equal to %d, expected to be different. \n",
                                  loop_k, rank, i * OP_COUNT + m, j * OP_COUNT + m,
                                  check_buf[i * OP_COUNT + m]);
                             (*errors)++;
@@ -67,7 +65,7 @@ void checkResults(int loop_k, int *errors)
         /* check results on P1 */
         for (i = 0; i < OP_COUNT; i++) {
             if (target_buf[i] != AM_BUF_NUM + SHM_BUF_NUM) {
-                printf("LOOP=%d, rank=%d, FOP, target_buf[%d] = %d, expected %d. \n",
+                printf("LOOP=%d, rank=%d, GACC, target_buf[%d] = %d, expected %d. \n",
                        loop_k, rank, i, target_buf[i], AM_BUF_NUM + SHM_BUF_NUM);
                 (*errors)++;
             }
@@ -76,20 +74,19 @@ void checkResults(int loop_k, int *errors)
     }
 }
 
-int main(int argc, char *argv[])
+static int test_atomic_rmw_gacc(void)
 {
     int i, k;
     int errors = 0;
-    int my_buf_num;
+    int my_buf_num = 0;         /* to suppress warning */
     MPI_Datatype origin_dtp, target_dtp;
-
-    MTest_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     if (size != 3) {
         /* run this test with three processes */
-        goto exit_test;
+        printf("Run this test with three processes.\n");
+        return 1;
     }
 
     MPI_Type_contiguous(OP_COUNT, MPI_INT, &origin_dtp);
@@ -260,7 +257,18 @@ int main(int argc, char *argv[])
     MPI_Type_free(&origin_dtp);
     MPI_Type_free(&target_dtp);
 
-  exit_test:
+    return errors;
+}
+
+int main(int argc, char *argv[])
+{
+    int errors = 0;
+
+    MTest_Init(&argc, &argv);
+
+    errors += test_atomic_rmw_gacc();
+    errors += test_atomic_rmw_gacc();
+
     MTest_Finalize(errors);
     return MTestReturnValue(errors);
 }

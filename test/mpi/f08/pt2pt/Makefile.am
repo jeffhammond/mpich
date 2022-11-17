@@ -1,9 +1,7 @@
-# -*- Mode: Makefile; -*-
-# vim: set ft=automake :
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
 include $(top_srcdir)/Makefile_f08.mtest
 
@@ -28,7 +26,8 @@ noinst_PROGRAMS = greqf08 \
                   prsendf08 \
                   pssendf08 \
                   sendrecvf08 \
-                  sendrecvreplf08
+                  sendrecvreplf08 \
+		  pt2pt_largef08
 
 sendf08_SOURCES = sendf08.f90 utilsf08.f90
 ssendf08_SOURCES = ssendf08.f90 utilsf08.f90
@@ -42,3 +41,4 @@ pssendf08_SOURCES = pssendf08.f90 utilsf08.f90
 sendrecvf08_SOURCES = sendrecvf08.f90 utilsf08.f90
 sendrecvreplf08_SOURCES = sendrecvreplf08.f90 utilsf08.f90
 greqf08_SOURCES = greqf08.f90 dummyf08.f90
+pt2pt_largef08_SOURCES = pt2pt_largef08.f90

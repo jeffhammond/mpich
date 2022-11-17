@@ -1,7 +1,8 @@
-!  
-!  (C) 2004 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
 !
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
+!
+
         program main
 ! This is a simple test to check that both the MPI and PMPI versions of the
 ! timers are available, and that they return double precision values.
@@ -12,7 +13,7 @@
           integer err
           double precision time1
 
-          call mpi_init(err)
+          call mtest_init(err)
 
           time1 = mpi_wtime()
           time1 = time1 + mpi_wtick()
@@ -24,8 +25,8 @@
 ! pass this test by mistake).
           if (time1 .lt. 0.0d0) then
              print *, ' Negative time result'
-          else
-                print *, ' No Errors'
+             err = 1
           endif
           
+          call mtest_finalize(err)
         end

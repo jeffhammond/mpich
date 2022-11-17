@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_testfs.h"
@@ -30,7 +28,7 @@ ADIO_Offset ADIOI_TESTFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
     int size_in_filetype;
     int filetype_is_contig;
     MPI_Count filetype_size;
-    MPI_Aint etype_size, filetype_extent;
+    MPI_Aint etype_size, lb, filetype_extent;
 
     *error_code = MPI_SUCCESS;
 
@@ -47,7 +45,7 @@ ADIO_Offset ADIOI_TESTFS_SeekIndividual(ADIO_File fd, ADIO_Offset offset,
     else {
         flat_file = ADIOI_Flatten_and_find(fd->filetype);
 
-        MPI_Type_extent(fd->filetype, &filetype_extent);
+        MPI_Type_get_extent(fd->filetype, &lb, &filetype_extent);
         MPI_Type_size_x(fd->filetype, &filetype_size);
         if (!filetype_size) {
             *error_code = MPI_SUCCESS;

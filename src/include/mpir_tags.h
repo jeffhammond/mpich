@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_TAGS_H_INCLUDED
@@ -48,7 +46,7 @@
 
 /* These macros must be used carefully. These macros will not work with
  * negative tags. By definition, users are not to use negative tags and the
- * only negative tag in MPICH is MPI_ANY_TAG which is checked seperately, but
+ * only negative tag in MPICH is MPI_ANY_TAG which is checked separately, but
  * if there is a time where negative tags become more common, this setup won't
  * work anymore. */
 

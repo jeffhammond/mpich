@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_REFCOUNT_SINGLE_H_INCLUDED
@@ -25,6 +24,16 @@ typedef int MPIR_cc_t;
         MPIR_Assert(*(incomplete_) >= 0);       \
     } while (0)
 
+#define MPIR_cc_inc(cc_ptr_) \
+    do { \
+        (*(cc_ptr_))++; \
+    } while (0)
+
+#define MPIR_cc_dec(cc_ptr_) \
+    do { \
+        (*(cc_ptr_))--; \
+        MPIR_Assert(*(cc_ptr_) >= 0); \
+    } while (0)
 
 /* "publishes" the obj with handle value (handle_) via the handle pointer
  * (hnd_lval_).  That is, it is a version of the following statement that fixes

@@ -1,12 +1,8 @@
-/* MPICH notes:
- * - The file name has been changed to avoid conflicts with any system-installed
- *   "utlist.h" header files.
- * - malloc/free/realloc usages have been substituted with utarray_malloc_
- *   (etc.) indirection macros and then changed to use MPL_malloc and friends
- * - add a ut_ptr_icd for the common case of dynamic tables of pointers
- * - intentionally omitted from "mpiimpl.h" in order to require using code to
- *   opt-in
- * [goodell@ 2011-10-04] */
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 /*
 Copyright (c) 2008-2011, Troy D. Hanson   http://uthash.sourceforge.net
 All rights reserved.
@@ -29,6 +25,16 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+/* MPICH notes:
+ * - The file name has been changed to avoid conflicts with any system-installed
+ *   "utlist.h" header files.
+ * - malloc/free/realloc usages have been substituted with utarray_malloc_
+ *   (etc.) indirection macros and then changed to use MPL_malloc and friends
+ * - add a ut_ptr_icd for the common case of dynamic tables of pointers
+ * - intentionally omitted from "mpiimpl.h" in order to require using code to
+ *   opt-in
+ * [goodell@ 2011-10-04] */
 
 /* a dynamic array implementation using macros
  * see http://uthash.sourceforge.net/utarray
@@ -107,7 +113,7 @@ typedef struct {
 #define utarray_reserve(a,by,class) do {                                      \
   if (((a)->i+by) > ((a)->n)) {                                               \
     void * d_;                                                                \
-    while (((a)->i+by) > ((a)->n)) { (a)->n = ((a)->n ? (2*(a)->n) : 8); }     \
+    while (((a)->i+by) > ((a)->n)) { (a)->n = ((a)->n ? (2*(a)->n) : 16); }     \
     d_=(char*)utarray_realloc_((a)->d, (a)->n*(a)->icd->sz, class);           \
     if (d_ == NULL) utarray_oom();                                            \
     (a)->d = d_;                                                              \
@@ -118,6 +124,11 @@ typedef struct {
   utarray_reserve(a,1,class);                                                 \
   if ((a)->icd->copy) { (a)->icd->copy(_utarray_eltptr(a,(a)->i++), p); }    \
   else { memcpy(_utarray_eltptr(a,(a)->i++), p, (a)->icd->sz); };             \
+} while (0)
+
+#define utarray_push_back_int(a,p,class) do {                                \
+  utarray_reserve(a,1,class);                                                \
+  ut_int_array(a)[(a)->i++] = *p;                                            \
 } while (0)
 
 #define utarray_pop_back(a) do {                                              \
@@ -258,6 +269,7 @@ static const UT_icd ut_ptr_icd _UNUSED_ = { sizeof(void *), NULL, NULL, NULL };
 #define ut_int_array(a) ((int*)(a)->d)
 #define ut_str_array(a) ((char**)(a)->d)
 #define ut_ptr_array(a) ((void**)(a)->d)
+#define ut_type_array(a, type) ((type)(a)->d)
 
 
 #endif /* UTARRAY_H_INCLUDED */

@@ -1,11 +1,9 @@
-# -*- Mode: Makefile; -*-
-# vim: set ft=automake :
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
-include $(top_srcdir)/Makefile.mtest
+include $(top_srcdir)/Makefile_single.mtest
 
 EXTRA_DIST = testlist
 
@@ -18,7 +16,14 @@ noinst_PROGRAMS = \
     exitst2       \
     exitst3       \
     initstat      \
+    session       \
+    session_mult_init \
+    session_psets \
+    session_self  \
     version       \
     library_version \
     timeout       \
     finalized
+
+session_mult_init_SOURCES = session.c
+session_mult_init_CPPFLAGS = -DMULT_INIT $(AM_CPPFLAGS)

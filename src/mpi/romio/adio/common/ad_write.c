@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 2004 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 
@@ -22,7 +20,7 @@
 #endif
 
 
-void ADIOI_GEN_WriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_GEN_WriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                            MPI_Datatype datatype, int file_ptr_type,
                            ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {
@@ -39,6 +37,11 @@ void ADIOI_GEN_WriteContig(ADIO_File fd, const void *buf, int count,
 #ifdef AGGREGATION_PROFILE
     MPE_Log_event(5036, 0, NULL);
 #endif
+
+    if (count == 0) {
+        err = 0;
+        goto fn_exit;
+    }
 
     MPI_Type_size_x(datatype, &datatype_size);
     len = (ADIO_Offset) datatype_size *(ADIO_Offset) count;
@@ -86,6 +89,7 @@ void ADIOI_GEN_WriteContig(ADIO_File fd, const void *buf, int count,
         bytes_xfered += err;
         p += err;
     }
+    fd->dirty_write = 1;
 
 #ifdef ROMIO_GPFS
     if (gpfsmpio_timing)
@@ -101,6 +105,7 @@ void ADIOI_GEN_WriteContig(ADIO_File fd, const void *buf, int count,
         gpfsmpio_prof_cw[GPFSMPIO_CIO_T_MPIO_RW] += (MPI_Wtime() - io_time);
 #endif
 
+  fn_exit:
 #ifdef HAVE_STATUS_SET_BYTES
     /* bytes_xfered could be larger than int */
     if (err != -1 && status)

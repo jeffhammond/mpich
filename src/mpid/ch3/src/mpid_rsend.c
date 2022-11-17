@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
@@ -13,11 +12,7 @@
 /*
  * MPID_Rsend()
  */
-#undef FUNCNAME
-#define FUNCNAME MPID_Rsend
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPID_Rsend(const void * buf, int count, MPI_Datatype datatype, int rank, int tag, MPIR_Comm * comm, int context_offset,
+int MPID_Rsend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int tag, MPIR_Comm * comm, int attr,
 	       MPIR_Request ** request)
 {
     intptr_t data_sz;
@@ -30,10 +25,10 @@ int MPID_Rsend(const void * buf, int count, MPI_Datatype datatype, int rank, int
     MPID_Seqnum_t seqnum;
 #endif    
     int mpi_errno = MPI_SUCCESS;    
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_RSEND);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_RSEND);
+    MPIR_FUNC_ENTER;
 
+    int context_offset = MPIR_PT2PT_ATTR_CONTEXT_OFFSET(attr);
     MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER,VERBOSE,(MPL_DBG_FDEST,
 					"rank=%d, tag=%d, context=%d", 
                               rank, tag, comm->context_id + context_offset));
@@ -48,11 +43,6 @@ int MPID_Rsend(const void * buf, int count, MPI_Datatype datatype, int rank, int
     if (rank == comm->rank && comm->comm_kind != MPIR_COMM_KIND__INTERCOMM)
     {
 	mpi_errno = MPIDI_Isend_self(buf, count, datatype, rank, tag, comm, context_offset, MPIDI_REQUEST_TYPE_RSEND, &sreq);
-	goto fn_exit;
-    }
-
-    if (rank == MPI_PROC_NULL)
-    {
 	goto fn_exit;
     }
 
@@ -91,7 +81,7 @@ int MPID_Rsend(const void * buf, int count, MPI_Datatype datatype, int rank, int
 	/* --BEGIN ERROR HANDLING-- */
 	if (mpi_errno != MPI_SUCCESS)
 	{
-	    mpi_errno = MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER, "**ch3|eagermsg", 0);
+	    mpi_errno = MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, __func__, __LINE__, MPI_ERR_OTHER, "**ch3|eagermsg", 0);
 	    goto fn_exit;
 	}
 	/* --END ERROR HANDLING-- */
@@ -111,7 +101,7 @@ int MPID_Rsend(const void * buf, int count, MPI_Datatype datatype, int rank, int
         {
             mpi_errno = MPIDI_CH3_EagerContigSend( &sreq,
                                                    MPIDI_CH3_PKT_READY_SEND,
-                                                   (char *)buf + dt_true_lb,
+                                                   MPIR_get_contig_ptr(buf, dt_true_lb),
                                                    data_sz, rank, tag, comm,
                                                    context_offset );
         }
@@ -122,7 +112,7 @@ int MPID_Rsend(const void * buf, int count, MPI_Datatype datatype, int rank, int
             mpi_errno = MPIDI_CH3_EagerNoncontigSend( &sreq,
                                                       MPIDI_CH3_PKT_READY_SEND,
                                                       buf, count, datatype,
-                                                      data_sz, rank, tag,
+                                                      rank, tag,
                                                       comm, context_offset );
         }
     } else {
@@ -141,6 +131,9 @@ int MPID_Rsend(const void * buf, int count, MPI_Datatype datatype, int rank, int
 
   fn_exit:
     *request = sreq;
+    if (sreq) {
+        MPII_SENDQ_REMEMBER(sreq, rank, tag, comm->recvcontext_id, buf, count);
+    }
 
     MPL_DBG_STMT(MPIDI_CH3_DBG_OTHER,VERBOSE,
     {
@@ -157,6 +150,6 @@ int MPID_Rsend(const void * buf, int count, MPI_Datatype datatype, int rank, int
 		  );
     
   fn_fail:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_RSEND);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }

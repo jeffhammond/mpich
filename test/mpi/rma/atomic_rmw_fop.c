@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test is going to test the atomicity for "read-modify-write" in FOP
@@ -29,7 +27,7 @@ int main(int argc, char *argv[])
     int rank, size, i, j, k;
     int errors = 0;
     int origin_shm, origin_am, dest;
-    int my_buf_size;
+    int my_buf_size = 0;        /* to avoid warnings */
     int *orig_buf = NULL, *result_buf = NULL, *target_buf = NULL, *check_buf = NULL;
     MPI_Win win;
     MPI_Status status;

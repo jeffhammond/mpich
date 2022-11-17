@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2005 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include "mpitest.h"
 #include <stdio.h>
@@ -18,6 +17,7 @@
 /* Needed for getcwd */
 #include <unistd.h>
 #endif
+#include <assert.h>
 
 /*
 static char MTEST_Descrip[] = "A simple test of Comm_spawn_multiple with info";
@@ -34,7 +34,6 @@ int main(int argc, char *argv[])
     MPI_Info spawninfos[2];
     char curdir[1024], wd[1024], childwd[1024];
     char *commands[2] = { (char *) "spawnminfo1", (char *) "spawnminfo1" };
-    char *cerr;
     int can_spawn;
 
     MTest_Init(&argc, &argv);
@@ -42,7 +41,8 @@ int main(int argc, char *argv[])
     errs += MTestSpawnPossible(&can_spawn);
 
     if (can_spawn) {
-        cerr = getcwd(curdir, sizeof(curdir));
+        char *s = getcwd(curdir, sizeof(curdir));
+        assert(s != NULL);
 
         MPI_Comm_get_parent(&parentcomm);
 
@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
         MPI_Comm_rank(intercomm, &rank);
 
         if (parentcomm == MPI_COMM_NULL) {
-            /* Master */
+            /* Parent */
             if (rsize != sumnp) {
                 errs++;
                 printf("Did not create %d processes (got %d)\n", sumnp, rsize);
@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
             /* Send our notion of the current directory to the parent */
             MPI_Send(curdir, strlen(curdir) + 1, MPI_CHAR, 0, 2, intercomm);
 
-            /* Send the errs back to the master process */
+            /* Send the errs back to the parent process */
             MPI_Ssend(&errs, 1, MPI_INT, 0, 1, intercomm);
         }
 

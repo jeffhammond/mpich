@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2005 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -120,8 +119,8 @@ struct mqs_image_ {
 int init_dbr(void)
 {
     int hasQ = 0;
-    char *version = mqs_version_string();
-    char *msg;
+    const char *version = mqs_version_string();
+    const char *msg;
 
     if (mqs_version_compatibility() != MQS_INTERFACE_COMPATIBILITY) {
         fprintf(stderr, "Unexpected value of version\n");
@@ -242,17 +241,20 @@ int showQueues(int nComm, int expected)
         mqs_next_communicator(&process);
     }
 
+    int ret = 0;
     if (nFound < expected) {
         fprintf(stderr, "Error: expected to find %d queue entries but only saw %d\n", expected,
                 nFound);
+        ret = 1;
     }
     if (nCommFound < nComm) {
         fprintf(stderr, "Error: expected to find %d comms but only saw %d\n", nComm, nCommFound);
+        ret = 1;
     }
 
     fflush(stdout);
     fflush(stderr);
-    return 0;
+    return ret;
 }
 
 

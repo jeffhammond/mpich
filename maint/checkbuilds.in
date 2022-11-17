@@ -1,5 +1,9 @@
 #! /usr/bin/env perl
-# -*- Mode: perl; -*-
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
+
 # @configure_input@
 #
 # Configure and build mpich with some of the options
@@ -52,7 +56,7 @@ $hasDemon   = 0;
 		  'error-messages;all;generic;class;none',
 		  'timer-type;linux86_cycle;gethrtime;clock_gettime;gettimeofday',
 		  'timing;none;all;runtime;log;log_detailed',
-		  'g;none;all;handle;dbg;log;meminit;handlealloc;instr;mem;mutex;mutexnesting;memarena',
+		  'g;none;all;handle;dbg;log;meminit;handlealloc;instr;mem;mutex;memarena',
 		  'fast;nochkmsg;notiming;ndebug;all',
 		  'f77',
 		  'fc',
@@ -65,12 +69,11 @@ $hasDemon   = 0;
 		  'debuginfo', # Message queues
 		  'weak-symbols;no;yes',
                   'threads;single;multiple;runtime',
-                  'thread-cs;global;per-object;lock-free',
+                  'thread-cs;global;per-vci;lock-free',
                   'refcount;lock;lock-free;none',
                   'mutex-timing',
                   'multi-aliases',
                   'predefined-refcount',
-                  'alloca',
                   'yield;sched_yield;yield;select;usleep;sleep',
                   'checkpointing',
 		  'runtimevalues',   # Fortran true/false
@@ -280,7 +283,7 @@ sub RunTest {
 	return;
     }
     # Clean the installation and build directories
-    # Even better would be to remove the installation directory alltogether,
+    # Even better would be to remove the installation directory altogether,
     # but we should only do that if explicitly requested (we could
     # *require* an empty directory for the tests instead)
     if (-d "$instdir/lib") {

@@ -1,6 +1,8 @@
-/* ---------------------------------------------------------------- */
-/* (C)Copyright IBM Corp.  2007, 2008                               */
-/* ---------------------------------------------------------------- */
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 /**
  * \file ad_bg_aggrs.h
  * \brief ???
@@ -27,7 +29,7 @@
 #define GPFS_SUPER_MAGIC (0x47504653)
 #endif
 
-    /* generate a list of I/O aggregators that utilizes BG-PSET orginization. */
+    /* generate a list of I/O aggregators that utilizes BG-PSET organization. */
 int ADIOI_BG_gen_agg_ranklist(ADIO_File fd, int n_aggrs_per_pset);
 
 #endif /* AD_BG_AGGRS_H_INCLUDED */

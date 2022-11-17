@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIU_EXTERNAL32_H_INCLUDED
@@ -14,9 +12,9 @@ int MPIU_read_external32_conversion_fn(void *userbuf, MPI_Datatype datatype,
                                        int count, void *filebuf);
 int MPIU_datatype_full_size(MPI_Datatype datatype, MPI_Aint * size);
 
-/* given a buffer, count, and datatype, return an apropriately sized and
+/* given a buffer, count, and datatype, return an appropriately sized and
  *  * external32-formatted buffer, suitable for handing off to a subsequent write
  *   * routine */
-int MPIU_external32_buffer_setup(const void *buf, int count, MPI_Datatype type, void **newbuf);
+int MPIU_external32_buffer_setup(const void *buf, MPI_Aint count, MPI_Datatype type, void **newbuf);
 
 #endif /* MPIU_EXTERNAL32_H_INCLUDED */

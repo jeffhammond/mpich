@@ -1,11 +1,6 @@
 /*
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
- *  Portions of this code were written by Intel Corporation.
- *  Copyright (C) 2011-2017 Intel Corporation.  Intel provides this material
- *  to Argonne National Laboratory subject to Software Grant and Corporate
- *  Contributor License Agreement dated February 8, 2012.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef RECEXCHALGO_H_INCLUDED
@@ -24,4 +19,23 @@ int MPII_Recexchalgo_step2rank_to_origrank(int rank, int rem, int T, int k);
 int MPII_Recexchalgo_get_count_and_offset(int rank, int phase, int k, int nranks, int *count,
                                           int *offset);
 int MPII_Recexchalgo_reverse_digits_step2(int rank, int comm_size, int k);
+
+int MPIR_TSP_Iallgatherv_sched_intra_recexch_step2(int step1_sendto, int step2_nphases,
+                                                   int **step2_nbrs, int rank, int nranks, int k,
+                                                   int p_of_k, int log_pofk, int T, int *nrecvs_,
+                                                   int **recv_id_, int tag, void *recvbuf,
+                                                   size_t recv_extent, const MPI_Aint * recvcounts,
+                                                   const MPI_Aint * displs, MPI_Datatype recvtype,
+                                                   int is_dist_halving, MPIR_Comm * comm,
+                                                   MPIR_TSP_sched_t sched);
+int MPIR_TSP_Ireduce_scatter_sched_intra_recexch_step2(void *tmp_results, void *tmp_recvbuf,
+                                                       const MPI_Aint * recvcounts,
+                                                       MPI_Aint * displs, MPI_Datatype datatype,
+                                                       MPI_Op op, size_t extent, int tag,
+                                                       MPIR_Comm * comm, int k, int is_dist_halving,
+                                                       int step2_nphases, int **step2_nbrs,
+                                                       int rank, int nranks, int sink_id,
+                                                       int is_out_vtcs, int *reduce_id_,
+                                                       MPIR_TSP_sched_t sched);
+
 #endif /* RECEXCHALGO_H_INCLUDED */

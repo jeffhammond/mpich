@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -18,7 +16,7 @@ void ADIOI_Get_byte_offset(ADIO_File fd, ADIO_Offset offset, ADIO_Offset * disp)
     ADIO_Offset n_filetypes, etype_in_filetype, sum, abs_off_in_filetype = 0, size_in_filetype;
     MPI_Count n_etypes_in_filetype, filetype_size, etype_size;
     int filetype_is_contig;
-    MPI_Aint filetype_extent;
+    MPI_Aint lb, filetype_extent;
 
     ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
     etype_size = fd->etype_size;
@@ -45,7 +43,7 @@ void ADIOI_Get_byte_offset(ADIO_File fd, ADIO_Offset offset, ADIO_Offset * disp)
         }
 
         /* abs. offset in bytes in the file */
-        MPI_Type_extent(fd->filetype, &filetype_extent);
+        MPI_Type_get_extent(fd->filetype, &lb, &filetype_extent);
         *disp =
             fd->disp + n_filetypes * ADIOI_AINT_CAST_TO_OFFSET filetype_extent +
             abs_off_in_filetype;

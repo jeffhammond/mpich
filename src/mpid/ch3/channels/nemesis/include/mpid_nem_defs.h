@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPID_NEM_DEFS_H_INCLUDED
@@ -10,7 +9,7 @@
 #include "mpid_nem_datatypes.h"
 #include "mpi.h"
 #include "mpiimpl.h"
-#include "mpidu_shm.h"
+#include "mpidu_init_shm.h"
 
 /* FIXME: This definition should be gotten from mpidi_ch3_impl.h */
 #ifndef MAX_HOSTNAME_LEN
@@ -30,26 +29,31 @@ extern char MPID_nem_hostname[MAX_HOSTNAME_LEN];
 #define MPID_NEM_POLL_OUT     1
 
 #define MPID_NEM_ASYMM_NULL_VAL    64
-typedef MPI_Aint MPID_nem_addr_t;
 extern  char *MPID_nem_asymm_base_addr;
 
 #define MPID_NEM_REL_NULL (0x0)
-#define MPID_NEM_IS_REL_NULL(rel_ptr) (OPA_load_ptr(&(rel_ptr).p) == MPID_NEM_REL_NULL)
-#define MPID_NEM_SET_REL_NULL(rel_ptr) (OPA_store_ptr(&((rel_ptr).p), MPID_NEM_REL_NULL))
+#define MPID_NEM_IS_REL_NULL(rel_ptr) (MPL_atomic_acquire_load_ptr(&(rel_ptr).p) == MPID_NEM_REL_NULL)
+#define MPID_NEM_SET_REL_NULL(rel_ptr) (MPL_atomic_release_store_ptr(&((rel_ptr).p), MPID_NEM_REL_NULL))
 #define MPID_NEM_REL_ARE_EQUAL(rel_ptr1, rel_ptr2) \
-    (OPA_load_ptr(&(rel_ptr1).p) == OPA_load_ptr(&(rel_ptr2).p))
+    (MPL_atomic_acquire_load_ptr(&(rel_ptr1).p) == MPL_atomic_acquire_load_ptr(&(rel_ptr2).p))
 
 #ifndef MPID_NEM_SYMMETRIC_QUEUES
 
+/* NOTE: we are casting to uintptr_t and using integer arithmetic here. While it is pedantically
+ * undefined usage, we don't anticipate issues because the REL addresses will not be directly accessed,
+ * and only consistency matters. We can't use pointer arithmetic here because both the address
+ * (p or a) and MPID_nem_asymm_base_addr could overflow `ptrdiff_t`.
+ */
 static inline MPID_nem_cell_ptr_t MPID_NEM_REL_TO_ABS (MPID_nem_cell_rel_ptr_t r)
 {
-    return (MPID_nem_cell_ptr_t)((char*)OPA_load_ptr(&r.p) + (MPID_nem_addr_t)MPID_nem_asymm_base_addr);
+    void *p = MPL_atomic_acquire_load_ptr(&r.p);
+    return (MPID_nem_cell_ptr_t) (void *) ((uintptr_t) p + (uintptr_t) MPID_nem_asymm_base_addr);
 }
 
 static inline MPID_nem_cell_rel_ptr_t MPID_NEM_ABS_TO_REL (MPID_nem_cell_ptr_t a)
 {
     MPID_nem_cell_rel_ptr_t ret;
-    OPA_store_ptr(&ret.p, (char *)a - (MPID_nem_addr_t)MPID_nem_asymm_base_addr);
+    MPL_atomic_release_store_ptr(&ret.p, (void *) ((uintptr_t) a - (uintptr_t) MPID_nem_asymm_base_addr));
     return ret;
 }
 
@@ -66,26 +70,9 @@ static inline MPID_nem_cell_rel_ptr_t MPID_NEM_ABS_TO_REL (MPID_nem_cell_ptr_t a
 #define MPID_NEM_IS_LOCAL(grank) (MPID_nem_mem_region.local_ranks[grank] != MPID_NEM_NON_LOCAL)
 #define MPID_NEM_LOCAL_RANK(grank) (MPID_nem_mem_region.local_ranks[grank])
 
-#define MPID_NEM_NUM_BARRIER_VARS 16
-typedef struct MPID_nem_barrier_vars
-{
-    OPA_int_t context_id;
-    OPA_int_t usage_cnt;
-    OPA_int_t cnt;
-#if MPID_NEM_CACHE_LINE_LEN != SIZEOF_INT
-    char padding0[MPID_NEM_CACHE_LINE_LEN - sizeof(int)];
-#endif
-    OPA_int_t sig0;
-    OPA_int_t sig;
-    char padding1[MPID_NEM_CACHE_LINE_LEN - 2* sizeof(int)];
-}
-MPID_nem_barrier_vars_t;
-
 typedef struct MPID_nem_mem_region
 {
-    MPIDU_shm_seg_t             memory;
-    MPIDU_shm_seg_info_t       *seg;
-    int                         num_seg;
+    void                       *shm_ptr;
     int                         map_lock;
     int                         num_local;
     int                         num_procs;
@@ -98,10 +85,8 @@ typedef struct MPID_nem_mem_region
     MPID_nem_cell_ptr_t         Elements;
     MPID_nem_queue_ptr_t       *FreeQ;
     MPID_nem_queue_ptr_t       *RecvQ;
-    MPIDU_shm_barrier_t        *barrier;
     MPID_nem_queue_ptr_t        my_freeQ;
     MPID_nem_queue_ptr_t        my_recvQ;
-    MPID_nem_barrier_vars_t    *barrier_vars;
     int                         rank;
     struct MPID_nem_mem_region *next;
 } MPID_nem_mem_region_t, *MPID_nem_mem_region_ptr_t;
