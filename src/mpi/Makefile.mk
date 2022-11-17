@@ -1,8 +1,6 @@
-## -*- Mode: Makefile; -*-
-## vim: set ft=automake :
 ##
-## (C) 2011 by Argonne National Laboratory.
-##     See COPYRIGHT in top-level directory.
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
 ##
 
 include $(top_srcdir)/src/mpi/attr/Makefile.mk
@@ -19,8 +17,8 @@ include $(top_srcdir)/src/mpi/pt2pt/Makefile.mk
 include $(top_srcdir)/src/mpi/request/Makefile.mk
 include $(top_srcdir)/src/mpi/rma/Makefile.mk
 include $(top_srcdir)/src/mpi/spawn/Makefile.mk
-include $(top_srcdir)/src/mpi/timer/Makefile.mk
 include $(top_srcdir)/src/mpi/topo/Makefile.mk
+include $(top_srcdir)/src/mpi/stream/Makefile.mk
 
 if BUILD_ROMIO
 SUBDIRS += src/mpi/romio

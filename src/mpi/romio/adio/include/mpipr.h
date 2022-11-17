@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIPR_H_INCLUDED
@@ -16,8 +15,6 @@
 
 #undef MPI_Abort
 #define MPI_Abort PMPI_Abort
-#undef MPI_Address
-#define MPI_Address PMPI_Address
 #undef MPI_Allgather
 #define MPI_Allgather PMPI_Allgather
 #undef MPI_Allgatherv
@@ -72,6 +69,8 @@
 #define MPI_Comm_compare PMPI_Comm_compare
 #undef MPI_Comm_create
 #define MPI_Comm_create PMPI_Comm_create
+#undef MPI_Comm_create_errhandler
+#define MPI_Comm_create_errhandler PMPI_Comm_create_errhandler
 #undef MPI_Comm_dup
 #define MPI_Comm_dup PMPI_Comm_dup
 #undef MPI_Comm_free
@@ -92,14 +91,12 @@
 #define MPI_Comm_test_inter PMPI_Comm_test_inter
 #undef MPI_Dims_create
 #define MPI_Dims_create PMPI_Dims_create
-#undef MPI_Errhandler_create
-#define MPI_Errhandler_create PMPI_Errhandler_create
 #undef MPI_Errhandler_free
 #define MPI_Errhandler_free PMPI_Errhandler_free
-#undef MPI_Errhandler_get
-#define MPI_Errhandler_get PMPI_Errhandler_get
-#undef MPI_Errhandler_set
-#define MPI_Errhandler_set PMPI_Errhandler_set
+#undef MPI_Comm_get_errhandler
+#define MPI_Comm_get_errhandler PMPI_Comm_get_errhandler
+#undef MPI_Comm_set_errhandler
+#define MPI_Comm_set_errhandler PMPI_Comm_set_errhandler
 #undef MPI_Error_class
 #define MPI_Error_class PMPI_Error_class
 #undef MPI_Error_string
@@ -110,6 +107,8 @@
 #define MPI_Gather PMPI_Gather
 #undef MPI_Gatherv
 #define MPI_Gatherv PMPI_Gatherv
+#undef MPI_Get_address
+#define MPI_Get_address PMPI_Get_address
 #undef MPI_Get_count
 #define MPI_Get_count PMPI_Get_count
 #undef MPI_Get_elements
@@ -174,6 +173,28 @@
 #define MPI_Isend PMPI_Isend
 #undef MPI_Issend
 #define MPI_Issend PMPI_Issend
+#undef MPI_Ialltoall
+#define MPI_Ialltoall PMPI_Ialltoall
+#undef MPI_Iallgather
+#define MPI_Iallgather PMPI_Iallgather
+#undef MPI_Iallreduce
+#define MPI_Iallreduce PMPI_Iallreduce
+#undef MPI_Ibcast
+#define MPI_Ibcast PMPI_Ibcast
+#undef MPI_Accumulate
+#define MPI_Accumulate PMPI_Accumulate
+#undef MPI_Get
+#define MPI_Get PMPI_Get
+#undef MPI_Put
+#define MPI_Put PMPI_Put
+#undef MPI_Win_create
+#define MPI_Win_create PMPI_Win_create
+#undef MPI_Win_free
+#define MPI_Win_free PMPI_Win_free
+#undef MPI_Win_lock
+#define MPI_Win_lock PMPI_Win_lock
+#undef MPI_Win_unlock
+#define MPI_Win_unlock PMPI_Win_unlock
 #undef MPI_Keyval_create
 #define MPI_Keyval_create PMPI_Keyval_create
 #undef MPI_Keyval_free
@@ -248,42 +269,42 @@
 #define MPI_Topo_test PMPI_Topo_test
 #undef MPI_Type_commit
 #define MPI_Type_commit PMPI_Type_commit
+#undef MPI_Type_dup
+#define MPI_Type_dup PMPI_Type_dup
 #undef MPI_Type_contiguous
 #define MPI_Type_contiguous PMPI_Type_contiguous
-#undef MPI_Type_count
-#define MPI_Type_count PMPI_Type_count
 /* #define MPI_Type_create_darray PMPI_Type_create_darray */
 #undef MPI_Type_create_indexed_block
 #define MPI_Type_create_indexed_block PMPI_Type_create_indexed_block
 #undef MPI_Type_create_hindexed_block
 #define MPI_Type_create_hindexed_block PMPI_Type_create_hindexed_block
+#undef MPI_Type_create_hindexed
+#define MPI_Type_create_hindexed PMPI_Type_create_hindexed
+#undef MPI_Type_create_struct
+#define MPI_Type_create_struct PMPI_Type_create_struct
+#undef MPI_Type_create_hvector
+#define MPI_Type_create_hvector PMPI_Type_create_hvector
 /* #define MPI_Type_create_subarray PMPI_Type_create_subarray */
-#undef MPI_Type_extent
-#define MPI_Type_extent PMPI_Type_extent
 #undef MPI_Type_free
 #define MPI_Type_free PMPI_Type_free
 #undef MPI_Type_get_contents
 #define MPI_Type_get_contents PMPI_Type_get_contents
 #undef MPI_Type_get_envelope
 #define MPI_Type_get_envelope PMPI_Type_get_envelope
+#undef MPI_Type_get_contents_c
+#define MPI_Type_get_contents_c PMPI_Type_get_contents_c
+#undef MPI_Type_get_envelope_c
+#define MPI_Type_get_envelope_c PMPI_Type_get_envelope_c
 #undef MPI_Type_get_true_extent
 #define MPI_Type_get_true_extent PMPI_Type_get_true_extent
-#undef MPI_Type_hindexed
-#define MPI_Type_hindexed PMPI_Type_hindexed
-#undef MPI_Type_hvector
-#define MPI_Type_hvector PMPI_Type_hvector
 #undef MPI_Type_indexed
 #define MPI_Type_indexed PMPI_Type_indexed
-#undef MPI_Type_lb
-#define MPI_Type_lb PMPI_Type_lb
 #undef MPI_Type_size
 #define MPI_Type_size PMPI_Type_size
 #undef MPI_Type_size_x
 #define MPI_Type_size_x PMPI_Type_size_x
-#undef MPI_Type_struct
-#define MPI_Type_struct PMPI_Type_struct
-#undef MPI_Type_ub
-#define MPI_Type_ub PMPI_Type_ub
+#undef MPI_Type_get_extent
+#define MPI_Type_get_extent PMPI_Type_get_extent
 #undef MPI_Type_vector
 #define MPI_Type_vector PMPI_Type_vector
 #undef MPI_Unpack

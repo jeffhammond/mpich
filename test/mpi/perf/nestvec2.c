@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -34,11 +33,10 @@ int main(int argc, char **argv)
 {
     int vcount, vstride;
     int32_t counts[2];
-    int v2stride, typesize, packsize, i, position, errs = 0;
+    int packsize, i, position, errs = 0;
     double *outbuf, *outbuf2;
     double *vsource;
     MPI_Datatype vtype, stype;
-    MPI_Aint lb, extent;
     double t0, t1;
     double tspack, tvpack, tmanual;
     int ntry;

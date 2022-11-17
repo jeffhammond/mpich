@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -21,15 +19,11 @@
  * *** Modification: We post only a small number of isends and irecvs at a time
  * and wait on them as suggested by Tony Ladd. ***
  */
-#undef FUNCNAME
-#define FUNCNAME MPIR_Alltoallw_intra_scattered
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIR_Alltoallw_intra_scattered(const void *sendbuf, const int sendcounts[], const int sdispls[],
-                                   const MPI_Datatype sendtypes[], void *recvbuf,
-                                   const int recvcounts[], const int rdispls[],
-                                   const MPI_Datatype recvtypes[], MPIR_Comm * comm_ptr,
-                                   MPIR_Errflag_t * errflag)
+int MPIR_Alltoallw_intra_scattered(const void *sendbuf, const MPI_Aint sendcounts[],
+                                   const MPI_Aint sdispls[], const MPI_Datatype sendtypes[],
+                                   void *recvbuf, const MPI_Aint recvcounts[],
+                                   const MPI_Aint rdispls[], const MPI_Datatype recvtypes[],
+                                   MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
     int comm_size, i;
     int mpi_errno = MPI_SUCCESS;
@@ -39,7 +33,7 @@ int MPIR_Alltoallw_intra_scattered(const void *sendbuf, const int sendcounts[], 
     int dst, rank;
     int outstanding_requests;
     int ii, ss, bblock;
-    int type_size;
+    MPI_Aint type_size;
     MPIR_CHKLMEM_DECL(2);
 
     comm_size = comm_ptr->local_size;
@@ -78,9 +72,7 @@ int MPIR_Alltoallw_intra_scattered(const void *sendbuf, const int sendcounts[], 
                                            recvcounts[dst], recvtypes[dst], dst,
                                            MPIR_ALLTOALLW_TAG, comm_ptr,
                                            &reqarray[outstanding_requests]);
-                    if (mpi_errno) {
-                        MPIR_ERR_POP(mpi_errno);
-                    }
+                    MPIR_ERR_CHECK(mpi_errno);
 
                     outstanding_requests++;
                 }
@@ -96,9 +88,7 @@ int MPIR_Alltoallw_intra_scattered(const void *sendbuf, const int sendcounts[], 
                                            sendcounts[dst], sendtypes[dst], dst,
                                            MPIR_ALLTOALLW_TAG, comm_ptr,
                                            &reqarray[outstanding_requests], errflag);
-                    if (mpi_errno) {
-                        MPIR_ERR_POP(mpi_errno);
-                    }
+                    MPIR_ERR_CHECK(mpi_errno);
 
                     outstanding_requests++;
                 }

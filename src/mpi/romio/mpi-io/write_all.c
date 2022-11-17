@@ -1,11 +1,11 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpioimpl.h"
+#include <limits.h>
+#include <assert.h>
 
 #ifdef HAVE_WEAK_SYMBOLS
 
@@ -19,6 +19,19 @@
 #elif defined(HAVE_WEAK_ATTRIBUTE)
 int MPI_File_write_all(MPI_File fh, const void *buf, int count, MPI_Datatype datatype,
                        MPI_Status * status) __attribute__ ((weak, alias("PMPI_File_write_all")));
+#endif
+
+#if defined(HAVE_PRAGMA_WEAK)
+#pragma weak MPI_File_write_all_c = PMPI_File_write_all_c
+#elif defined(HAVE_PRAGMA_HP_SEC_DEF)
+#pragma _HP_SECONDARY_DEF PMPI_File_write_all_c MPI_File_write_all_c
+#elif defined(HAVE_PRAGMA_CRI_DUP)
+#pragma _CRI duplicate MPI_File_write_all_c as PMPI_File_write_all_c
+/* end of weak pragmas */
+#elif defined(HAVE_WEAK_ATTRIBUTE)
+int MPI_File_write_all_c(MPI_File fh, const void *buf, MPI_Count count, MPI_Datatype datatype,
+                         MPI_Status * status)
+    __attribute__ ((weak, alias("PMPI_File_write_all_c")));
 #endif
 
 /* Include mapping from MPI->PMPI */
@@ -63,13 +76,52 @@ int MPI_File_write_all(MPI_File fh, ROMIO_CONST void *buf, int count,
     return error_code;
 }
 
+/* large count function */
+
+
+
+/*@
+    MPI_File_write_all_c - Collective write using individual file pointer
+
+Input Parameters:
+. fh - file handle (handle)
+. buf - initial address of buffer (choice)
+. count - number of elements in buffer (nonnegative integer)
+. datatype - datatype of each buffer element (handle)
+
+Output Parameters:
+. status - status object (Status)
+
+.N fortran
+@*/
+int MPI_File_write_all_c(MPI_File fh, ROMIO_CONST void *buf, MPI_Count count,
+                         MPI_Datatype datatype, MPI_Status * status)
+{
+    int error_code;
+    static char myname[] = "MPI_FILE_WRITE_ALL";
+#ifdef MPI_hpux
+    int fl_xmpi;
+
+    HPMP_IO_START(fl_xmpi, BLKMPIFILEWRITEALL, TRDTBLOCK, fh, datatype, count);
+#endif /* MPI_hpux */
+
+    error_code = MPIOI_File_write_all(fh, (MPI_Offset) 0,
+                                      ADIO_INDIVIDUAL, buf, count, datatype, myname, status);
+
+#ifdef MPI_hpux
+    HPMP_IO_END(fl_xmpi, fh, datatype, count);
+#endif /* MPI_hpux */
+
+    return error_code;
+}
+
 /* prevent multiple definitions of this routine */
 #ifdef MPIO_BUILD_PROFILING
 int MPIOI_File_write_all(MPI_File fh,
                          MPI_Offset offset,
                          int file_ptr_type,
                          const void *buf,
-                         int count, MPI_Datatype datatype, char *myname, MPI_Status * status)
+                         MPI_Aint count, MPI_Datatype datatype, char *myname, MPI_Status * status)
 {
     int error_code;
     MPI_Count datatype_size;

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -48,7 +47,7 @@ int main(int argc, char *argv[])
     double *ldata, *pdata;
 
     int tsize, nelem;
-    char *filename;
+    const char *filename;
 
     MPI_File dfile;
 
@@ -128,5 +127,5 @@ int main(int argc, char *argv[])
     MPI_Type_free(&darray);
     MTest_Finalize(nerrors);
 
-    MTestReturnValue(total_errors);
+    return MTestReturnValue(total_errors);
 }

@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2008 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "adio.h"
 
 int ADIOI_GEN_Feature(ADIO_File fd, int flag)
@@ -16,6 +15,7 @@ int ADIOI_GEN_Feature(ADIO_File fd, int flag)
         case ADIO_UNLINK_AFTER_CLOSE:
         case ADIO_TWO_PHASE:
         case ADIO_SCALABLE_RESIZE:
+        case ADIO_IMMEDIATELY_VISIBLE:
             return 1;
             break;
         case ADIO_SCALABLE_OPEN:

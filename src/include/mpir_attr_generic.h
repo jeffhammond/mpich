@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_ATTR_GENERIC_H_INCLUDED
@@ -126,9 +125,6 @@ MPICH_API_PUBLIC int MPII_Comm_get_attr(MPI_Comm, int, void *, int *, MPIR_Attr_
 MPICH_API_PUBLIC int MPII_Type_get_attr(MPI_Datatype, int, void *, int *, MPIR_Attr_type);
 MPICH_API_PUBLIC int MPII_Win_get_attr(MPI_Win, int, void *, int *, MPIR_Attr_type);
 
-MPICH_API_PUBLIC int MPII_Comm_get_attr_fort(MPI_Comm, int, void *, int *, MPIR_Attr_type);
-
-
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -137,7 +133,7 @@ extern "C" {
   Language bindings for MPI
 
   A few operations in MPI need to know how to marshal the callback into the calling
-  lanuage calling convention. The marshaling code is provided by a thunk layer which
+  language calling convention. The marshaling code is provided by a thunk layer which
   implements the correct behavior.  Examples of these callback functions are the
   keyval attribute copy and delete functions.
 

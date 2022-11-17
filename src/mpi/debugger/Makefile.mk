@@ -1,8 +1,6 @@
-## -*- Mode: Makefile; -*-
-## vim: set ft=automake :
 ##
-## (C) 2011 by Argonne National Laboratory.
-##     See COPYRIGHT in top-level directory.
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
 ##
 
 # all of these routines are internal, nothing gets added to mpi_sources
@@ -16,7 +14,7 @@ noinst_HEADERS += src/mpi/debugger/mpich_dll_defs.h
 noinst_LTLIBRARIES += src/mpi/debugger/libdbginitdummy.la
 src_mpi_debugger_libdbginitdummy_la_SOURCES = src/mpi/debugger/dbginit.c
 src_mpi_debugger_libdbginitdummy_la_CFLAGS = -g
-pmpi_convenience_libs += $(top_builddir)/src/mpi/debugger/libdbginitdummy.la
+pmpi_convenience_libs += src/mpi/debugger/libdbginitdummy.la
 
 lib_LTLIBRARIES += lib/libtvmpich.la
 # There is no static debugger interface library

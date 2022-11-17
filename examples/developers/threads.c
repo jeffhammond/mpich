@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -92,7 +91,6 @@ void *thrdsub(void *arg)
             MPI_Recv(r_buff, 1024, MPI_CHAR, 1, mythrdrank, MPI_COMM_WORLD, &status);
             if (strcmp(s_buff, r_buff) != 0) {
                 printf("comm_rank=%d mythrdrank=%d bad recv\n", comm_rank, mythrdrank);
-                exit(-1);
             }
             if (thread_level_provided == MPI_THREAD_SINGLE ||
                 thread_level_provided == MPI_THREAD_FUNNELED) {
@@ -107,7 +105,6 @@ void *thrdsub(void *arg)
             MPI_Recv(r_buff, 1024, MPI_CHAR, 0, mythrdrank, MPI_COMM_WORLD, &status);
             if (strcmp(s_buff, r_buff) != 0) {
                 printf("comm_rank=%d mythrdrank=%d bad recv\n", comm_rank, mythrdrank);
-                exit(-1);
             }
             MPI_Send(s_buff, strlen(s_buff) + 1, MPI_CHAR, 0, mythrdrank, MPI_COMM_WORLD);
             if (thread_level_provided == MPI_THREAD_SINGLE ||

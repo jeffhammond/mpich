@@ -1,16 +1,11 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
 #include "hcoll.h"
 
-#undef FUNCNAME
-#define FUNCNAME hcoll_Barrier
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int hcoll_Barrier(MPIR_Comm * comm_ptr, MPIR_Errflag_t * err)
 {
     int rc = -1;
@@ -20,15 +15,13 @@ int hcoll_Barrier(MPIR_Comm * comm_ptr, MPIR_Errflag_t * err)
         return rc;
 
     MPL_DBG_MSG(MPIR_DBG_HCOLL, VERBOSE, "RUNNING HCOL BARRIER.");
+    MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
     rc = hcoll_collectives.coll_barrier(comm_ptr->hcoll_priv.hcoll_context);
+    MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
     return rc;
 }
 
-#undef FUNCNAME
-#define FUNCNAME hcoll_Bcast
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int hcoll_Bcast(void *buffer, int count, MPI_Datatype datatype, int root,
+int hcoll_Bcast(void *buffer, MPI_Aint count, MPI_Datatype datatype, int root,
                 MPIR_Comm * comm_ptr, MPIR_Errflag_t * err)
 {
     dte_data_representation_t dtype;
@@ -47,18 +40,16 @@ int hcoll_Bcast(void *buffer, int count, MPI_Datatype datatype, int root,
         MPL_DBG_MSG(MPIR_DBG_HCOLL, VERBOSE, "unsupported data layout, calling fallback bcast.");
         rc = -1;
     } else {
+        MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
         rc = hcoll_collectives.coll_bcast(buffer, count, dtype, root,
                                           comm_ptr->hcoll_priv.hcoll_context);
+        MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
     }
     return rc;
 }
 
-#undef FUNCNAME
-#define FUNCNAME hcoll_Reduce
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int hcoll_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
-                 int root, MPIR_Comm * comm_ptr, MPIR_Errflag_t * err)
+int hcoll_Reduce(const void *sendbuf, void *recvbuf, MPI_Aint count, MPI_Datatype datatype,
+                 MPI_Op op, int root, MPIR_Comm * comm_ptr, MPIR_Errflag_t * err)
 {
     dte_data_representation_t dtype;
     hcoll_dte_op_t *Op;
@@ -80,17 +71,15 @@ int hcoll_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype dat
         MPL_DBG_MSG(MPIR_DBG_HCOLL, VERBOSE, "unsupported data layout, calling fallback bcast.");
         rc = -1;
     } else {
+        MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
         rc = hcoll_collectives.coll_reduce((void *) sendbuf, recvbuf, count, dtype, Op, root,
                                            comm_ptr->hcoll_priv.hcoll_context);
+        MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
     }
     return rc;
 }
 
-#undef FUNCNAME
-#define FUNCNAME hcoll_Allreduce
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int hcoll_Allreduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
+int hcoll_Allreduce(const void *sendbuf, void *recvbuf, MPI_Aint count, MPI_Datatype datatype,
                     MPI_Op op, MPIR_Comm * comm_ptr, MPIR_Errflag_t * err)
 {
     dte_data_representation_t Dtype;
@@ -112,16 +101,14 @@ int hcoll_Allreduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype 
                     "unsupported data layout, calling fallback allreduce.");
         rc = -1;
     } else {
+        MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
         rc = hcoll_collectives.coll_allreduce((void *) sendbuf, recvbuf, count, Dtype, Op,
                                               comm_ptr->hcoll_priv.hcoll_context);
+        MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
     }
     return rc;
 }
 
-#undef FUNCNAME
-#define FUNCNAME hcoll_Allgather
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int hcoll_Allgather(const void *sbuf, int scount, MPI_Datatype sdtype,
                     void *rbuf, int rcount, MPI_Datatype rdtype, MPIR_Comm * comm_ptr,
                     MPIR_Errflag_t * err)
@@ -148,16 +135,14 @@ int hcoll_Allgather(const void *sbuf, int scount, MPI_Datatype sdtype,
                     "unsupported data layout; calling fallback allgather.");
         rc = -1;
     } else {
+        MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
         rc = hcoll_collectives.coll_allgather((void *) sbuf, scount, stype, rbuf, rcount, rtype,
                                               comm_ptr->hcoll_priv.hcoll_context);
+        MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
     }
     return rc;
 }
 
-#undef FUNCNAME
-#define FUNCNAME hcoll_Alltoall
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int hcoll_Alltoall(const void *sbuf, int scount, MPI_Datatype sdtype,
                    void *rbuf, int rcount, MPI_Datatype rdtype, MPIR_Comm * comm_ptr,
                    MPIR_Errflag_t * err)
@@ -184,19 +169,18 @@ int hcoll_Alltoall(const void *sbuf, int scount, MPI_Datatype sdtype,
                     "unsupported data layout; calling fallback allgather.");
         rc = -1;
     } else {
+        MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
         rc = hcoll_collectives.coll_alltoall((void *) sbuf, scount, stype, rbuf, rcount, rtype,
                                              comm_ptr->hcoll_priv.hcoll_context);
+        MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
     }
     return rc;
 }
 
-#undef FUNCNAME
-#define FUNCNAME hcoll_Alltoallv
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int hcoll_Alltoallv(const void *sbuf, const int *scounts, const int *sdispls, MPI_Datatype sdtype,
-                    void *rbuf, const int *rcounts, const int *rdispls, MPI_Datatype rdtype,
-                    MPIR_Comm * comm_ptr, MPIR_Errflag_t * err)
+int hcoll_Alltoallv(const void *sbuf, const MPI_Aint * scounts, const MPI_Aint * sdispls,
+                    MPI_Datatype sdtype, void *rbuf, const MPI_Aint * rcounts,
+                    const MPI_Aint * rdispls, MPI_Datatype rdtype, MPIR_Comm * comm_ptr,
+                    MPIR_Errflag_t * err)
 {
     MPI_Comm comm = comm_ptr->handle;
     dte_data_representation_t stype;
@@ -220,9 +204,11 @@ int hcoll_Alltoallv(const void *sbuf, const int *scounts, const int *sdispls, MP
                     "unsupported data layout; calling fallback allgather.");
         rc = -1;
     } else {
+        MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
         rc = hcoll_collectives.coll_alltoallv((void *) sbuf, (int *) scounts, (int *) sdispls,
                                               stype, rbuf, (int *) rcounts, (int *) rdispls, rtype,
                                               comm_ptr->hcoll_priv.hcoll_context);
+        MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_HCOLL_MUTEX);
     }
     return rc;
 }

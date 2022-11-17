@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 2004 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_panfs.h"
@@ -11,12 +9,17 @@
 #include <unistd.h>
 #endif
 
-void ADIOI_PANFS_WriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_PANFS_WriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                              MPI_Datatype datatype, int file_ptr_type,
                              ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {
     MPI_Count err = -1, datatype_size, len;
     static char myname[] = "ADIOI_PANFS_WRITECONTIG";
+
+    if (count == 0) {
+        err = 0;
+        goto fn_exit;
+    }
 
     MPI_Type_size_x(datatype, &datatype_size);
     len = datatype_size * count;
@@ -56,8 +59,10 @@ void ADIOI_PANFS_WriteContig(ADIO_File fd, const void *buf, int count,
     if (file_ptr_type == ADIO_INDIVIDUAL) {
         fd->fp_ind += err;
     }
+
+  fn_exit:
 #ifdef HAVE_STATUS_SET_BYTES
-    if (err != -1 && status)
+    if (status && err != -1)
         MPIR_Status_set_bytes(status, datatype, err);
 #endif
 

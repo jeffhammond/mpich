@@ -1,12 +1,15 @@
 #! /usr/bin/env perl
-# -*- Mode: perl; -*-
-# 
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
+
 # This script is a replacement for several scripts that process source
 # files, extracting information from them.  This file provides a set 
 # of routines for processing files and maintaining a cache of the results.
 # It uses a more sophisticated
 # approach to avoid rescanning all files by keeping track of local changes
-# It does this on a directory-by-directory basis as a comprimise between
+# It does this on a directory-by-directory basis as a compromise between
 # doing the minimal work but limiting the number and size of the "extra"
 # files.  In this case, for each directory, the following dot file is 
 # produced (with a <name> provided depending on use:
@@ -55,7 +58,7 @@
 # Data structures
 # Within a directory
 #   fileInfo{filename} = extracted info
-#   filesUpdated[]     = array of file names that match critera
+#   filesUpdated[]     = array of file names that match criteria
 #   fileInCache{filename} = comparison info
 #   
 # -------------------------------------------------------------------------
@@ -73,7 +76,7 @@ sub GetFileNamesInDirectory {
     my @filesFound = ();
 
     opendir DIR, $dir || die "Could not open $dir\n";
-    while (my $file = readdir DIR) {
+    for my $file (sort readdir DIR) {
 	if (! -f "$dir/$file") { next; }
 	if ($file =~ /^\.$/ || $file =~ /^\.\.$/) { next; }
 	if ($file =~ /$pattern/) {
@@ -246,7 +249,7 @@ sub processDirs {
     my @dirs = ();
     # Find the directories
     opendir DIR, "$dir" || die "Cannot open $dir\n";
-    while (my $file = readdir DIR) {
+    for my $file (sort readdir DIR) {
 	if (! -d "$dir/$file") { next; }
 	if ($file =~ /^\./) { next; }
 	if ($file =~ /^.svn/) { next; }
@@ -273,7 +276,7 @@ sub processDirsAndAction {
     my @dirs = ();
     # Find the directories
     opendir DIR, "$dir" || die "Cannot open $dir\n";
-    while (my $file = readdir DIR) {
+    for my $file (sort readdir DIR) {
 	if (! -d "$dir/$file") { next; }
 	if ($file =~ /^\./) { next; }
 	if ($file =~ /^.svn/) { next; }

@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -28,14 +26,17 @@ void ADIOI_GEN_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
     /* if we've already set up default hints and the user has not asked us to
      * process any hints (MPI_INFO_NULL), then we can short-circuit hint
      * processing */
-    if (fd->hints->initialized && fd->info == MPI_INFO_NULL) {
+    if (fd->hints->initialized && users_info == MPI_INFO_NULL) {
         *error_code = MPI_SUCCESS;
         return;
     }
     ad_get_env_vars();
 
-    if (fd->info == MPI_INFO_NULL)
+    /* Interpreting MPI-4.0 to mean ROMIO should only return hints it knows
+     * about when user calls MPI_File_get_info */
+    if (fd->info == MPI_INFO_NULL) {
         MPI_Info_create(&(fd->info));
+    }
     info = fd->info;
 
     MPI_Comm_size(fd->comm, &nprocs);
@@ -124,6 +125,20 @@ void ADIOI_GEN_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
          * no good default value so just leave it unset */
         fd->hints->min_fdomain_size = 0;
         fd->hints->striping_unit = 0;
+
+        /* temporally synchronizing flush: I think this is going to be a useful
+         * optimization for all users, but might have surprising hangs if
+         * client code incorrectly treats MPI_File_sync as independent */
+        ADIOI_Info_set(info, "romio_synchronized_flush", "disabled");
+        fd->hints->synchronizing_flush = 0;
+
+        /* While MPI-IO rules say a write from one process is not visible until
+         * sync or close, many file systems implement the more restrictive
+         * POSIX semantics:  under POSIX semantics a write from one process is
+         * visible to everyone.  For counter-example, Unify, NFS and PVFS do
+         * not support this semantic */
+        ADIOI_Info_set(info, "romio_visibility_immediate", "true");
+        fd->hints->visibility_immediate = 1;
 
         fd->hints->initialized = 1;
 
@@ -246,9 +261,12 @@ void ADIOI_GEN_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
          * process hints for it. */
         ADIOI_Info_check_and_install_int(fd, users_info, "striping_unit",
                                          &(fd->hints->striping_unit), myname, error_code);
+
+        ADIOI_Info_check_and_install_enabled(fd, users_info, "romio_synchronized_flush",
+                                             &(fd->hints->synchronizing_flush), myname, error_code);
     }
 
-    /* Begin hint post-processig: some hints take precidence over or conflict
+    /* Begin hint post-processig: some hints take precedence over or conflict
      * with others, or aren't supported by some file systems */
 
     /* handle cb_config_list default value here; avoids an extra

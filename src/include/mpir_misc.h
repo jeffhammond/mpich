@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_MISC_H_INCLUDED
@@ -47,19 +45,25 @@ typedef enum MPIR_Lang_t {
 #endif
 } MPIR_Lang_t;
 
-extern const char MPII_Version_string[] MPICH_API_PUBLIC;
-extern const char MPII_Version_date[] MPICH_API_PUBLIC;
-extern const char MPII_Version_ABI[] MPICH_API_PUBLIC;
-extern const char MPII_Version_configure[] MPICH_API_PUBLIC;
-extern const char MPII_Version_device[] MPICH_API_PUBLIC;
-extern const char MPII_Version_CC[] MPICH_API_PUBLIC;
-extern const char MPII_Version_CXX[] MPICH_API_PUBLIC;
-extern const char MPII_Version_F77[] MPICH_API_PUBLIC;
-extern const char MPII_Version_FC[] MPICH_API_PUBLIC;
-extern const char MPII_Version_custom[] MPICH_API_PUBLIC;
+extern MPL_initlock_t MPIR_init_lock;
+
+#include "typerep_pre.h"        /* needed for MPIR_Typerep_req */
 
 int MPIR_Localcopy(const void *sendbuf, MPI_Aint sendcount, MPI_Datatype sendtype,
                    void *recvbuf, MPI_Aint recvcount, MPI_Datatype recvtype);
+int MPIR_Ilocalcopy(const void *sendbuf, MPI_Aint sendcount, MPI_Datatype sendtype,
+                    void *recvbuf, MPI_Aint recvcount, MPI_Datatype recvtype,
+                    MPIR_Typerep_req * typerep_req);
+int MPIR_Localcopy_stream(const void *sendbuf, MPI_Aint sendcount, MPI_Datatype sendtype,
+                          void *recvbuf, MPI_Aint recvcount, MPI_Datatype recvtype, void *stream);
+
+/* Contiguous datatype calculates buffer address with `(char *) buf + dt_true_lb`.
+ * However, dt_true_lb is treated as ptrdiff_t (signed), and when buf is MPI_BOTTOM
+ * and on 32-bit systems, ubsan will warn the latter overflow. Cast to uintptr_t
+ * to work around.
+ */
+#define MPIR_get_contig_ptr(buf, true_lb) \
+    (void *) ((uintptr_t) buf + (uintptr_t) (true_lb))
 
 /*@ MPIR_Add_finalize - Add a routine to be called when MPI_Finalize is invoked
 
@@ -78,19 +82,23 @@ Notes:
 void MPIR_Add_finalize(int (*routine) (void *), void *extra, int priority);
 
 /* Routines for determining local and remote processes */
-int MPIR_Find_local_and_external(struct MPIR_Comm *comm, int *local_size_p, int *local_rank_p,
-                                 int **local_ranks_p, int *external_size_p, int *external_rank_p,
-                                 int **external_ranks_p, int **intranode_table,
-                                 int **internode_table_p);
+int MPIR_Find_local(struct MPIR_Comm *comm, int *local_size_p, int *local_rank_p,
+                    int **local_ranks_p, int **intranode_table);
+int MPIR_Find_external(struct MPIR_Comm *comm, int *external_size_p, int *external_rank_p,
+                       int **external_ranks_p, int **internode_table_p);
 int MPIR_Get_internode_rank(MPIR_Comm * comm_ptr, int r);
 int MPIR_Get_intranode_rank(MPIR_Comm * comm_ptr, int r);
 
-int MPIR_Close_port_impl(const char *port_name);
-int MPIR_Open_port_impl(MPIR_Info * info_ptr, char *port_name);
-int MPIR_Cancel(MPIR_Request * request_ptr);
-
-/* Default routines for asynchronous progress thread */
-int MPIR_Init_async_thread(void);
-int MPIR_Finalize_async_thread(void);
+#define MPIR_CAST(T, val) CAST_##T((val))
+#ifdef NDEBUG
+#define MPIR_CAST_int(val) ((int) (val))
+#define MPIR_CAST_Aint(val) ((MPI_Aint) (val))
+#else
+#define MPIR_CAST_int(val) \
+    (((val) > INT_MAX || ((val) < 0 && (val) < INT_MIN)) ? (assert(0), 0) : (int) (val))
+#define MPIR_CAST_Aint(val) \
+    (((val) > MPIR_AINT_MAX || ((val) < 0 && (val) < MPIR_AINT_MIN)) ? (assert(0), 0) \
+     : (MPI_Aint) (val))
+#endif
 
 #endif /* MPIR_MISC_H_INCLUDED */

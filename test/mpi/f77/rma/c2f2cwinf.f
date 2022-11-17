@@ -1,10 +1,8 @@
-C -*- Mode: Fortran; -*- 
 C
-C  (C) 2003 by Argonne National Laboratory.
-C      See COPYRIGHT in top-level directory.
-C   
-C Test just MPI-RMA
+C Copyright (C) by Argonne National Laboratory
+C     See COPYRIGHT in top-level directory
 C
+
       program main
       implicit none
       include 'mpif.h'
@@ -17,7 +15,7 @@ C The integer asize must be of ADDRESS_KIND size
       include 'addsize.h'
       errs = 0
 
-      call mpi_init( ierr )
+      call mtest_init( ierr )
 
 C
 C Test passing a Fortran MPI object to C
@@ -38,15 +36,7 @@ C     displacement unit 1
 C
 C Summarize the errors
 C
-      call mpi_allreduce( errs, toterrs, 1, MPI_INTEGER, MPI_SUM,
-     $     MPI_COMM_WORLD, ierr )
-      if (wrank .eq. 0) then
-         if (toterrs .eq. 0) then
-            print *, ' No Errors'
-         else
-            print *, ' Found ', toterrs, ' errors'
-         endif
-      endif
+      call mtest_finalize( errs )
 
       end
       

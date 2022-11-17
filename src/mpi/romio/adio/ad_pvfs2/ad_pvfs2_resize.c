@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_pvfs2.h"
@@ -30,7 +28,7 @@ void ADIOI_PVFS2_Resize(ADIO_File fd, ADIO_Offset size, int *error_code)
     /* MPI-IO semantics treat conflicting MPI_File_set_size requests the
      * same as conflicting write requests. Thus, a resize from one
      * process does not have to be visible to the other processes until a
-     * syncronization point is reached */
+     * synchronization point is reached */
 
     if (rank == fd->hints->ranklist[0]) {
         ret = PVFS_sys_truncate(pvfs_fs->object_ref, size, &(pvfs_fs->credentials));
@@ -49,7 +47,3 @@ void ADIOI_PVFS2_Resize(ADIO_File fd, ADIO_Offset size, int *error_code)
     }
     /* --END ERROR HANDLING-- */
 }
-
-/*
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */

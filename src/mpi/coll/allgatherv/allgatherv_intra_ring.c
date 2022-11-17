@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -24,16 +22,12 @@
  * Myrinet and IBM SP).
  */
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Allgatherv_intra_ring
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Allgatherv_intra_ring(const void *sendbuf,
-                               int sendcount,
+                               MPI_Aint sendcount,
                                MPI_Datatype sendtype,
                                void *recvbuf,
-                               const int *recvcounts,
-                               const int *displs,
+                               const MPI_Aint * recvcounts,
+                               const MPI_Aint * displs,
                                MPI_Datatype recvtype,
                                MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
@@ -56,45 +50,52 @@ int MPIR_Allgatherv_intra_ring(const void *sendbuf,
 
     MPIR_Datatype_get_extent_macro(recvtype, recvtype_extent);
 
-    char *sbuf = NULL, *rbuf = NULL;
-    int soffset, roffset;
-    int torecv, tosend, min;
-    int sendnow, recvnow;
-    int sidx, ridx;
-
     if (sendbuf != MPI_IN_PLACE) {
         /* First, load the "local" version in the recvbuf. */
         mpi_errno = MPIR_Localcopy(sendbuf, sendcount, sendtype,
                                    ((char *) recvbuf + displs[rank] * recvtype_extent),
                                    recvcounts[rank], recvtype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     left = (comm_size + rank - 1) % comm_size;
     right = (rank + 1) % comm_size;
 
+    MPI_Aint torecv, tosend, max, chunk_count;
     torecv = total_count - recvcounts[rank];
     tosend = total_count - recvcounts[right];
 
-    min = recvcounts[0];
+    chunk_count = 0;
+    max = recvcounts[0];
     for (i = 1; i < comm_size; i++)
-        if (min > recvcounts[i])
-            min = recvcounts[i];
-    if (min * recvtype_extent < MPIR_CVAR_ALLGATHERV_PIPELINE_MSG_SIZE)
-        min = MPIR_CVAR_ALLGATHERV_PIPELINE_MSG_SIZE / recvtype_extent;
-    /* Handle the case where the datatype extent is larger than
-     * the pipeline size. */
-    if (!min)
-        min = 1;
+        if (max < recvcounts[i])
+            max = recvcounts[i];
+    if (MPIR_CVAR_ALLGATHERV_PIPELINE_MSG_SIZE > 0 &&
+        max * recvtype_extent > MPIR_CVAR_ALLGATHERV_PIPELINE_MSG_SIZE) {
+        chunk_count = MPIR_CVAR_ALLGATHERV_PIPELINE_MSG_SIZE / recvtype_extent;
+        /* Handle the case where the datatype extent is larger than
+         * the pipeline size. */
+        if (!chunk_count)
+            chunk_count = 1;
+    }
+    /* pipeline is disabled */
+    if (!chunk_count)
+        chunk_count = max;
 
+    int soffset, roffset;
+    int sidx, ridx;
     sidx = rank;
     ridx = left;
     soffset = 0;
     roffset = 0;
     while (tosend || torecv) {  /* While we have data to send or receive */
-        sendnow = ((recvcounts[sidx] - soffset) > min) ? min : (recvcounts[sidx] - soffset);
-        recvnow = ((recvcounts[ridx] - roffset) > min) ? min : (recvcounts[ridx] - roffset);
+        MPI_Aint sendnow, recvnow;
+        sendnow = ((recvcounts[sidx] - soffset) >
+                   chunk_count) ? chunk_count : (recvcounts[sidx] - soffset);
+        recvnow = ((recvcounts[ridx] - roffset) >
+                   chunk_count) ? chunk_count : (recvcounts[ridx] - roffset);
+
+        char *sbuf, *rbuf;
         sbuf = (char *) recvbuf + ((displs[sidx] + soffset) * recvtype_extent);
         rbuf = (char *) recvbuf + ((displs[ridx] + roffset) * recvtype_extent);
 

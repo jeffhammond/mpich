@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
-/* vim: set ft=c.mpich : */
 /*
- *  (C) 2018 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -29,7 +27,7 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(split_comm, &local_rank);
 
     /* two processes trying to abort on the same subcomm
-     * should comlete normally, no hanging */
+     * should complete normally, no hanging */
     if (rank == 1) {
         MPI_Abort(split_comm, 8);
     }

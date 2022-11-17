@@ -1,15 +1,11 @@
-/* ---------------------------------------------------------------- */
-/* (C)Copyright IBM Corp.  2007, 2008                               */
-/* ---------------------------------------------------------------- */
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 /**
  * \file ad_gpfs_hints.c
  * \brief GPFS hint processing - for now, only used for BlueGene and PE platforms
- */
-
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
-/*
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
  */
 
 #include "adio.h"
@@ -67,6 +63,7 @@ void ADIOI_GPFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
     char *value;
     int flag, intval, nprocs = 0, nprocs_is_valid = 0;
     static char myname[] = "ADIOI_GPFS_SETINFO";
+    size_t len;
 
     int did_anything = 0;
 
@@ -111,7 +108,11 @@ void ADIOI_GPFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
         nprocs_is_valid = 1;
         MPL_snprintf(value, MPI_MAX_INFO_VAL + 1, "%d", nprocs);
         ADIOI_Info_set(info, "cb_nodes", value);
+#ifdef BGQPLATFORM
         fd->hints->cb_nodes = -1;
+#else
+        fd->hints->cb_nodes = nprocs;
+#endif
 
         /* hint indicating that no indep. I/O will be performed on this file */
         ADIOI_Info_set(info, "romio_no_indep_rw", "false");
@@ -233,6 +234,27 @@ void ADIOI_GPFS_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code)
             fd->hints->cb_nodes = intval;
         }
 #endif
+    }
+
+    /* note that we track i/o aggregators two ways:
+     * - cb_config_list is the string the user passed in to describe I/O
+     *   aggregator locations (the node-name:nprocs syntax e.g "*:1" or "*:*")
+     * - the 'fd->hints->ranklist' array of MPI ranks representing aggregators.
+     *   Some GPFS platforms have special ranklist generating code, but in the
+     *   common case most GPFS platforms should use the generic ranklist code,
+     *   which takes the "cb_config_list" hint as input */
+    if (fd->hints->cb_config_list == NULL) {
+        ADIOI_Info_set(info, "cb_config_list", ADIOI_CB_CONFIG_LIST_DFLT);
+        len = (strlen(ADIOI_CB_CONFIG_LIST_DFLT) + 1) * sizeof(char);
+        fd->hints->cb_config_list = ADIOI_Malloc(len);
+        if (fd->hints->cb_config_list == NULL) {
+            ADIOI_Free(value);
+            *error_code = MPIO_Err_create_code(*error_code,
+                                               MPIR_ERR_RECOVERABLE,
+                                               myname, __LINE__, MPI_ERR_OTHER, "**nomem2", 0);
+            return;
+        }
+        ADIOI_Strncpy(fd->hints->cb_config_list, ADIOI_CB_CONFIG_LIST_DFLT, len);
     }
 
     /* special CB aggregator assignment */

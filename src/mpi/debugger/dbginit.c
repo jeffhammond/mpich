@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -24,7 +23,7 @@ cvars:
       category    : DEBUGGER
       type        : int
       default     : 64
-      class       : device
+      class       : none
       verbosity   : MPI_T_VERBOSITY_USER_BASIC
       scope       : MPI_T_SCOPE_ALL_EQ
       description : >-
@@ -34,7 +33,7 @@ cvars:
       category    : DEBUGGER
       type        : boolean
       default     : false
-      class       : device
+      class       : none
       verbosity   : MPI_T_VERBOSITY_USER_BASIC
       scope       : MPI_T_SCOPE_ALL_EQ
       description : >-
@@ -86,7 +85,7 @@ void *MPIR_Breakpoint(void);
 
 /*
  * In addition to the discussion in the paper "A Standard Interface for Debugger
- * Access to Message Queue Inforation in MPI" and the more recent paper "An
+ * Access to Message Queue Information in MPI" and the more recent paper "An
  * Interface to Support the Identification of Dynamic {MPI} 2 Processes for
  * Scalable Parallel Debugging", there are a few features that have become
  * defacto standard.  These include the "proctable" (a relic of the way
@@ -172,11 +171,27 @@ static int MPIR_FreeProctable(void *);
 */
 
 /* Forward references */
-static void SendqInit(void);
-static int SendqFreePool(void *);
+static void DebugqInit(void);
+static int DebugqFreePool(void *);
+
+static MPID_Thread_mutex_t lock;
+
+static void init_lock(void)
+{
+    int err;
+    MPID_Thread_mutex_create(&lock, &err);
+    MPIR_Assert(err == 0);
+}
+
+static void finalize_lock(void)
+{
+    int err;
+    MPID_Thread_mutex_destroy(&lock, &err);
+    MPIR_Assert(err == 0);
+}
 
 /*
- * If MPICH is built with the --enable-debugger option, MPI_Init and
+ * If MPICH is built with the --enable-debuginfo option, MPI_Init and
  * MPI_Init_thread will call MPII_Wait_for_debugger.  This ensures both that
  * the debugger can gather information on the MPI job before the MPI_Init
  * returns to the user and that the necessary symbols for providing
@@ -188,9 +203,11 @@ static int SendqFreePool(void *);
  */
 void MPII_Wait_for_debugger(void)
 {
+    init_lock();
+
 #ifdef MPIU_PROCTABLE_NEEDED
-    int rank = MPIR_Process.comm_world->rank;
-    int size = MPIR_Process.comm_world->local_size;
+    int rank = MPIR_Process.rank;
+    int size = MPIR_Process.size;
     int i, maxsize;
 
     /* FIXME: In MPICH, the executables may not have the information
@@ -269,8 +286,8 @@ void MPII_Wait_for_debugger(void)
     /* After we exit the MPIR_Breakpoint routine, the debugger may have
      * set variables such as MPIR_being_debugged */
 
-    /* Initialize the sendq support */
-    SendqInit();
+    /* Initialize the request queue support */
+    DebugqInit();
 
     if (getenv("MPIEXEC_DEBUG")) {
         while (!MPIR_debug_gate);
@@ -304,6 +321,8 @@ void *MPIR_Breakpoint(void)
  */
 void MPIR_Debugger_set_aborting(const char *msg)
 {
+    finalize_lock();
+
     MPIR_debug_abort_string = (char *) msg;
     MPIR_debug_state = MPIR_DEBUG_ABORTING;
 #ifdef MPIU_BREAKPOINT_NEEDED
@@ -314,119 +333,107 @@ void MPIR_Debugger_set_aborting(const char *msg)
 
 /* ------------------------------------------------------------------------- */
 /*
- * Manage the send queue.
+ * Manage the request queues.
  *
- * The send queue is needed only by the debugger.  The communication
- * device has a separate notion of send queue, which are the operations
- * that it needs to complete, independent of whether the user has called
- * MPI_Wait/Test/etc on the request.
- *
- * This implementation uses a simple linked list of user-visible requests
- * (more specifically, requests created with MPI_Isend, MPI_Issend, or
- * MPI_Irsend).
+ * This implementation uses a simple linked list of requests.
  *
  * FIXME: We should exploit this to allow Finalize to report on
  * send requests that were never completed.
  */
 
-/* We need to save the tag and rank since this information may not
-   be included in the request.  Saving the context_id also simplifies
-   matching these entries with a communicator */
-typedef struct MPIR_Sendq {
-    MPIR_Request *sreq;
-    int tag, rank, context_id;
-    struct MPIR_Sendq *next;
-    struct MPIR_Sendq *prev;
-} MPIR_Sendq;
-
-MPIR_Sendq *MPIR_Sendq_head = 0;
-/* Keep a pool of previous sendq elements to speed allocation of queue
+MPIR_Debugq *MPIR_Sendq_head = 0;
+MPIR_Debugq *MPIR_Recvq_head = 0;
+MPIR_Debugq *MPIR_Unexpq_head = 0;
+/* Keep a pool of previous debugq elements to speed allocation of queue
    elements */
-static MPIR_Sendq *pool = 0;
+static MPIR_Debugq *pool = 0;
 
-/* This routine is used to establish a queue of send requests to allow the
-   debugger easier access to the active requests.  Some devices may be able
-   to provide this information without requiring this separate queue. */
-void MPII_Sendq_remember(MPIR_Request * req, int rank, int tag, int context_id)
+/* This routine is used to establish a queue of requests to allow the
+   debugger easier access to the active requests. */
+void MPII_Debugq_remember(MPIR_Request * req, int rank, int tag, int context_id, const void *buf,
+                          MPI_Aint count, MPIR_Debugq ** queue)
 {
 #if defined HAVE_DEBUGGER_SUPPORT
-    MPIR_Sendq *p;
+    MPIR_Debugq *p;
 
-/* TODO: We reuse the global lock for the per-vni granularity here instead of a
- * theoritically more scalable approach of creating a separate lock. Whether
- * this brief-global critical section would perturbate debugging is unknown;
- * investigation is needed before attempting to optimize this case. */
+    /* Builtin requests are always completed, simply return. */
+    if (HANDLE_IS_BUILTIN(req->handle)) {
+        return;
+    }
 
-    MPID_THREAD_CS_ENTER(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
-    MPID_THREAD_CS_ENTER(POBJ, req->pobj_mutex);
+    MPID_THREAD_CS_ENTER(VCI, lock);
+    MPID_THREAD_CS_ENTER(POBJ, lock);
     if (pool) {
         p = pool;
         pool = p->next;
     } else {
-        p = (MPIR_Sendq *) MPL_malloc(sizeof(MPIR_Sendq), MPL_MEM_DEBUG);
+        p = (MPIR_Debugq *) MPL_malloc(sizeof(MPIR_Debugq), MPL_MEM_DEBUG);
         if (!p) {
             /* Just ignore it */
-            if (MPIR_REQUEST_KIND__SEND == req->kind)
-                req->u.send.dbg_next = NULL;
-            else if (MPIR_REQUEST_KIND__PREQUEST_SEND == req->kind)
-                req->u.persist.dbg_next = NULL;
+            if (queue == &MPIR_Sendq_head) {
+                req->send = NULL;
+            } else if (queue == &MPIR_Recvq_head) {
+                req->recv = NULL;
+            } else {
+                req->unexp = NULL;
+            }
             goto fn_exit;
         }
     }
-    p->sreq = req;
+    p->req = req;
     p->tag = tag;
     p->rank = rank;
     p->context_id = context_id;
-    p->next = MPIR_Sendq_head;
-    p->prev = NULL;
-    MPIR_Sendq_head = p;
-    if (p->next)
-        p->next->prev = p;
-    if (MPIR_REQUEST_KIND__SEND == req->kind)
-        req->u.send.dbg_next = p;
-    else if (MPIR_REQUEST_KIND__PREQUEST_SEND == req->kind)
-        req->u.persist.dbg_next = p;
+    p->buf = buf;
+    p->count = count;
+    DL_PREPEND(*queue, p);
+
+    if (queue == &MPIR_Sendq_head) {
+        req->send = p;
+    } else if (queue == &MPIR_Recvq_head) {
+        req->recv = p;
+    } else {
+        req->unexp = p;
+    }
+
   fn_exit:
-    MPID_THREAD_CS_EXIT(POBJ, req->pobj_mutex);
-    MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
+    MPID_THREAD_CS_EXIT(VCI, lock);
+    MPID_THREAD_CS_EXIT(POBJ, lock);
 #endif /* HAVE_DEBUGGER_SUPPORT */
 }
 
-void MPII_Sendq_forget(MPIR_Request * req)
+void MPII_Debugq_forget(MPIR_Request * req, MPIR_Debugq ** queue)
 {
 #if defined HAVE_DEBUGGER_SUPPORT
-    MPIR_Sendq *p, *prev;
+    MPIR_Debugq *p = NULL;
 
-    MPID_THREAD_CS_ENTER(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
-    MPID_THREAD_CS_ENTER(POBJ, req->pobj_mutex);
-    if (MPIR_REQUEST_KIND__SEND == req->kind)
-        p = req->u.send.dbg_next;
-    else if (MPIR_REQUEST_KIND__PREQUEST_SEND == req->kind)
-        p = req->u.persist.dbg_next;
+    MPID_THREAD_CS_ENTER(VCI, lock);
+    MPID_THREAD_CS_ENTER(POBJ, lock);
+    if (queue == &MPIR_Sendq_head) {
+        p = req->send;
+    } else if (queue == &MPIR_Recvq_head) {
+        p = req->recv;
+    } else {
+        p = req->unexp;
+    }
     if (!p) {
         /* Just ignore it */
-        MPID_THREAD_CS_EXIT(POBJ, req->pobj_mutex);
-        MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
+        MPID_THREAD_CS_EXIT(VCI, lock);
+        MPID_THREAD_CS_EXIT(POBJ, lock);
         return;
     }
-    prev = p->prev;
-    if (prev != NULL)
-        prev->next = p->next;
-    else
-        MPIR_Sendq_head = p->next;
-    if (p->next != NULL)
-        p->next->prev = prev;
+    DL_DELETE(*queue, p);
     /* Return this element to the pool */
     p->next = pool;
     pool = p;
-    MPID_THREAD_CS_EXIT(POBJ, req->pobj_mutex);
-    MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
+    MPID_THREAD_CS_EXIT(VCI, lock);
+    MPID_THREAD_CS_EXIT(POBJ, lock);
 #endif /* HAVE_DEBUGGER_SUPPORT */
 }
 
-static int SendqFreePool(void *d)
+static int DebugqFreePool(void *d)
 {
-    MPIR_Sendq *p;
+    MPIR_Debugq *p;
 
     /* Free the pool */
     p = pool;
@@ -445,14 +452,14 @@ static int SendqFreePool(void *d)
     return 0;
 }
 
-static void SendqInit(void)
+static void DebugqInit(void)
 {
     int i;
-    MPIR_Sendq *p;
+    MPIR_Debugq *p;
 
     /* Preallocated a few send requests */
     for (i = 0; i < 10; i++) {
-        p = (MPIR_Sendq *) MPL_malloc(sizeof(MPIR_Sendq), MPL_MEM_DEBUG);
+        p = (MPIR_Debugq *) MPL_malloc(sizeof(MPIR_Debugq), MPL_MEM_DEBUG);
         if (!p) {
             /* Just ignore it */
             break;
@@ -462,7 +469,7 @@ static void SendqInit(void)
     }
 
     /* Make sure the pool is deleted */
-    MPIR_Add_finalize(SendqFreePool, 0, 0);
+    MPIR_Add_finalize(DebugqFreePool, 0, 0);
 }
 
 /* Manage the known communicators */
@@ -480,8 +487,8 @@ void MPII_CommL_remember(MPIR_Comm * comm_ptr)
     MPL_DBG_MSG_P(MPIR_DBG_COMM, VERBOSE, "Adding communicator %p to remember list", comm_ptr);
     MPL_DBG_MSG_P(MPIR_DBG_COMM, VERBOSE,
                   "Remember list structure address is %p", &MPIR_All_communicators);
-    MPID_THREAD_CS_ENTER(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
-    MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_COMM_MUTEX(comm_ptr));
+    MPID_THREAD_CS_ENTER(VCI, lock);
+    MPID_THREAD_CS_ENTER(POBJ, lock);
     if (comm_ptr == MPIR_All_communicators.head) {
         MPL_internal_error_printf("Internal error: communicator is already on free list\n");
         return;
@@ -489,10 +496,10 @@ void MPII_CommL_remember(MPIR_Comm * comm_ptr)
     comm_ptr->comm_next = MPIR_All_communicators.head;
     MPIR_All_communicators.head = comm_ptr;
     MPIR_All_communicators.sequence_number++;
-    MPL_DBG_MSG_P(MPIR_DBG_COMM, VERBOSE, "master head is %p", MPIR_All_communicators.head);
+    MPL_DBG_MSG_P(MPIR_DBG_COMM, VERBOSE, "main head is %p", MPIR_All_communicators.head);
 
-    MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_COMM_MUTEX(comm_ptr));
-    MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
+    MPID_THREAD_CS_EXIT(VCI, lock);
+    MPID_THREAD_CS_EXIT(POBJ, lock);
 }
 
 void MPII_CommL_forget(MPIR_Comm * comm_ptr)
@@ -501,8 +508,8 @@ void MPII_CommL_forget(MPIR_Comm * comm_ptr)
 
     MPL_DBG_MSG_P(MPIR_DBG_COMM, VERBOSE,
                   "Forgetting communicator %p from remember list", comm_ptr);
-    MPID_THREAD_CS_ENTER(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
-    MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_COMM_MUTEX(comm_ptr));
+    MPID_THREAD_CS_ENTER(VCI, lock);
+    MPID_THREAD_CS_ENTER(POBJ, lock);
     p = MPIR_All_communicators.head;
     prev = 0;
     while (p) {
@@ -523,8 +530,8 @@ void MPII_CommL_forget(MPIR_Comm * comm_ptr)
     }
     /* Record a change to the list */
     MPIR_All_communicators.sequence_number++;
-    MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_COMM_MUTEX(comm_ptr));
-    MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
+    MPID_THREAD_CS_EXIT(VCI, lock);
+    MPID_THREAD_CS_EXIT(POBJ, lock);
 }
 
 #ifdef MPIU_PROCTABLE_NEEDED
@@ -534,9 +541,7 @@ static int MPIR_FreeProctable(void *ptable)
     int i;
     MPIR_PROCDESC *proctable = (MPIR_PROCDESC *) ptable;
     for (i = 0; i < MPIR_proctable_size; i++) {
-        if (proctable[i].host_name) {
-            MPL_free(proctable[i].host_name);
-        }
+        MPL_free(proctable[i].host_name);
     }
     MPL_free(proctable);
 

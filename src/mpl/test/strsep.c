@@ -1,14 +1,13 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2011 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
+#include "mpl.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "mpl.h"
 
 int main(void)
 {
@@ -21,14 +20,14 @@ int main(void)
     assert(next == NULL);
     assert(str == NULL);
 
-    orig = strdup("");
+    orig = MPL_strdup("");
     str = orig;
     next = MPL_strsep(&str, "|");
     assert(str == NULL);
     assert(next == orig);
-    free(orig);
+    MPL_free(orig);
 
-    orig = strdup("a|b|c");
+    orig = MPL_strdup("a|b|c");
     str = orig;
     next = MPL_strsep(&str, "|");
     assert(next == orig);
@@ -40,9 +39,9 @@ int main(void)
     next = MPL_strsep(&str, "|");
     assert(next == NULL);
     assert(str == NULL);
-    free(orig);
+    MPL_free(orig);
 
-    orig = strdup("a|b:c");
+    orig = MPL_strdup("a|b:c");
     str = orig;
     next = MPL_strsep(&str, ":|");
     assert(next == orig);
@@ -54,9 +53,9 @@ int main(void)
     next = MPL_strsep(&str, ":|");
     assert(next == NULL);
     assert(str == NULL);
-    free(orig);
+    MPL_free(orig);
 
-    orig = strdup("a|:b:c");
+    orig = MPL_strdup("a|:b:c");
     str = orig;
     next = MPL_strsep(&str, ":|");
     assert(next == orig);
@@ -70,7 +69,7 @@ int main(void)
     next = MPL_strsep(&str, ":|");
     assert(next == NULL);
     assert(str == NULL);
-    free(orig);
+    MPL_free(orig);
 
     return 0;
 }

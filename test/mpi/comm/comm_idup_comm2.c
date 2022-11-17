@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test tests overlapping of Comm_idups with other comm. generations calls */
@@ -23,7 +22,7 @@ int main(int argc, char **argv)
     int ranges[1][3];
     int isLeft, rleader;
     MPI_Group dup_group, high_group, even_group;
-    MPI_Comm local_comm, inter_comm, test_comm, outcomm, dupcomm;
+    MPI_Comm local_comm, inter_comm, outcomm, dupcomm;
     MPI_Comm idupcomms[NUM_IDUPS];
     MPI_Request reqs[NUM_IDUPS];
 

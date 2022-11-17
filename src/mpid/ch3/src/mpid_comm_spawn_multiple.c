@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
@@ -28,10 +27,6 @@
 .N Errors
 .N MPI_SUCCESS
 @*/
-#undef FUNCNAME
-#define FUNCNAME MPID_Comm_spawn_multiple
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_Comm_spawn_multiple(int count, char *array_of_commands[],
 			     char ** array_of_argv[], const int array_of_maxprocs[],
 			     MPIR_Info * array_of_info_ptrs[], int root,
@@ -39,9 +34,8 @@ int MPID_Comm_spawn_multiple(int count, char *array_of_commands[],
 			     int array_of_errcodes[]) 
 {
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_COMM_SPAWN_MULTIPLE);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_COMM_SPAWN_MULTIPLE);
+    MPIR_FUNC_ENTER;
 
     /* Check to make sure the communicator hasn't already been revoked */
     if (comm_ptr->revoked) {
@@ -59,11 +53,12 @@ int MPID_Comm_spawn_multiple(int count, char *array_of_commands[],
 					  array_of_errcodes);
 #   else
     MPIR_ERR_SET1(mpi_errno,MPI_ERR_OTHER, "**notimpl",
-		  "**notimpl %s", FCNAME);
+		  "**notimpl %s", __func__);
 #   endif
     
-fn_fail:
-fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_COMM_SPAWN_MULTIPLE);
+  fn_exit:
+    MPIR_FUNC_EXIT;
     return mpi_errno;
+  fn_fail:
+    goto fn_exit;
 }

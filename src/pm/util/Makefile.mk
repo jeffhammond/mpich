@@ -1,15 +1,12 @@
-## -*- Mode: Makefile; -*-
-## vim: set ft=automake :
 ##
-## (C) 2011 by Argonne National Laboratory.
-##     See COPYRIGHT in top-level directory.
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
 ##
 
 # common include paths that are used by gforker, remshell, and any other process
 # managers that use utility code from this directory
 common_pm_includes = \
     -I${top_builddir}/src/include -I${top_srcdir}/src/include \
-    -I${top_builddir}/src/pmi/simple -I${top_srcdir}/src/pmi/simple \
     -I${top_builddir}/src/pm/util -I${top_srcdir}/src/pm/util
 
 if BUILD_PM_UTIL

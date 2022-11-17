@@ -1,6 +1,8 @@
-/* ---------------------------------------------------------------- */
-/* (C)Copyright IBM Corp.  2007, 2008                               */
-/* ---------------------------------------------------------------- */
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 /**
  * \file ad_gpfs_tuning.h
  * \brief ???
@@ -38,7 +40,7 @@ enum {
     GPFSMPIO_CIO_T_OTHREQ,      /* time for ADIOI_Calc_others_req(), short Alltoall */
     GPFSMPIO_CIO_T_DEXCH,       /* time for I/O data exchange */
     /* the next DEXCH_* timers capture finer-grained portions of T_DEXCH */
-    GPFSMPIO_CIO_T_DEXCH_RECV_EXCH,     /* time for each process to exchange recieve
+    GPFSMPIO_CIO_T_DEXCH_RECV_EXCH,     /* time for each process to exchange receive
                                          * size info with everyone else */
     GPFSMPIO_CIO_T_DEXCH_SETUP, /* time for setup portion of I/O data exchange */
     GPFSMPIO_CIO_T_DEXCH_NET,   /* time for network portion of I/O data exchange */

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidi_ch3_impl.h"
@@ -86,8 +85,8 @@ static int MPIDI_CH3I_Port_connreq_free(MPIDI_CH3I_Port_connreq_t * connreq);
 /*
  * Structure of this file and the connect/accept algorithm:
  *
- * Here are the steps involved in implementating MPI_Comm_connect and
- * MPI_Comm_accept.  These same steps are used withing MPI_Comm_spawn
+ * Here are the steps involved in implementing MPI_Comm_connect and
+ * MPI_Comm_accept.  These same steps are used within MPI_Comm_spawn
  * and MPI_Comm_spawn_multiple.
  *
  * First, the connecting process establishes a connection (not a virtual
@@ -247,10 +246,6 @@ static MPIDI_CH3I_Port_connreq_q_t revoked_connreq_q = {NULL, NULL, 0};
  * connect and accept.
  */
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_Create_inter_root_communicator_connect
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int MPIDI_Create_inter_root_communicator_connect(const char *port_name, 
 							int timeout, MPIR_Comm **comm_pptr,
 							MPIDI_VC_t **vc_pptr)
@@ -261,22 +256,19 @@ static int MPIDI_Create_inter_root_communicator_connect(const char *port_name,
     int port_name_tag;
     MPIDI_CH3I_Port_connreq_t *connreq = NULL;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CREATE_INTER_ROOT_COMMUNICATOR_CONNECT);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CREATE_INTER_ROOT_COMMUNICATOR_CONNECT);
+    MPIR_FUNC_ENTER;
 
     /* Connect to the root on the other side. Create a
        temporary intercommunicator between the two roots so that
        we can use MPI functions to communicate data between them. */
 
     mpi_errno = MPIDI_CH3_Connect_to_root(port_name, &connect_vc);
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* extract the tag from the port_name */
     mpi_errno = MPIDI_GetTagFromPort( port_name, &port_name_tag);
-    if (mpi_errno != MPL_STR_SUCCESS) {
+    if (mpi_errno != MPL_SUCCESS) {
 	MPIR_ERR_POP(mpi_errno);
     }
 
@@ -287,20 +279,19 @@ static int MPIDI_Create_inter_root_communicator_connect(const char *port_name,
      * before timed out. The response is handled in MPIDI_CH3_PktHandler_ConnResp
      * in progress.*/
     {
-        MPID_Time_t time_sta, time_now;
+        MPL_time_t time_sta, time_now;
         double time_gap = 0;
 
         MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_CONNECT, VERBOSE,
                        (MPL_DBG_FDEST, "connect: waiting accept in %d(s)", timeout));
 
-        MPID_Wtime(&time_sta);
+        MPL_wtime(&time_sta);
         do {
             mpi_errno = MPID_Progress_poke();
-            if (mpi_errno != MPI_SUCCESS)
-                MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
 
-            MPID_Wtime(&time_now);
-            MPID_Wtime_diff(&time_sta, &time_now, &time_gap);
+            MPL_wtime(&time_now);
+            MPL_wtime_diff(&time_sta, &time_now, &time_gap);
 
             /* Avoid blocking other threads since I am inside an infinite loop */
             MPID_THREAD_CS_YIELD(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
@@ -334,8 +325,7 @@ static int MPIDI_Create_inter_root_communicator_connect(const char *port_name,
                     "Error - remote closed without matching this connection");
 
         mpi_errno = MPIDI_CH3I_Port_local_close_vc(connreq->vc);
-        if (mpi_errno != MPI_SUCCESS)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         MPIDI_CH3I_PORT_CONNREQ_SET_STAT(connreq, FREE);
         MPIR_ERR_SETANDJUMP(mpi_errno, MPI_ERR_PORT, "**ch3|portclose");
@@ -348,9 +338,7 @@ static int MPIDI_Create_inter_root_communicator_connect(const char *port_name,
     }
 
     mpi_errno = MPIDI_CH3I_Initialize_tmp_comm(&tmp_comm, connect_vc, 1, port_name_tag);
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
 
     *comm_pptr = tmp_comm;
     *vc_pptr = connect_vc;
@@ -358,7 +346,7 @@ static int MPIDI_Create_inter_root_communicator_connect(const char *port_name,
     MPL_free(connreq);
 
  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CREATE_INTER_ROOT_COMMUNICATOR_CONNECT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
  fn_fail:
     if (connreq != NULL) {
@@ -373,10 +361,6 @@ static int MPIDI_Create_inter_root_communicator_connect(const char *port_name,
 /* Creates a communicator for the purpose of communicating with one other 
    process (the root of the other group).  It also returns the virtual
    connection */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_Create_inter_root_communicator_accept
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int MPIDI_Create_inter_root_communicator_accept(const char *port_name, 
 						MPIR_Comm **comm_pptr,
 						MPIDI_VC_t **vc_pptr)
@@ -388,13 +372,12 @@ static int MPIDI_Create_inter_root_communicator_accept(const char *port_name,
     int port_name_tag;
     MPIDI_CH3I_Port_connreq_t *connreq = NULL;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CREATE_INTER_ROOT_COMMUNICATOR_ACCEPT);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CREATE_INTER_ROOT_COMMUNICATOR_ACCEPT);
+    MPIR_FUNC_ENTER;
 
     /* extract the tag from the port_name */
     mpi_errno = MPIDI_GetTagFromPort( port_name, &port_name_tag);
-    if (mpi_errno != MPL_STR_SUCCESS) {
+    if (mpi_errno != MPL_SUCCESS) {
 	MPIR_ERR_POP(mpi_errno);
     }
 
@@ -413,8 +396,7 @@ static int MPIDI_Create_inter_root_communicator_accept(const char *port_name,
 
         if (connreq == NULL) {
             mpi_errno = MPIDI_CH3I_Acceptq_dequeue(&connreq, port_name_tag);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
         }
 
         if (connreq != NULL && connreq->stat == MPIDI_CH3I_PORT_CONNREQ_INITED) {
@@ -457,8 +439,7 @@ static int MPIDI_Create_inter_root_communicator_accept(const char *port_name,
                 /* Client already started vc closing process, thus it is safe to
                  * blocking wait here till vc freed. */
                 mpi_errno = MPIDI_CH3I_Port_connreq_free(connreq);
-                if (mpi_errno != MPI_SUCCESS)
-                    MPIR_ERR_POP(mpi_errno);
+                MPIR_ERR_CHECK(mpi_errno);
 
                 connreq = NULL;
                 break;  /* continue while loop */
@@ -475,9 +456,7 @@ static int MPIDI_Create_inter_root_communicator_accept(const char *port_name,
     MPID_Progress_end(&progress_state);
 
     mpi_errno = MPIDI_CH3I_Initialize_tmp_comm(&tmp_comm, new_vc, 0, port_name_tag);
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
 
     *comm_pptr = tmp_comm;
     *vc_pptr = new_vc;
@@ -488,7 +467,7 @@ static int MPIDI_Create_inter_root_communicator_accept(const char *port_name,
 		  "new_vc=%p", new_vc));
 
 fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CREATE_INTER_ROOT_COMMUNICATOR_ACCEPT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 
 fn_fail:
@@ -504,40 +483,31 @@ fn_fail:
 /* This is a utility routine used to initialize temporary communicators
    used in connect/accept operations, and is only used in the above two 
    routines */
-#undef FUNCNAME
-#define FUNCNAME  MPIDI_CH3I_Initialize_tmp_comm
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int MPIDI_CH3I_Initialize_tmp_comm(MPIR_Comm **comm_pptr,
 					  MPIDI_VC_t *vc_ptr, int is_low_group, int context_id_offset)
 {
     int mpi_errno = MPI_SUCCESS;
     MPIR_Comm *tmp_comm, *commself_ptr;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3I_INITIALIZE_TMP_COMM);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3I_INITIALIZE_TMP_COMM);
+    MPIR_FUNC_ENTER;
 
     MPIR_Comm_get_ptr( MPI_COMM_SELF, commself_ptr );
 
     /* WDG-old code allocated a context id that was then discarded */
     mpi_errno = MPIR_Comm_create(&tmp_comm);
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
     /* fill in all the fields of tmp_comm. */
 
     /* We use the second half of the context ID bits for dynamic
      * processes. This assumes that the context ID mask array is made
      * up of uint32_t's. */
-    /* FIXME: This code is still broken for the following case:
-     * If the same process opens connections to the multiple
-     * processes, this context ID might get out of sync.
-     */
-    tmp_comm->context_id     = MPIR_CONTEXT_SET_FIELD(DYNAMIC_PROC, context_id_offset, 1);
+    int context_id;
+    context_id = context_id_offset << MPIR_CONTEXT_PREFIX_SHIFT;
+    tmp_comm->context_id     = MPIR_CONTEXT_SET_FIELD(DYNAMIC_PROC, context_id, 1);
     tmp_comm->recvcontext_id = tmp_comm->context_id;
 
     /* sanity: the INVALID context ID value could potentially conflict with the
-     * dynamic proccess space */
+     * dynamic process space */
     MPIR_Assert(tmp_comm->context_id     != MPIR_INVALID_CONTEXT_ID);
     MPIR_Assert(tmp_comm->recvcontext_id != MPIR_INVALID_CONTEXT_ID);
 
@@ -546,7 +516,6 @@ static int MPIDI_CH3I_Initialize_tmp_comm(MPIR_Comm **comm_pptr,
 
     /* Fill in new intercomm */
     tmp_comm->local_size   = 1;
-    tmp_comm->pof2         = 0;
     tmp_comm->rank         = 0;
     tmp_comm->comm_kind    = MPIR_COMM_KIND__INTERCOMM;
     tmp_comm->local_comm   = NULL;
@@ -578,13 +547,13 @@ static int MPIDI_CH3I_Initialize_tmp_comm(MPIR_Comm **comm_pptr,
     /* Even though this is a tmp comm and we don't call
        MPI_Comm_commit, we still need to call the creation hook
        because the destruction hook will be called in comm_release */
-    mpi_errno = MPID_Comm_create_hook(tmp_comm);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    mpi_errno = MPID_Comm_commit_pre_hook(tmp_comm);
+    MPIR_ERR_CHECK(mpi_errno);
     
     *comm_pptr = tmp_comm;
 
 fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3I_INITIALIZE_TMP_COMM);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 fn_fail:
     goto fn_exit;
@@ -603,10 +572,6 @@ fn_fail:
    because there can be multiple process groups on each side. 
 */ 
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_Comm_connect
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
 		       MPIR_Comm *comm_ptr, MPIR_Comm **newcomm)
 {
@@ -623,13 +588,12 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
     MPIR_Context_id_t recvcontext_id = MPIR_INVALID_CONTEXT_ID;
     MPIR_Errflag_t errflag = MPIR_ERR_NONE;
     MPIR_CHKLMEM_DECL(3);
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_COMM_CONNECT);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_COMM_CONNECT);
+    MPIR_FUNC_ENTER;
 
     /* Get the context ID here because we need to send it to the remote side */
     mpi_errno = MPIR_Get_contextid_sparse( comm_ptr, &recvcontext_id, FALSE );
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
     rank = comm_ptr->rank;
     local_comm_size = comm_ptr->local_size;
@@ -694,8 +658,8 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
 
     /* broadcast the received info to local processes */
     MPL_DBG_MSG(MPIDI_CH3_DBG_CONNECT,VERBOSE,"broadcasting the received 3 ints");
-    mpi_errno = MPIR_Bcast_intra_auto(recv_ints, 3, MPI_INT, root, comm_ptr, &errflag);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    mpi_errno = MPIR_Bcast_allcomm_auto(recv_ints, 3, MPI_INT, root, comm_ptr, &errflag);
+    MPIR_ERR_CHECK(mpi_errno);
     MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
 
     /* check if root was unable to connect to the port */
@@ -729,9 +693,7 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
 				  remote_translation, remote_comm_size * 2, 
 				  MPI_INT, 0, recvtag++, tmp_comm,
 				  MPI_STATUS_IGNORE, &errflag);
-	if (mpi_errno) {
-	    MPIR_ERR_POP(mpi_errno);
-	}
+	MPIR_ERR_CHECK(mpi_errno);
 
 #ifdef MPICH_DBG_OUTPUT
 	MPL_DBG_MSG_D(MPIDI_CH3_DBG_OTHER,TERSE,"[%d]connect:Received remote_translation:\n", rank);
@@ -750,9 +712,9 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
 
     /* Broadcast out the remote rank translation array */
     MPL_DBG_MSG(MPIDI_CH3_DBG_CONNECT,VERBOSE,"Broadcasting remote translation");
-    mpi_errno = MPIR_Bcast_intra_auto(remote_translation, remote_comm_size * 2, MPI_INT,
+    mpi_errno = MPIR_Bcast_allcomm_auto(remote_translation, remote_comm_size * 2, MPI_INT,
                                  root, comm_ptr, &errflag);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
     MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
 
 #ifdef MPICH_DBG_OUTPUT
@@ -765,7 +727,7 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
 #endif
 
     mpi_errno = MPIR_Comm_create(newcomm);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
     (*newcomm)->context_id     = context_id;
     (*newcomm)->recvcontext_id = recvcontext_id;
@@ -773,9 +735,7 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
 
     mpi_errno = SetupNewIntercomm( comm_ptr, remote_comm_size, 
 				   remote_translation, remote_pg, *newcomm );
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* synchronize with remote root */
     if (rank == root)
@@ -785,19 +745,15 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
                                      sendtag++, &j, 0, MPI_INT,
                                      0, recvtag++, tmp_comm,
                                      MPI_STATUS_IGNORE, &errflag);
-        if (mpi_errno != MPI_SUCCESS) {
-	    MPIR_ERR_POP(mpi_errno);
-        }
+        MPIR_ERR_CHECK(mpi_errno);
 
         /* All communication with remote root done. Release the communicator. */
         MPIR_Comm_release(tmp_comm);
     }
 
     /*printf("connect:barrier\n");fflush(stdout);*/
-    mpi_errno = MPIR_Barrier_intra_auto(comm_ptr, &errflag);
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    mpi_errno = MPIR_Barrier_allcomm_auto(comm_ptr, &errflag);
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* Free new_vc. It was explicitly allocated in MPIDI_CH3_Connect_to_root.*/
     if (rank == root) {
@@ -807,7 +763,7 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
  fn_exit: 
     MPL_DBG_MSG(MPIDI_CH3_DBG_CONNECT,VERBOSE,"Exiting ch3u_comm_connect");
     MPIR_CHKLMEM_FREEALL();
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_COMM_CONNECT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
  fn_fail:
     {
@@ -842,7 +798,7 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
 
         /* notify other processes to return an error */
         MPL_DBG_MSG(MPIDI_CH3_DBG_CONNECT,VERBOSE,"broadcasting 3 ints: error case");
-        mpi_errno2 = MPIR_Bcast_intra_auto(recv_ints, 3, MPI_INT, root, comm_ptr, &errflag);
+        mpi_errno2 = MPIR_Bcast_allcomm_auto(recv_ints, 3, MPI_INT, root, comm_ptr, &errflag);
         if (mpi_errno2) MPIR_ERR_ADD(mpi_errno, mpi_errno2);
         if (errflag) {
             MPIR_ERR_SET(mpi_errno2, MPI_ERR_OTHER, "**coll_fail");
@@ -864,10 +820,6 @@ int MPIDI_Comm_connect(const char *port_name, MPIR_Info *info, int root,
  * all of the process groups that have made up the communicator that
  * will define the "remote group".  
  */
-#undef FUNCNAME
-#define FUNCNAME ExtractLocalPGInfo
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int ExtractLocalPGInfo( MPIR_Comm *comm_p,
 			       pg_translation local_translation[], 
 			       pg_node **pg_list_p,
@@ -876,9 +828,8 @@ static int ExtractLocalPGInfo( MPIR_Comm *comm_p,
     pg_node        *pg_list = 0, *pg_iter, *pg_trailer;
     int            i, cur_index = 0, local_comm_size, mpi_errno = 0;
     MPIR_CHKPMEM_DECL(1);
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_EXTRACTLOCALPGINFO);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_EXTRACTLOCALPGINFO);
+    MPIR_FUNC_ENTER;
 
     /* If we are in the case of singleton-init, we may need to reset the
        id string for comm world.  We do this before doing anything else */
@@ -902,9 +853,7 @@ static int ExtractLocalPGInfo( MPIR_Comm *comm_p,
     MPIR_Assert( MPIR_Object_get_ref(comm_p->dev.vcrt->vcr_table[0]->pg));
     mpi_errno = MPIDI_PG_To_string(comm_p->dev.vcrt->vcr_table[0]->pg, &pg_list->str,
 				   &pg_list->lenStr );
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
     MPL_DBG_STMT(MPIDI_CH3_DBG_CONNECT,VERBOSE,MPIDI_PrintConnStr(__FILE__,__LINE__,"PG as string is", pg_list->str ));
     local_translation[0].pg_index = 0;
     local_translation[0].pg_rank = comm_p->dev.vcrt->vcr_table[0]->pg_rank;
@@ -937,9 +886,7 @@ static int ExtractLocalPGInfo( MPIR_Comm *comm_p,
 	    pg_iter->next = NULL;
 	    mpi_errno = MPIDI_PG_To_string(comm_p->dev.vcrt->vcr_table[i]->pg, &pg_iter->str,
 					   &pg_iter->lenStr );
-	    if (mpi_errno != MPI_SUCCESS) {
-		MPIR_ERR_POP(mpi_errno);
-	    }
+	    MPIR_ERR_CHECK(mpi_errno);
 	    local_translation[i].pg_index = pg_iter->index;
 	    local_translation[i].pg_rank = comm_p->dev.vcrt->vcr_table[i]->pg_rank;
 	    pg_trailer->next = pg_iter;
@@ -959,7 +906,7 @@ static int ExtractLocalPGInfo( MPIR_Comm *comm_p,
 
 
  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_EXTRACTLOCALPGINFO);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
  fn_fail:
     MPIR_CHKPMEM_REAP();
@@ -971,10 +918,6 @@ static int ExtractLocalPGInfo( MPIR_Comm *comm_p,
    process groups and then distributes them to the other processes
    in comm_ptr.
    See SendPGToPeer for the routine that sends the descriptions */
-#undef FUNCNAME
-#define FUNCNAME ReceivePGAndDistribute
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int ReceivePGAndDistribute( MPIR_Comm *tmp_comm, MPIR_Comm *comm_ptr,
 				   int root, int *recvtag_p, 
 				   int n_remote_pgs, MPIDI_PG_t *remote_pg[] )
@@ -985,9 +928,8 @@ static int ReceivePGAndDistribute( MPIR_Comm *tmp_comm, MPIR_Comm *comm_ptr,
     int  mpi_errno = 0;
     int  recvtag = *recvtag_p;
     MPIR_Errflag_t errflag = MPIR_ERR_NONE;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_RECEIVEPGANDDISTRIBUTE);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_RECEIVEPGANDDISTRIBUTE);
+    MPIR_FUNC_ENTER;
 
     for (i=0; i<n_remote_pgs; i++) {
 
@@ -996,9 +938,7 @@ static int ReceivePGAndDistribute( MPIR_Comm *tmp_comm, MPIR_Comm *comm_ptr,
 	    mpi_errno = MPIC_Recv(&j, 1, MPI_INT, 0, recvtag++,
 				  tmp_comm, MPI_STATUS_IGNORE, &errflag);
 	    *recvtag_p = recvtag;
-	    if (mpi_errno != MPI_SUCCESS) {
-		MPIR_ERR_POP(mpi_errno);
-	    }
+	    MPIR_ERR_CHECK(mpi_errno);
 	    pg_str = (char*)MPL_malloc(j, MPL_MEM_DYNAMIC);
 	    if (pg_str == NULL) {
 		MPIR_ERR_POP(mpi_errno);
@@ -1006,15 +946,13 @@ static int ReceivePGAndDistribute( MPIR_Comm *tmp_comm, MPIR_Comm *comm_ptr,
 	    mpi_errno = MPIC_Recv(pg_str, j, MPI_CHAR, 0, recvtag++,
 				  tmp_comm, MPI_STATUS_IGNORE, &errflag);
 	    *recvtag_p = recvtag;
-	    if (mpi_errno != MPI_SUCCESS) {
-		MPIR_ERR_POP(mpi_errno);
-	    }
+	    MPIR_ERR_CHECK(mpi_errno);
 	}
 
 	/* Broadcast the size and data to the local communicator */
 	/*printf("accept:broadcasting 1 int\n");fflush(stdout);*/
-	mpi_errno = MPIR_Bcast_intra_auto(&j, 1, MPI_INT, root, comm_ptr, &errflag);
-	if (mpi_errno != MPI_SUCCESS) MPIR_ERR_POP(mpi_errno);
+	mpi_errno = MPIR_Bcast_allcomm_auto(&j, 1, MPI_INT, root, comm_ptr, &errflag);
+	MPIR_ERR_CHECK(mpi_errno);
         MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
 
 	if (rank != root) {
@@ -1025,22 +963,20 @@ static int ReceivePGAndDistribute( MPIR_Comm *tmp_comm, MPIR_Comm *comm_ptr,
 	    }
 	}
 	/*printf("accept:broadcasting string of length %d\n", j);fflush(stdout);*/
-	mpi_errno = MPIR_Bcast_intra_auto(pg_str, j, MPI_CHAR, root, comm_ptr, &errflag);
-	if (mpi_errno != MPI_SUCCESS) MPIR_ERR_POP(mpi_errno);
+	mpi_errno = MPIR_Bcast_allcomm_auto(pg_str, j, MPI_CHAR, root, comm_ptr, &errflag);
+	MPIR_ERR_CHECK(mpi_errno);
         MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
 	/* Then reconstruct the received process group.  This step
 	   also initializes the created process group */
 
 	MPL_DBG_STMT(MPIDI_CH3_DBG_CONNECT,VERBOSE,MPIDI_PrintConnStr(__FILE__,__LINE__,"Creating pg from string", pg_str ));
 	mpi_errno = MPIDI_PG_Create_from_string(pg_str, &remote_pg[i], &flag);
-	if (mpi_errno != MPI_SUCCESS) {
-	    MPIR_ERR_POP(mpi_errno);
-	}
+	MPIR_ERR_CHECK(mpi_errno);
 	
 	MPL_free(pg_str);
     }
  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_RECEIVEPGANDDISTRIBUTE);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
  fn_fail:
     goto fn_exit;
@@ -1050,10 +986,6 @@ static int ReceivePGAndDistribute( MPIR_Comm *tmp_comm, MPIR_Comm *comm_ptr,
  all processes in comm.  The process with rank root in comm is the 
  process in peercomm from which the process groups are taken. This routine 
  is collective over comm_p . */
-#undef FUNCNAME
-#define FUNCNAME MPID_PG_BCast
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_PG_BCast( MPIR_Comm *peercomm_p, MPIR_Comm *comm_p, int root )
 {
     int n_local_pgs=0, mpi_errno = MPI_SUCCESS;
@@ -1078,7 +1010,7 @@ int MPID_PG_BCast( MPIR_Comm *peercomm_p, MPIR_Comm *comm_p, int root )
 
     /* Now, broadcast the number of local pgs */
     mpi_errno = MPIR_Bcast( &n_local_pgs, 1, MPI_INT, root, comm_p, &errflag);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
     MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
 
     pg_list = pg_head;
@@ -1099,7 +1031,7 @@ int MPID_PG_BCast( MPIR_Comm *peercomm_p, MPIR_Comm *comm_p, int root )
 	    pg_list = pg_list->next;
 	}
 	mpi_errno = MPIR_Bcast( &len, 1, MPI_INT, root, comm_p, &errflag);
-        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
         MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
 	if (rank != root) {
 	    pg_str = (char *)MPL_malloc(len, MPL_MEM_DYNAMIC);
@@ -1138,9 +1070,7 @@ int MPID_PG_BCast( MPIR_Comm *peercomm_p, MPIR_Comm *comm_p, int root )
     while (pg_list) {
 	pg_next = pg_list->next;
 	MPL_free( pg_list->str );
-	if (pg_list->pg_id ) {
-	    MPL_free( pg_list->pg_id );
-	}
+        MPL_free( pg_list->pg_id );
 	MPL_free( pg_list );
 	pg_list = pg_next;
     }
@@ -1154,10 +1084,6 @@ int MPID_PG_BCast( MPIR_Comm *peercomm_p, MPIR_Comm *comm_p, int root )
 
 /* Sends the process group information to the peer and frees the 
    pg_list */
-#undef FUNCNAME
-#define FUNCNAME SendPGtoPeerAndFree
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int SendPGtoPeerAndFree( MPIR_Comm *tmp_comm, int *sendtag_p,
 				pg_node *pg_list )
 {
@@ -1165,9 +1091,8 @@ static int SendPGtoPeerAndFree( MPIR_Comm *tmp_comm, int *sendtag_p,
     int sendtag = *sendtag_p, i;
     pg_node *pg_iter;
     MPIR_Errflag_t errflag = MPIR_ERR_NONE;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_SENDPGTOPEERANDFREE);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_SENDPGTOPEERANDFREE);
+    MPIR_FUNC_ENTER;
 
     while (pg_list != NULL) {
 	pg_iter = pg_list;
@@ -1175,17 +1100,13 @@ static int SendPGtoPeerAndFree( MPIR_Comm *tmp_comm, int *sendtag_p,
 	/*printf("connect:sending 1 int: %d\n", i);fflush(stdout);*/
 	mpi_errno = MPIC_Send(&i, 1, MPI_INT, 0, sendtag++, tmp_comm, &errflag);
 	*sendtag_p = sendtag;
-	if (mpi_errno != MPI_SUCCESS) {
-	    MPIR_ERR_POP(mpi_errno);
-	}
+	MPIR_ERR_CHECK(mpi_errno);
 	
 	/* printf("connect:sending string length %d\n", i);fflush(stdout); */
 	mpi_errno = MPIC_Send(pg_iter->str, i, MPI_CHAR, 0, sendtag++,
 			      tmp_comm, &errflag);
 	*sendtag_p = sendtag;
-	if (mpi_errno != MPI_SUCCESS) {
-	    MPIR_ERR_POP(mpi_errno);
-	}
+	MPIR_ERR_CHECK(mpi_errno);
 	
 	pg_list = pg_list->next;
 	MPL_free(pg_iter->str);
@@ -1194,7 +1115,7 @@ static int SendPGtoPeerAndFree( MPIR_Comm *tmp_comm, int *sendtag_p,
     }
 
  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_SENDPGTOPEERANDFREE);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
  fn_fail:
     goto fn_exit;
@@ -1216,10 +1137,6 @@ static int SendPGtoPeerAndFree( MPIR_Comm *tmp_comm, int *sendtag_p,
    process groups on each side.
 
  */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_Comm_accept
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
 		      MPIR_Comm *comm_ptr, MPIR_Comm **newcomm)
 {
@@ -1235,18 +1152,15 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
     MPIDI_PG_t **remote_pg = NULL;
     MPIR_Errflag_t errflag = MPIR_ERR_NONE;
     MPIR_CHKLMEM_DECL(3);
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_COMM_ACCEPT);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_COMM_ACCEPT);
+    MPIR_FUNC_ENTER;
 
     /* Create the new intercommunicator here. We need to send the
        context id to the other side. */
     mpi_errno = MPIR_Comm_create(newcomm);
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
     mpi_errno = MPIR_Get_contextid_sparse( comm_ptr, &(*newcomm)->recvcontext_id, FALSE );
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
     /* FIXME why is this commented out? */
     /*    (*newcomm)->context_id = (*newcomm)->recvcontext_id; */
     
@@ -1259,9 +1173,7 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
 	   other side. */
 	mpi_errno = MPIDI_Create_inter_root_communicator_accept(port_name, 
 						&tmp_comm, &new_vc);
-	if (mpi_errno != MPI_SUCCESS) {
-	    MPIR_ERR_POP(mpi_errno);
-	}
+	MPIR_ERR_CHECK(mpi_errno);
 
 	/* Make an array to translate local ranks to process group index and 
 	   rank */
@@ -1288,15 +1200,13 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
                                      sendtag++, recv_ints, 3, MPI_INT,
                                      0, recvtag++, tmp_comm,
                                      MPI_STATUS_IGNORE, &errflag);
-        if (mpi_errno != MPI_SUCCESS) {
-	    MPIR_ERR_POP(mpi_errno);
-	}
+	MPIR_ERR_CHECK(mpi_errno);
     }
 
     /* broadcast the received info to local processes */
     /*printf("accept:broadcasting 2 ints - %d and %d\n", recv_ints[0], recv_ints[1]);fflush(stdout);*/
-    mpi_errno = MPIR_Bcast_intra_auto(recv_ints, 3, MPI_INT, root, comm_ptr, &errflag);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    mpi_errno = MPIR_Bcast_allcomm_auto(recv_ints, 3, MPI_INT, root, comm_ptr, &errflag);
+    MPIR_ERR_CHECK(mpi_errno);
     MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
 
 
@@ -1318,10 +1228,10 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
 	   distributes them to the processes in comm_ptr */
 	mpi_errno = ReceivePGAndDistribute( tmp_comm, comm_ptr, root, &recvtag,
 					n_remote_pgs, remote_pg );
-        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 	
 	mpi_errno = SendPGtoPeerAndFree( tmp_comm, &sendtag, pg_list );
-        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
 	/* Receive the translations from remote process rank to process group index */
 	/*printf("accept:sending %d ints and receiving %d ints\n", local_comm_size * 2, remote_comm_size * 2);fflush(stdout);*/
@@ -1330,7 +1240,7 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
 				  remote_translation, remote_comm_size * 2, 
 				  MPI_INT, 0, recvtag++, tmp_comm,
 				  MPI_STATUS_IGNORE, &errflag);
-        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
 #ifdef MPICH_DBG_OUTPUT
 	MPL_DBG_MSG_D(MPIDI_CH3_DBG_OTHER,TERSE,"[%d]accept:Received remote_translation:\n", rank);
@@ -1345,14 +1255,14 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
     {
 	mpi_errno = ReceivePGAndDistribute( tmp_comm, comm_ptr, root, &recvtag,
 					    n_remote_pgs, remote_pg );
-        if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     /* Broadcast out the remote rank translation array */
     MPL_DBG_MSG(MPIDI_CH3_DBG_CONNECT,VERBOSE,"Broadcast remote_translation");
-    mpi_errno = MPIR_Bcast_intra_auto(remote_translation, remote_comm_size * 2, MPI_INT,
+    mpi_errno = MPIR_Bcast_allcomm_auto(remote_translation, remote_comm_size * 2, MPI_INT,
                                  root, comm_ptr, &errflag);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
     MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
 #ifdef MPICH_DBG_OUTPUT
     MPL_DBG_MSG_D(MPIDI_CH3_DBG_OTHER,TERSE,"[%d]accept:Received remote_translation after broadcast:\n", rank);
@@ -1371,9 +1281,7 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
 
     mpi_errno = SetupNewIntercomm( comm_ptr, remote_comm_size, 
 				   remote_translation, remote_pg, intercomm );
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* synchronize with remote root */
     if (rank == root)
@@ -1383,19 +1291,15 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
                                      sendtag++, &j, 0, MPI_INT,
                                      0, recvtag++, tmp_comm,
                                      MPI_STATUS_IGNORE, &errflag);
-        if (mpi_errno != MPI_SUCCESS) {
-	    MPIR_ERR_POP(mpi_errno);
-        }
+        MPIR_ERR_CHECK(mpi_errno);
 
         /* All communication with remote root done. Release the communicator. */
         MPIR_Comm_release(tmp_comm);
     }
 
     MPL_DBG_MSG(MPIDI_CH3_DBG_CONNECT,VERBOSE,"Barrier");
-    mpi_errno = MPIR_Barrier_intra_auto(comm_ptr, &errflag);
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    mpi_errno = MPIR_Barrier_allcomm_auto(comm_ptr, &errflag);
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* Free new_vc once the connection is completed. It was explicitly 
        allocated in ch3_progress.c and returned by 
@@ -1406,7 +1310,7 @@ int MPIDI_Comm_accept(const char *port_name, MPIR_Info *info, int root,
 
 fn_exit:
     MPIR_CHKLMEM_FREEALL();
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_COMM_ACCEPT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 
 fn_fail:
@@ -1437,10 +1341,6 @@ Input/Output Parameters:
    Note:
    This routine performance a barrier over 'comm_ptr'.  Why?
 */
-#undef FUNCNAME
-#define FUNCNAME SetupNewIntercomm
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int SetupNewIntercomm( MPIR_Comm *comm_ptr, int remote_comm_size,
 			      pg_translation remote_translation[],
 			      MPIDI_PG_t **remote_pg, 
@@ -1455,7 +1355,6 @@ static int SetupNewIntercomm( MPIR_Comm *comm_ptr, int remote_comm_size,
     intercomm->attributes   = NULL;
     intercomm->remote_size  = remote_comm_size;
     intercomm->local_size   = comm_ptr->local_size;
-    intercomm->pof2         = MPL_pof2(intercomm->local_size);
     intercomm->rank         = comm_ptr->rank;
     intercomm->local_group  = NULL;
     intercomm->remote_group = NULL;
@@ -1477,13 +1376,11 @@ static int SetupNewIntercomm( MPIR_Comm *comm_ptr, int remote_comm_size,
     }
 
     mpi_errno = MPIR_Comm_commit(intercomm);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
     
     MPL_DBG_MSG(MPIDI_CH3_DBG_CONNECT,VERBOSE,"Barrier");
-    mpi_errno = MPIR_Barrier_intra_auto(comm_ptr, &errflag);
-    if (mpi_errno != MPI_SUCCESS) {
-	MPIR_ERR_POP(mpi_errno);
-    }
+    mpi_errno = MPIR_Barrier_allcomm_auto(comm_ptr, &errflag);
+    MPIR_ERR_CHECK(mpi_errno);
 
  fn_exit:
     return mpi_errno;
@@ -1494,10 +1391,6 @@ static int SetupNewIntercomm( MPIR_Comm *comm_ptr, int remote_comm_size,
 
 /* Free new_vc. It was explicitly allocated in MPIDI_CH3_Connect_to_root. */
 /* FIXME: The free and the create routines should be in the same file */
-#undef FUNCNAME
-#define FUNCNAME FreeNewVC
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int FreeNewVC( MPIDI_VC_t *new_vc )
 {
     MPID_Progress_state progress_state;
@@ -1549,18 +1442,13 @@ static int FreeNewVC( MPIDI_VC_t *new_vc )
  * enqueue the request to that port's accept queue to wait for an accept call to
  * serve it; otherwise, such request should be discarded, thus we immediately send
  * nack back to client and start closing. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Acceptq_enqueue
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3I_Acceptq_enqueue(MPIDI_VC_t * vc, int port_name_tag )
 {
     int mpi_errno=MPI_SUCCESS;
     MPIDI_CH3I_Port_connreq_t *connreq = NULL;
     MPIDI_CH3I_Port_t *port = NULL;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3I_ACCEPTQ_ENQUEUE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3I_ACCEPTQ_ENQUEUE);
+    MPIR_FUNC_ENTER;
 
     LL_SEARCH_SCALAR(active_portq.head, port, port_name_tag, port_name_tag);
 
@@ -1573,13 +1461,11 @@ int MPIDI_CH3I_Acceptq_enqueue(MPIDI_VC_t * vc, int port_name_tag )
     if (port == NULL) {
         /* Notify connecting client. */
         mpi_errno = MPIDI_CH3I_Port_issue_conn_ack(connreq->vc, FALSE /* closed port */);
-        if (mpi_errno != MPI_SUCCESS)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         /* Start VC closing protocol. */
         mpi_errno = MPIDI_CH3I_Port_local_close_vc(connreq->vc);
-        if (mpi_errno != MPI_SUCCESS)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         MPIDI_CH3I_PORT_CONNREQ_SET_STAT(connreq, FREE);
 
@@ -1602,7 +1488,7 @@ int MPIDI_CH3I_Acceptq_enqueue(MPIDI_VC_t * vc, int port_name_tag )
     }
 
   fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3I_ACCEPTQ_ENQUEUE);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
   fn_fail:
     if (connreq)
@@ -1613,17 +1499,12 @@ int MPIDI_CH3I_Acceptq_enqueue(MPIDI_VC_t * vc, int port_name_tag )
 
 /* Attempt to dequeue a connection request from the accept queue. If the queue
  * is empty return a NULL object. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Acceptq_dequeue
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3I_Acceptq_dequeue(MPIDI_CH3I_Port_connreq_t ** connreq_ptr, int port_name_tag)
 {
     int mpi_errno=MPI_SUCCESS;
     MPIDI_CH3I_Port_t *port = NULL;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3I_ACCEPTQ_DEQUEUE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3I_ACCEPTQ_DEQUEUE);
+    MPIR_FUNC_ENTER;
 
     /* Find port object by using port_name_tag. */
     LL_SEARCH_SCALAR(active_portq.head, port, port_name_tag, port_name_tag);
@@ -1636,7 +1517,7 @@ int MPIDI_CH3I_Acceptq_dequeue(MPIDI_CH3I_Port_connreq_t ** connreq_ptr, int por
                          (*connreq_ptr), port_name_tag, (*connreq_ptr)->vc));
     }
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3I_ACCEPTQ_DEQUEUE);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }
 
@@ -1645,10 +1526,6 @@ int MPIDI_CH3I_Acceptq_dequeue(MPIDI_CH3I_Port_connreq_t ** connreq_ptr, int por
  * MPIDI_CH3I_Port_destroy(close_port) and MPIDI_Port_finalize (finalize).
  * Note that we already deleted port from active_port queue before cleaning up
  * its accept queue, thus no new VC can be enqueued concurrently. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Acceptq_cleanup
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int MPIDI_CH3I_Acceptq_cleanup(MPIDI_CH3I_Port_connreq_q_t * accept_connreq_q)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -1659,20 +1536,17 @@ static int MPIDI_CH3I_Acceptq_cleanup(MPIDI_CH3I_Port_connreq_q_t * accept_connr
 
         /* Notify connecting client. */
         mpi_errno = MPIDI_CH3I_Port_issue_conn_ack(connreq->vc, FALSE /* closed port */);
-        if (mpi_errno != MPI_SUCCESS)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         /* Start VC closing protocol. */
         mpi_errno = MPIDI_CH3I_Port_local_close_vc(connreq->vc);
-        if (mpi_errno != MPI_SUCCESS)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         MPIDI_CH3I_PORT_CONNREQ_SET_STAT(connreq, FREE);
 
         /* Free connection request (blocking wait till VC closed). */
         mpi_errno = MPIDI_CH3I_Port_connreq_free(connreq);
-        if (mpi_errno != MPI_SUCCESS)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     MPIR_Assert(accept_connreq_q->size == 0);
@@ -1690,10 +1564,6 @@ static int MPIDI_CH3I_Acceptq_cleanup(MPIDI_CH3I_Port_connreq_q_t * accept_connr
  * We do not want to wait for these VCs being freed in timed out connect,
  * because it is blocked till the server calls a matching accept or close_port.
  * This routine is called in finalize on client process. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Revokeq_cleanup
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int MPIDI_CH3I_Revokeq_cleanup(void)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -1733,10 +1603,6 @@ static int MPIDI_CH3I_Revokeq_cleanup(void)
 /*** Packet handlers exposed to progress engine  ***/
 
 /* Packet handler to handle response (connection ACK) on client process. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_PktHandler_ConnAck
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3_PktHandler_ConnAck(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt,
                                  void *data ATTRIBUTE((unused)),
                                  intptr_t * buflen, MPIR_Request ** rreqp)
@@ -1814,10 +1680,6 @@ int MPIDI_CH3_PktHandler_ConnAck(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt,
 }
 
 /* Packet handler to handle response (acceptance ACK) on server process. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_PktHandler_AcceptAck
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3_PktHandler_AcceptAck(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt,
                                    void *data ATTRIBUTE((unused)),
                                    intptr_t * buflen, MPIR_Request ** rreqp)
@@ -1844,8 +1706,7 @@ int MPIDI_CH3_PktHandler_AcceptAck(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt,
          * Note that accept call does not return when client timed out,
          * thus we only change the state and let accept call handle closing. */
         mpi_errno = MPIDI_CH3I_Port_local_close_vc(connreq->vc);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         MPIDI_CH3I_PORT_CONNREQ_SET_STAT(connreq, FREE);
     }
@@ -1861,10 +1722,6 @@ int MPIDI_CH3_PktHandler_AcceptAck(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt,
 
 /*** Routines for connection request creation and freeing  ***/
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Port_connreq_create
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int MPIDI_CH3I_Port_connreq_create(MPIDI_VC_t * vc, MPIDI_CH3I_Port_connreq_t ** connreq_ptr)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -1893,10 +1750,6 @@ static int MPIDI_CH3I_Port_connreq_create(MPIDI_VC_t * vc, MPIDI_CH3I_Port_connr
     goto fn_exit;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Port_connreq_free
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static int MPIDI_CH3I_Port_connreq_free(MPIDI_CH3I_Port_connreq_t * connreq)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -1928,17 +1781,12 @@ static int MPIDI_CH3I_Port_connreq_free(MPIDI_CH3I_Port_connreq_t * connreq)
 /*** Routines to initialize / destroy dynamic connection  ***/
 
 /* Initialize port's accept queue. It is called in MPIDI_Open_port. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Port_init
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3I_Port_init(int port_name_tag)
 {
     int mpi_errno = MPI_SUCCESS;
     MPIDI_CH3I_Port_t *port = NULL;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3I_PORT_INIT);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3I_PORT_INIT);
+    MPIR_FUNC_ENTER;
 
     MPIR_CHKPMEM_DECL(1);
     MPIR_CHKPMEM_MALLOC(port, MPIDI_CH3I_Port_t *, sizeof(MPIDI_CH3I_Port_t),
@@ -1954,7 +1802,7 @@ int MPIDI_CH3I_Port_init(int port_name_tag)
 
   fn_exit:
     MPIR_CHKPMEM_COMMIT();
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3I_PORT_INIT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
   fn_fail:
     MPIR_CHKPMEM_REAP();
@@ -1962,48 +1810,37 @@ int MPIDI_CH3I_Port_init(int port_name_tag)
 }
 
 /* Destroy port's accept queue. It is called in MPIDI_Close_port. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Port_destroy
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3I_Port_destroy(int port_name_tag)
 {
     int mpi_errno = MPI_SUCCESS;
     MPIDI_CH3I_Port_t *port = NULL;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3I_PORT_DESTROY);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3I_PORT_DESTROY);
+    MPIR_FUNC_ENTER;
 
     LL_SEARCH_SCALAR(active_portq.head, port, port_name_tag, port_name_tag);
     if (port != NULL) {
         LL_DELETE(active_portq.head, active_portq.tail, port);
 
         mpi_errno = MPIDI_CH3I_Acceptq_cleanup(&port->accept_connreq_q);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
 
         MPL_free(port);
         active_portq.size--;
     }
 
   fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3I_PORT_DESTROY);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
   fn_fail:
     goto fn_exit;
 }
 
 /* This routine is called by MPID_Finalize to clean up dynamic connections. */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_Port_finalize
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_Port_finalize(void)
 {
     int mpi_errno = MPI_SUCCESS;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_PORT_FINALIZE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_PORT_FINALIZE);
+    MPIR_FUNC_ENTER;
 
     /* Server side clean up. */
 
@@ -2034,8 +1871,7 @@ int MPIDI_Port_finalize(void)
         LL_FOREACH_SAFE(unexpt_connreq_q.head, connreq, connreq_tmp) {
             MPIDI_CH3I_Port_connreq_q_delete(&unexpt_connreq_q, connreq);
             mpi_errno = MPIDI_CH3I_Port_connreq_free(connreq);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
         }
         MPIR_Assert(unexpt_connreq_q.size == 0);
     }
@@ -2044,11 +1880,10 @@ int MPIDI_Port_finalize(void)
 
     /* - Destroy all revoked connection requests. */
     mpi_errno = MPIDI_CH3I_Revokeq_cleanup();
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
   fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_PORT_FINALIZE);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
   fn_fail:
     goto fn_exit;

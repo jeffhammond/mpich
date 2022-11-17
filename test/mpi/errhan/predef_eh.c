@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -15,7 +13,7 @@
  * communicators does not cause a problem at finalize time.  Regression
  * test for ticket #1591 */
 
-void errf(MPI_Comm * comm, int *ec)
+static void errf(MPI_Comm * comm, int *ec)
 {
     /* do nothing */
 }

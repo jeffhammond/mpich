@@ -1,9 +1,14 @@
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 #include <mpi.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "mpitest.h"
 
-char *datarep = "external32";
+const char *datarep = "external32";
 
 #define UINT_COUNT (2)
 #define DBLE_COUNT (24)

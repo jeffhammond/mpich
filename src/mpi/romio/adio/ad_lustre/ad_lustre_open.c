@@ -1,11 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
- *
- *   Copyright (C) 2007 Oak Ridge National Laboratory
- *
- *   Copyright (C) 2008 Sun Microsystems, Lustre group
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_lustre.h"
@@ -124,7 +119,7 @@ void ADIOI_LUSTRE_Open(ADIO_File fd, int *error_code)
 
     /* Pascal Deveze reports that, even though we pass a
      * "GETSTRIPE" (read) flag to the ioctl, if some of the values of this
-     * struct are uninitialzed, the call can give an error.  zero it out in case
+     * struct are uninitialized, the call can give an error.  zero it out in case
      * there are other members that must be initialized and in case
      * lov_user_md struct changes in future */
     memset(lum, 0, lumlen);

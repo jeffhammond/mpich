@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -15,7 +13,13 @@
             readbuf_len = (unsigned) (MPL_MIN(max_bufsize, end_offset-readbuf_off+1)); \
             ADIO_ReadContig(fd, readbuf, readbuf_len, MPI_BYTE,         \
                             ADIO_EXPLICIT_OFFSET, readbuf_off, &status1, error_code); \
-            if (*error_code != MPI_SUCCESS) return;                     \
+            if (*error_code != MPI_SUCCESS) {                           \
+                *error_code = MPIO_Err_create_code(*error_code,         \
+                                          MPIR_ERR_RECOVERABLE, myname, \
+                                                  __LINE__, MPI_ERR_IO, \
+                                                   "**iorsrc", 0);      \
+                return;                                                 \
+            }                                                           \
         }                                                               \
         while (req_len > readbuf_off + readbuf_len - req_off) {         \
             ADIOI_Assert((readbuf_off + readbuf_len - req_off) == (int) (readbuf_off + readbuf_len - req_off)); \
@@ -32,14 +36,20 @@
             ADIO_ReadContig(fd, readbuf+partial_read, readbuf_len-partial_read, \
                             MPI_BYTE, ADIO_EXPLICIT_OFFSET, readbuf_off+partial_read, \
                             &status1, error_code);                      \
-            if (*error_code != MPI_SUCCESS) return;                     \
+            if (*error_code != MPI_SUCCESS) {                           \
+                *error_code = MPIO_Err_create_code(*error_code,         \
+                                          MPIR_ERR_RECOVERABLE, myname, \
+                                                  __LINE__, MPI_ERR_IO, \
+                                                   "**iorsrc", 0);      \
+                return;                                                 \
+            }                                                           \
         }                                                               \
         ADIOI_Assert(req_len == (size_t)req_len);                       \
         memcpy((char *)buf + userbuf_off, readbuf+req_off-readbuf_off, req_len); \
     }
 
 
-void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, MPI_Aint count,
                            MPI_Datatype datatype, int file_ptr_type,
                            ADIO_Offset offset, ADIO_Status * status, int
                            *error_code)
@@ -56,7 +66,7 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
     ADIO_Offset n_filetypes, etype_in_filetype, st_n_filetypes, size_in_filetype;
     ADIO_Offset abs_off_in_filetype = 0, new_frd_size, frd_size = 0, st_frd_size;
     MPI_Count filetype_size, etype_size, buftype_size, partial_read;
-    MPI_Aint filetype_extent, buftype_extent;
+    MPI_Aint lb, filetype_extent, buftype_extent;
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset userbuf_off, req_len, sum;
     ADIO_Offset off, req_off, disp, end_offset = 0, readbuf_off, start_off;
@@ -64,6 +74,7 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
     int info_flag;
     unsigned max_bufsize, readbuf_len;
     ADIO_Status status1;
+    static char myname[] = "ADIOI_GEN_ReadStrided";
 
     if (fd->hints->ds_read == ADIOI_HINT_DISABLE) {
         /* if user has disabled data sieving on reads, use naive
@@ -89,9 +100,9 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
         return;
     }
 
-    MPI_Type_extent(fd->filetype, &filetype_extent);
+    MPI_Type_get_extent(fd->filetype, &lb, &filetype_extent);
     MPI_Type_size_x(datatype, &buftype_size);
-    MPI_Type_extent(datatype, &buftype_extent);
+    MPI_Type_get_extent(datatype, &lb, &buftype_extent);
     etype_size = fd->etype_size;
 
     ADIOI_Assert((buftype_size * count) ==
@@ -389,5 +400,4 @@ void ADIOI_GEN_ReadStrided(ADIO_File fd, void *buf, int count,
    keep track of how much data was actually read and placed in buf
    by ADIOI_BUFFERED_READ. */
 #endif
-
 }

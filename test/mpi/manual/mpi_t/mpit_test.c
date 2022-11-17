@@ -1,12 +1,10 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2011 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* A simple test of the proposed MPI_T_ interface that queries all of
- * the control variables exposed by the MPI implememtation and prints
+ * the control variables exposed by the MPI implementation and prints
  * them to stdout.
  *
  * Author: Dave Goodell <goodell@mcs.anl.gov.

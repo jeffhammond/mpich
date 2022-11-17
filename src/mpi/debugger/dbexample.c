@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2009 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -12,7 +12,7 @@
 /* style: allow:printf:2 sig:0 */
 
 /*
- * This program provides a convienient way to test some of the debugger
+ * This program provides a convenient way to test some of the debugger
  * interface functionality, including message queues and named communicators
  */
 

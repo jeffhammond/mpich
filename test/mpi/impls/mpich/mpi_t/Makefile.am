@@ -1,11 +1,9 @@
-# -*- Mode: Makefile; -*-
-# vim: set ft=automake :
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
-include $(top_srcdir)/Makefile.mtest
+include $(top_srcdir)/Makefile_single.mtest
 
 EXTRA_DIST = testlist
 
@@ -13,4 +11,4 @@ EXTRA_DIST = testlist
 ## file, we don't need per-target _SOURCES rules, automake will infer them
 ## correctly
 noinst_PROGRAMS = \
-	collparmt
+	collparmt recvq_events

@@ -1,9 +1,7 @@
-# -*- Mode: Makefile; -*-
-# vim: set ft=automake :
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
 include $(top_srcdir)/Makefile_cxx.mtest
 
@@ -71,7 +69,7 @@ nodist_writeordbenosx_SOURCES =   writeordbenosx.cxx
 nodist_writeshnosx_SOURCES =      writeshnosx.cxx
 nodist_writeatallbenosx_SOURCES = writeatallbenosx.cxx
 
-# these files are genereated using testmerge (see below)
+# these files are generated using testmerge (see below)
 generated_io_sources =   \
     iwriteatx.cxx        \
     iwritex.cxx          \

@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_GROUP_H_INCLUDED
@@ -15,10 +13,11 @@
  *---------------------------------------------------------------------------*/
 /* This structure is used to implement the group operations such as
    MPI_Group_translate_ranks */
+/* note: next_lpid (with idx_of_first_lpid in MPIR_Group) gives a linked list
+ * in a sorted lpid ascending order */
 typedef struct MPII_Group_pmap_t {
-    int lpid;                   /* local process id, from VCONN */
+    uint64_t lpid;              /* local process id, from VCONN */
     int next_lpid;              /* Index of next lpid (in lpid order) */
-    int flag;                   /* marker, used to implement group operations */
 } MPII_Group_pmap_t;
 
 /* Any changes in the MPIR_Group structure must be made to the
@@ -85,7 +84,6 @@ struct MPIR_Group {
 
 extern MPIR_Object_alloc_t MPIR_Group_mem;
 /* Preallocated group objects */
-#define MPIR_GROUP_N_BUILTIN 1
 extern MPIR_Group MPIR_Group_builtin[MPIR_GROUP_N_BUILTIN];
 extern MPIR_Group MPIR_Group_direct[];
 
@@ -98,27 +96,13 @@ extern MPIR_Group *const MPIR_Group_empty;
 #define MPIR_Group_release_ref(_group, _inuse) \
      do { MPIR_Object_release_ref(_group, _inuse); } while (0)
 
+void MPII_Group_setup_lpid_list(MPIR_Group *);
+int MPIR_Group_check_valid_ranks(MPIR_Group *, const int[], int);
+int MPIR_Group_check_valid_ranges(MPIR_Group *, int[][3], int);
+void MPIR_Group_setup_lpid_pairs(MPIR_Group *, MPIR_Group *);
 int MPIR_Group_create(int, MPIR_Group **);
 int MPIR_Group_release(MPIR_Group * group_ptr);
 
-int MPIR_Group_compare_impl(MPIR_Group * group_ptr1, MPIR_Group * group_ptr2, int *result);
-int MPIR_Group_difference_impl(MPIR_Group * group_ptr1, MPIR_Group * group_ptr2,
-                               MPIR_Group ** new_group_ptr);
-int MPIR_Group_excl_impl(MPIR_Group * group_ptr, int n, const int *ranks,
-                         MPIR_Group ** new_group_ptr);
-int MPIR_Group_free_impl(MPIR_Group * group_ptr);
-int MPIR_Group_incl_impl(MPIR_Group * group_ptr, int n, const int *ranks,
-                         MPIR_Group ** new_group_ptr);
-int MPIR_Group_intersection_impl(MPIR_Group * group_ptr1, MPIR_Group * group_ptr2,
-                                 MPIR_Group ** new_group_ptr);
-int MPIR_Group_range_excl_impl(MPIR_Group * group_ptr, int n, int ranges[][3],
-                               MPIR_Group ** new_group_ptr);
-int MPIR_Group_range_incl_impl(MPIR_Group * group_ptr, int n, int ranges[][3],
-                               MPIR_Group ** new_group_ptr);
-int MPIR_Group_translate_ranks_impl(MPIR_Group * group_ptr1, int n, const int *ranks1,
-                                    MPIR_Group * group_ptr2, int *ranks2);
-int MPIR_Group_union_impl(MPIR_Group * group_ptr1, MPIR_Group * group_ptr2,
-                          MPIR_Group ** new_group_ptr);
 int MPIR_Group_check_subset(MPIR_Group * group_ptr, MPIR_Comm * comm_ptr);
 int MPIR_Group_init(void);
 

@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 /*
  * Test of reduce scatter.
  *
@@ -50,7 +50,7 @@ void right(void *a, void *b, int *count, MPI_Datatype * type)
 }
 
 /* Just performs a simple sum but can be marked as non-commutative to
-   potentially tigger different logic in the implementation. */
+   potentially trigger different logic in the implementation. */
 void nc_sum(void *a, void *b, int *count, MPI_Datatype * type);
 void nc_sum(void *a, void *b, int *count, MPI_Datatype * type)
 {

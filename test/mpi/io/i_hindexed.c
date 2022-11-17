@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* Wei-keng Liao (wkliao@ece.northwestern.edu) September 8, 2008 */
@@ -60,7 +59,8 @@ char compare_buf[XLEN * 4][YLEN * 4] = {
 int main(int argc, char **argv)
 {
     int i, j, err, rank, np, num_io;
-    char *buf, *filename;
+    char *buf;
+    const char *filename;
     int rank_dim[2], array_of_sizes[2];
     int array_of_subsizes[2];
     int count, *blocklengths, global_array_size;

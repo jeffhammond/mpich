@@ -1,8 +1,8 @@
-C -*- Mode: Fortran; -*-
 C
-C  (C) 2012 by Argonne National Laboratory.
-C      See COPYRIGHT in top-level directory.
+C Copyright (C) by Argonne National Laboratory
+C     See COPYRIGHT in top-level directory
 C
+
 C This program is based on the allpair.f test from the MPICH-1 test
 C (test/pt2pt/allpair.f), which in turn was inspired by a bug report from
 C fsset@corelli.lerc.nasa.gov (Scott Townsend)
@@ -42,6 +42,7 @@ C
       logical flag
       real send_buf(TEST_SIZE), recv_buf(TEST_SIZE)
       logical verbose
+      integer completed
       common /flags/ verbose
 C
       if (verbose) then
@@ -74,16 +75,16 @@ C
 C
          call MPI_Startall(2, requests, ierr)
 C
-         index = -1
-         do while (index .ne. 1)
+         completed = 0
+         do while (completed .lt. 2)
             call MPI_Testsome(2, requests, outcount,
      .                        indices, statuses, ierr)
             do i = 1,outcount
                if (indices(i) .eq. 1) then
                   call msg_check( recv_buf, next, tag, count,
      .                 statuses(1,i), TEST_SIZE, 'testsome', errs )
-                  index = 1
                end if
+               completed = completed + 1
             end do
          end do
 C

@@ -1,7 +1,8 @@
-!  
-!  (C) 2004 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
 !
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
+!
+
         program main
           use mpi
           integer ierr, errs
@@ -12,7 +13,7 @@
           complex c
 
           errs = 0
-          call mpi_init(ierr)
+          call mtest_init(ierr)
           call mpi_sizeof( errs, size1, ierr )
           call mpi_type_size( MPI_INTEGER, size2, ierr )
           if (size1 .ne. size2) then
@@ -52,10 +53,6 @@
              print *, "real array size is ", size2, " sizeof claims ", size1
           endif
 
-          if (errs .gt. 0) then
-             print *, ' Found ', errs, ' errors'
-          else
-             print *, ' No Errors'
-          endif
+          call mtest_finalize( errs )
           
         end program main

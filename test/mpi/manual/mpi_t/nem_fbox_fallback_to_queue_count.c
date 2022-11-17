@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test checks that the nemesis code correctly exposes statistics related
@@ -35,10 +33,11 @@ int err, rank;
 MPI_T_pvar_session session;
 MPI_T_pvar_handle fbox_handle;
 
-/* Check that we can successfuly write to the variable.
+/* Check that we can successfully write to the variable.
  * Question: Do we really want to write pvars other than reset?
  */
-void blank_test()
+void blank_test(void);
+void blank_test(void)
 {
     uint64_t temp[2] = { -1 };
 
@@ -58,7 +57,7 @@ void blank_test()
  * Here, the sender posts all sends before the receiver has a chance to
  * acknowledge any of them; this should force the sender to fall_back to the
  * queue every time. */
-void send_first_test()
+static void send_first_test(void)
 {
     uint64_t nem_fbox_fall_back_to_queue_count[2] = { -1 };
 
@@ -118,7 +117,8 @@ void send_first_test()
  *        also uses messages).  May want to 'sleep' between sends as a
  *        workaround.
  */
-void recv_first_test()
+void recv_first_test(void);
+void recv_first_test(void)
 {
     uint64_t nem_fbox_fall_back_to_queue_count[2] = { -1 };
 

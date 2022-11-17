@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidi_ch3_impl.h"
@@ -17,21 +16,16 @@
  * the entire message is successfully sent, then NULL is returned.
  * Otherwise a request is allocated, the header is copied into the
  * request, and a pointer to the request is returned.  An error
- * condition also results in a request be allocated and the errror
+ * condition also results in a request be allocated and the error
  * being returned in the status field of the request.
  */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_iStartMsg
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, intptr_t hdr_sz, MPIR_Request **sreq_ptr)
 {
     int mpi_errno = MPI_SUCCESS;
     int again = 0;
     int in_cs = 0;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3_ISTARTMSG);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3_ISTARTMSG);
+    MPIR_FUNC_ENTER;
 
     MPIR_ERR_CHKANDJUMP1(vc->state == MPIDI_VC_STATE_MORIBUND, mpi_errno, MPIX_ERR_PROC_FAILED, "**comm_fail", "**comm_fail %d", vc->pg_rank);
 
@@ -77,7 +71,7 @@ int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, intptr_t hdr_sz, MPIR_Reques
     if (in_cs) {
         MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
     }
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3_ISTARTMSG);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
  fn_fail:
     goto fn_exit;
@@ -94,8 +88,8 @@ int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, intptr_t hdr_sz, MPIR_Reques
 	MPIR_Object_set_ref (sreq, 2);
 
 	sreq->dev.pending_pkt = *(MPIDI_CH3_Pkt_t *) hdr;
-	sreq->dev.iov[0].MPL_IOV_BUF = (char *) &sreq->dev.pending_pkt;
-	sreq->dev.iov[0].MPL_IOV_LEN = hdr_sz;
+	sreq->dev.iov[0].iov_base = (char *) &sreq->dev.pending_pkt;
+	sreq->dev.iov[0].iov_len = hdr_sz;
 	sreq->dev.iov_count = 1;
 	sreq->dev.iov_offset = 0;
         sreq->ch.noncontig = FALSE;
@@ -111,7 +105,7 @@ int MPIDI_CH3_iStartMsg (MPIDI_VC_t *vc, void *hdr, intptr_t hdr_sz, MPIR_Reques
             /* FIXME we are sometimes called from within the progress engine, we
              * shouldn't be calling the progress engine again */
             mpi_errno = MPIDI_CH3I_Shm_send_progress();
-            if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
         }
     
 	*sreq_ptr = sreq;

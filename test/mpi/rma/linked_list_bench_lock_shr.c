@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*            MPI-3 distributed linked list construction example
@@ -54,7 +53,7 @@ static int my_elems_size = 0;
 static int my_elems_count = 0;
 
 /* Allocate a new shared linked list element */
-MPI_Aint alloc_elem(int value, MPI_Win win)
+static MPI_Aint alloc_elem(int value, MPI_Win win)
 {
     MPI_Aint disp;
     llist_elem_t *elem_ptr;

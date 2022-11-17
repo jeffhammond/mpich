@@ -1,9 +1,13 @@
-# -*- Mode: shell-script -*-
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
+
 # build with
 # autoconf --localdir=../confdb configure.ac
 # (or wherever the confdb is)
 #
-AC_PREREQ([2.63])
+AC_PREREQ([2.69])
 
 m4_include([version.m4])
 dnl 2nd arg is intentionally underquoted
@@ -26,12 +30,14 @@ AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability-recursive foreign 1.12.3 silent
 AM_MAINTAINER_MODE([enable])
 
 dnl must come before LT_INIT, which AC_REQUIREs AC_PROG_CC
-PAC_PROG_CC
+AC_PROG_CC
+AC_PROG_CC_C99
 AM_PROG_CC_C_O
 PAC_CHECK_VISIBILITY
 AC_SUBST(VISIBILITY_CFLAGS)
 
 AC_USE_SYSTEM_EXTENSIONS
+PAC_C_NO_COMMON
 
 AM_PROG_AR
 
@@ -43,16 +49,17 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 # AC_MSG_RESULT([Configuring ROMIO Version $VERSION])
 CONFIGURE_ARGS="$*"
 if test -n "$CONFIGURE_ARGS" ; then
-    echo "Configuring with args $CONFIGURE_ARGS"
+    AC_MSG_NOTICE([Configuring with args $CONFIGURE_ARGS])
 fi
 
-AC_CONFIG_HEADER(adio/include/romioconf.h)
+AC_CONFIG_HEADERS([adio/include/romioconf.h])
 AH_TOP([/*
- *  (C) 2008 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 #ifndef ROMIOCONF_H_INCLUDED
 #define ROMIOCONF_H_INCLUDED
+#include <mplconfig.h>
 ])
 AH_BOTTOM([
 /* quash PACKAGE and PACKAGE_* vars, see MPICH top-level configure.ac for
@@ -125,22 +132,27 @@ AC_SUBST([mpl_libdir])
 mpl_lib=""
 AC_SUBST([mpl_lib])
 if test "$FROM_MPICH" = "no" ; then
-if test "$with_mpl_prefix" = "embedded" ; then
-    mpl_srcdir="mpl"
-    mpl_dist_srcdir="mpl"
-    mpl_subdir_args="--disable-versioning --enable-embedded"
-    PAC_CONFIG_SUBDIR_ARGS([mpl],[$mpl_subdir_args],[],[AC_MSG_ERROR(MPL configure failed)])
-    mpl_includedir='-I$(top_builddir)/mpl/include -I$(top_srcdir)/mpl/include'
-    mpl_lib="mpl/lib${MPLLIBNAME}.la"
+    if test "$with_mpl_prefix" = "embedded" ; then
+        mpl_srcdir="mpl"
+        mpl_dist_srcdir="mpl"
+        mpl_subdir_args="--disable-versioning --enable-embedded"
+        PAC_CONFIG_SUBDIR_ARGS([mpl],[$mpl_subdir_args],[],[AC_MSG_ERROR(MPL configure failed)])
+        mpl_includedir='-I$(top_builddir)/mpl/include -I$(top_srcdir)/mpl/include'
+        mpl_lib="mpl/lib${MPLLIBNAME}.la"
+    else
+        # The user specified an already-installed MPL; just sanity check, don't
+        # subconfigure it
+        AS_IF([test -s "${with_mpl_prefix}/include/mplconfig.h"],
+            [:],[AC_MSG_ERROR([the MPL installation in "${with_mpl_prefix}" appears broken])])
+        mpl_includedir="-I${with_mpl_prefix}/include"
+        mpl_libdir="-L${with_mpl_prefix}/lib"
+        mpl_lib="-l${MPLLIBNAME}"
+    fi
 else
-    # The user specified an already-installed MPL; just sanity check, don't
-    # subconfigure it
-    AS_IF([test -s "${with_mpl_prefix}/include/mplconfig.h"],
-          [:],[AC_MSG_ERROR([the MPL installation in "${with_mpl_prefix}" appears broken])])
-    mpl_includedir="-I${with_mpl_prefix}/include"
-    mpl_libdir="-L${with_mpl_prefix}/lib"
-    mpl_lib="-l${MPLLIBNAME}"
-fi
+    # we are configuring romio inside mpich. MPICH should configured MPL already,
+    # just set mpl_includedir and source mpl/localdefs if any.
+    pac_skip_mpl_lib=yes
+    PAC_CONFIG_MPL
 fi
 
 CFLAGS=${CFLAGS:-""}
@@ -172,10 +184,7 @@ MAKE=${MAKE:-"make"}
 # foll. needed for f77 test programs
 F77GETARG="call getarg(i,str)"
 F77IARGC="iargc()"
-F77MPIOINC=""
-FTESTDEFINE=""
 FORTRAN_MPI_OFFSET=""
-MPIOF_H_INCLUDED=0
 MPI_OFFSET_KIND1="!"
 MPI_OFFSET_KIND2="!"
 TEST_CC=""
@@ -187,7 +196,7 @@ dnl An m4 macro for use with m4_foreach_w and friends.  You should modify this
 dnl list if you want to add a known file system.  The list is just whitespace
 dnl separated, so you can use newlines and tabs as well.
 m4_define([known_filesystems_m4_w],
-          [nfs ufs pvfs2 testfs xfs panfs lustre gpfs ime])dnl
+          [daos nfs ufs pvfs2 testfs xfs panfs lustre gpfs ime quobytefs])dnl
 dnl
 dnl An m4 macro for use with m4_foreach and friends.  Expands to a quoted list of
 dnl quoted elements.  A bit easier to use without unintended expansion than the
@@ -203,14 +212,14 @@ known_filesystems="m4_join([ ],known_filesystems_m4)"
 # Defaults
 AC_ARG_ENABLE(aio,[
 --enable-aio - Request use of asynchronous I/O routines (default)],
-[ 
+[
   if test "x$enableval" = "xno" ; then
     disable_aio=yes
   else
     disable_aio=no
   fi
 ], disable_aio=no)
-AC_ARG_ENABLE(echo, 
+AC_ARG_ENABLE(echo,
 [--enable-echo  - Turn on strong echoing. The default is enable=no.] ,set -x)
 AC_ARG_ENABLE(f77,
 [--enable-f77 - Turn on support for Fortran 77 (default)],,enable_f77=yes)
@@ -228,7 +237,7 @@ AC_ARG_WITH(mpi-impl,[
 --with-mpi-impl=name - Specify MPI implementation to build ROMIO for],,)
 dnl
 AC_ARG_WITH(mpi, [
---with-mpi=path   - Path to instalation of MPI (headers, libs, etc)],,)
+--with-mpi=path   - Path to installation of MPI (headers, libs, etc)],,)
 dnl
 if test "$enable_f77" != "yes" ; then
    NOF77=1
@@ -263,9 +272,9 @@ if test -z "$ARCH" -a -x $srcdir/util/tarch ; then
     ARCH=`$srcdir/util/tarch | sed s/-/_/g`
     if test -z "$ARCH" ; then
        AC_MSG_RESULT([Unknown!])
-       AC_MSG_ERROR([Error: Could not guess target architecture, you must 
-set an architecture type with the environment variable ARCH]) 
-    fi 
+       AC_MSG_ERROR([Error: Could not guess target architecture, you must
+set an architecture type with the environment variable ARCH])
+    fi
     eval "arch_$ARCH=1"
     AC_MSG_RESULT($ARCH)
 fi
@@ -280,7 +289,7 @@ fi
 #
 #
 # Find the home directory if not specified
-if test "X$srcdir" != "X." -a -s $srcdir/mpi-io/Makefile.in ; then 
+if test "X$srcdir" != "X." -a -s $srcdir/mpi-io/Makefile.in ; then
     ROMIO_HOME_TRIAL=$srcdir
 else
     # Take advantage of autoconf2 features
@@ -315,7 +324,7 @@ AC_SUBST(mandir)
 if test -z "$docdir" ; then docdir='${prefix}/doc' ; fi
 AC_SUBST(docdir)
 if test -z "$htmldir" ; then htmldir='${prefix}/www' ; fi
-AC_SUBST(htmldir) 
+AC_SUBST(htmldir)
 
 
 # If we are building within a known MPI implementation, we must avoid the
@@ -363,7 +372,7 @@ if test $WITHIN_KNOWN_MPI_IMPL = no ; then
 #     compile command. Some compilers complain if it's only -I
       MPI_INCLUDE_DIR=.
    fi
-else 
+else
    MPI_INCLUDE_DIR=.
 fi
 #
@@ -385,22 +394,22 @@ else
     USER_FFLAGS="$FFLAGS -O"
 fi
 #
-# Here begin the architecture-specific tests.  
+# Here begin the architecture-specific tests.
 # --------------------------------------------------------------------------
-# We must first select the C and Fortran compilers.  Because of the 
+# We must first select the C and Fortran compilers.  Because of the
 # way that the PROG_CC autoconf macro works (and all of the macros that
 # require it, including CHECK_HEADERS), that macro must occur exactly
-# once in the configure.ac file, at least as of autoconf 2.57 .  
+# once in the configure.ac file, at least as of autoconf 2.57 .
 # Unfortunately, this requirement is not enforced.  To handle this,
 # we first case on the architecture; then use PROG_CC, then case on the
 # architecture again for any arch-specific features.  We also set the
 # C_DEBUG_FLAG and F77_DEBUG_FLAG in case debugging is selected.
-# 
+#
 # For the MPICH and MPICH configures, the compilers will already be
 # selected, so most of the compiler-selection code will be bypassed.
 # --------------------------------------------------------------------------
 # For historical reasons
-if test -z "$FC" ; then 
+if test -z "$FC" ; then
     FC=$F77
 fi
 #
@@ -426,7 +435,7 @@ if test "$CC" = "gcc" -a -z "$C_DEBUG_FLAG" ; then
 fi
 if test $DEBUG = "yes" ; then
     CFLAGS="$CFLAGS $C_DEBUG_FLAG"
-else 
+else
     CFLAGS="$CFLAGS $C_OPT_FLAG"
 fi
 # ---------------------------------------------------------------------------
@@ -451,14 +460,14 @@ fi
 
 PAC_GET_SPECIAL_SYSTEM_INFO
 
-AC_HAVE_FUNCS(memalign)
+AC_CHECK_FUNCS(memalign)
 
 #
-# Question: Should ROMIO under MPICH ignore the Fortran tests, since 
+# Question: Should ROMIO under MPICH ignore the Fortran tests, since
 # MPICH provides all of the Fortran interface routines?
 #
 if test $NOF77 = 0 ; then
-    echo "checking Fortran external names"
+    AC_MSG_NOTICE([checking Fortran external names])
     PAC_GET_FORTNAMES
     if test -n "$WDEF" ; then
         CFLAGS="$CFLAGS $WDEF"
@@ -470,7 +479,7 @@ if test $NOF77 = 0 ; then
         if test ! -d test ; then mkdir test ; fi
         ln -s $MPI_INCLUDE_DIR/mpif.h test
     fi
-else 
+else
     F77=":"
 fi
 #
@@ -543,7 +552,7 @@ if test "$ac_cv_sizeof_long_long" != 0 ; then
        MPI_OFFSET_KIND1="!"
        MPI_OFFSET_KIND2="!"
     else
-       echo "defining MPI_Offset as long in C and integer in Fortran" 
+       AC_MSG_NOTICE([defining MPI_Offset as long in C and integer in Fortran])
        MPI_OFFSET_TYPE="long"
        DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
        FORTRAN_MPI_OFFSET="integer"
@@ -552,7 +561,7 @@ if test "$ac_cv_sizeof_long_long" != 0 ; then
        MPI_OFFSET_KIND2="!"
     fi
 else
-    echo "defining MPI_Offset as long in C and integer in Fortran" 
+    AC_MSG_NOTICE([defining MPI_Offset as long in C and integer in Fortran])
     MPI_OFFSET_TYPE="long"
     DEFINE_MPI_OFFSET="typedef long MPI_Offset;"
     FORTRAN_MPI_OFFSET="integer"
@@ -571,7 +580,7 @@ if test -n "$ac_cv_sizeof_long_long"; then
    fi
 fi
 #
-if test -n "$OFFSET_KIND" -a "A$MPI_OFFSET_KIND1" = "A!" ; then 
+if test -n "$OFFSET_KIND" -a "A$MPI_OFFSET_KIND1" = "A!" ; then
   MPI_OFFSET_KIND1="        INTEGER MPI_OFFSET_KIND"
   MPI_OFFSET_KIND2="        PARAMETER (MPI_OFFSET_KIND=$OFFSET_KIND)"
   MPI_OFFSET_KIND_VAL=$OFFSET_KIND
@@ -636,7 +645,7 @@ else
    MPI_FINFO2="!"
    MPI_FINFO3="!"
    MPI_FINFO4="!"
-fi   
+fi
 #
 if test -n "$mpi_sgi"; then
 dnl   if test -z "$HAVE_MPI_INFO" ; then
@@ -647,8 +656,8 @@ dnl   fi
    PAC_TEST_MPI_HAVE_OFFSET_KIND
 fi
 #
-# check if darray and subarray constructors are defined in the MPI 
-# implementation 
+# check if darray and subarray constructors are defined in the MPI
+# implementation
 if test $WITHIN_KNOWN_MPI_IMPL = no ; then
    PAC_MPI_DARRAY_SUBARRAY
 fi
@@ -666,7 +675,7 @@ if test $FROM_MPICH = yes ; then
    MPI_FARRAY5="!"
    MPI_FARRAY6="!"
    MPI_FARRAY7="!"
-fi   
+fi
 
 # Check to see if weak symbols work correctly
 if test "$enable_weak_symbols" = "yes" ; then
@@ -704,7 +713,7 @@ if test "x$HAVE_WEAK_SYMBOLS" = "x0" ; then
 fi
 
 
-# weird: we have conflated "buid ROMIO's versions of the fortran bindings" and
+# weird: we have conflated "build ROMIO's versions of the fortran bindings" and
 # "build ROMIO"s fortran I/O tests". Of course the common situaiton is that we
 # are building as part of MPICH, which builds its own fortran bindings, but we
 # still want tests built
@@ -715,23 +724,23 @@ AM_CONDITIONAL([BUILD_F77_TESTS],[test "x$NOF77" != "x1"])
 #
 # Check whether the MPI Offset type is compatible with struct flock
 AC_MSG_CHECKING([whether struct flock compatible with MPI_Offset])
-AC_TRY_COMPILE([#include <fcntl.h>],
-[struct flock l;
- $MPI_OFFSET_TYPE a=1;
- l.l_start = a; 
- l.l_len   = a;
-],pac_cv_struct_flock_and_mpi_offset=yes,pac_cv_struct_flock_and_mpi_offset=no)
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <fcntl.h>]],[[
+    struct flock l;
+    $MPI_OFFSET_TYPE a=1;
+    l.l_start = a;
+    l.l_len   = a;
+    ]])],pac_cv_struct_flock_and_mpi_offset=yes,pac_cv_struct_flock_and_mpi_offset=no)
 AC_MSG_RESULT($pac_cv_struct_flock_and_mpi_offset)
 # FIXME: We should look for struct flock64 and the F_SETLK64/F_GETLK64
-# ADIOI_Set_lock could use these instead.
+# ADIOI_GEN_SetLock. could use these instead.
 if test "$pac_cv_struct_flock_and_mpi_offset" = no ; then
     AC_MSG_CHECKING([whether struct flock compatible with int])
-    AC_TRY_COMPILE([#include <fcntl.h>],
-[struct flock l;
- int a=1;
- l.l_start = a; 
- l.l_len   = a;
-],pac_cv_struct_flock_and_int=yes,pac_cv_struct_flock_and_int=no)
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <fcntl.h>]],[[
+        struct flock l;
+        int a=1;
+        l.l_start = a;
+        l.l_len   = a;
+        ]])],pac_cv_struct_flock_and_int=yes,pac_cv_struct_flock_and_int=no)
     AC_MSG_RESULT($pac_cv_struct_flock_and_int)
     if test "$pac_cv_struct_flock_and_int" = yes ; then
         AC_DEFINE(NEEDS_INT_CAST_WITH_FLOCK,1,[Define if l_start and l_len data should be cast as int])
@@ -755,15 +764,15 @@ if test -n "$FILE_SYSTEM" ; then
    # if multiple filesystems are passed in, they are '+'-delimited
    # we could set the IFS to tokenize FILE_SYSTEM, but the FILE_SYSTEM env var
    # is used in multiple places in the build system: get rid of the '+'s so we
-   # can use the 'for x in $FILE_SYSTEM ...' idiom 
-   FILE_SYSTEM=`echo $FILE_SYSTEM|sed -e 's/\+/ /g'`
+   # can use the 'for x in $FILE_SYSTEM ...' idiom
+   FILE_SYSTEM=`echo $FILE_SYSTEM|tr '+' ' '`
    for x in $FILE_SYSTEM
    do
       found=no
       # We could also do test -d "ad_$y" to test for known file systems
-      # based on having access to the adio code.  Then adding a file 
+      # based on having access to the adio code.  Then adding a file
       # system would not require changing configure to change known_filesystems
-      for y in $known_filesystems ; do 
+      for y in $known_filesystems ; do
           if test $x = $y ; then
 	      found=yes
 	      eval "file_system_`echo $x`=1"
@@ -774,6 +783,31 @@ if test -n "$FILE_SYSTEM" ; then
          AC_MSG_WARN([Unknown file system $x... proceeding anyway])
       fi
    done
+fi
+
+AC_ARG_WITH([daos],
+    [AS_HELP_STRING([--with-daos],
+	    [Build DAOS ROMIO driver[default=no]])],,
+    [with_daos=no])
+
+AS_IF([test "x$with_daos" != xno], [
+    DAOS="yes"
+    PAC_SET_HEADER_LIB_PATH(daos)
+    AC_CHECK_HEADERS(daos_types.h,, [unset DAOS])
+    AC_CHECK_HEADERS(gurt/hash.h,, [unset DAOS])
+    AC_CHECK_LIB([gurt], [d_hash_table_create],, [unset DAOS])
+    AC_CHECK_LIB([uuid], [uuid_generate],, [unset DAOS])
+    AC_CHECK_LIB([daos], [daos_init],, [unset DAOS])
+    AC_CHECK_LIB([dfs], [dfs_mount],, [unset DAOS])
+    AC_CHECK_LIB([duns], [duns_resolve_path],, [unset DAOS])
+])
+
+if test -n "$file_system_daos" ; then
+    if test "x$DAOS" == xyes ; then
+	AC_DEFINE(ROMIO_DAOS,1,[Define for ROMIO with DAOS])
+    else
+	AC_MSG_ERROR([DAOS support requested but not found (--with-daos)])
+    fi
 fi
 
 #############################################
@@ -913,32 +947,30 @@ AM_CONDITIONAL([LUSTRE_LOCKAHEAD],[test "$lustre_lockahead" = "yes"])
 if test -n "$file_system_xfs"; then
     AC_DEFINE(ROMIO_XFS,1,[Define for ROMIO with XFS])
     # Check for memalign value
-    AC_CACHE_CHECK([for memory alignment needed for direct I/O],
-    pac_cv_memalignval,
-    [
-    rm -f confmemalignval
-    rm -f /tmp/romio_tmp.bin
-    AC_TRY_RUN([
-#include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdio.h>
-int main(int argc, char **argv) { 
-	struct dioattr st;
-	int fd = open("/tmp/romio_tmp.bin", O_RDWR | O_CREAT, 0644);
-	FILE *f=fopen("confmemalignval","w");
-	if (fd == -1) exit(1);
-	if (!f) exit(1);
-	fcntl(fd, F_DIOINFO, &st);
-	fprintf( f, "%u\n", st.d_mem);
-	exit(0);
-	}
-	],
-	pac_cv_memalignval=`cat confmemalignval`,
-	pac_cv_memalignval="unknown",pac_cv_memalignval="unknown"
-    )
-    rm -f confmemalignval
-    rm -f /tmp/romio_tmp.bin
+    AC_CACHE_CHECK([for memory alignment needed for direct I/O], pac_cv_memalignval,[
+        rm -f confmemalignval
+        rm -f /tmp/romio_tmp.bin
+        AC_RUN_IFELSE([AC_LANG_SOURCE([[
+            #include <stdio.h>
+            #include <unistd.h>
+            #include <fcntl.h>
+            #include <stdio.h>
+            int main(int argc, char **argv) {
+                struct dioattr st;
+                int fd = open("/tmp/romio_tmp.bin", O_RDWR | O_CREAT, 0644);
+                FILE *f=fopen("confmemalignval","w");
+                if (fd == -1) exit(1);
+                if (!f) exit(1);
+                fcntl(fd, F_DIOINFO, &st);
+                fprintf( f, "%u\n", st.d_mem);
+                exit(0);
+            }
+            ]])],
+            pac_cv_memalignval=`cat confmemalignval`,
+            pac_cv_memalignval="unknown",pac_cv_memalignval="unknown"
+        )
+        rm -f confmemalignval
+        rm -f /tmp/romio_tmp.bin
     ])
     if test -n "$pac_cv_memalignval" -a "$pac_cv_memalignval" != 0 -a \
 	"$pac_cv_memalignval" != "unknown" ; then
@@ -956,6 +988,11 @@ if test -n "$file_system_ime"; then
         )
 fi
 
+if test -n "$file_system_quobytefs" ; then
+	AC_DEFINE(ROMIO_QUOBYTEFS,1,[Define for ROMIO with QUOBYTEFS])
+	PAC_APPEND_FLAG([-lquobyte],[LIBS])
+fi
+
 #
 # Verify presence of pvfs2.h
 #
@@ -964,7 +1001,7 @@ if test -n "$file_system_pvfs2"; then
     AC_CHECK_HEADERS(pvfs2.h,
 	AC_DEFINE(ROMIO_PVFS2,1,[Define for ROMIO with PVFS2])
 	AC_DEFINE(HAVE_PVFS2_SUPER_MAGIC, 1, [Define if PVFS2_SUPER_MAGIC defined.]),
-        AC_MSG_ERROR([PVFS2 support requested but cannot find pvfs2.h header file])                                        
+        AC_MSG_ERROR([PVFS2 support requested but cannot find pvfs2.h header file])
     )
 fi
 
@@ -974,17 +1011,16 @@ if test -n "$file_system_pvfs2"; then
         AC_LANG_SOURCE([
 #include <stdlib.h>
 #include "pvfs2.h"
-          int main(int argc, char **argv) { 
+          int main(int argc, char **argv) {
 	      PVFS_object_ref ref;
 	      PVFS_sys_attr attr;
-	      PVFS_sys_create(NULL, ref, attr, NULL, NULL, NULL, NULL); 
+	      PVFS_sys_create(NULL, ref, attr, NULL, NULL, NULL, NULL);
 	  return 0; }
        ])],
-       , AC_DEFINE(HAVE_PVFS2_CREATE_WITHOUT_LAYOUT, 1, 
+       , AC_DEFINE(HAVE_PVFS2_CREATE_WITHOUT_LAYOUT, 1,
        		[Define if PVFS_sys_create does not have layout parameter])
        )
 fi
-
 
 AS_IF([test -n "$file_system_gpfs"],
     [SYSDEP_INC=-I${prefix}/include], [SYSDEP_INC=])
@@ -1029,33 +1065,33 @@ if test "$ac_cv_header_aio_h" = "yes" -o "$ac_cv_header_sys_aio_h" = "yes" -o "x
 
     # Check that aio is available (many systems appear to have aio
     # either installed improperly or turned off).
-    # The test is the following: if not cross compiling, try to run a 
+    # The test is the following: if not cross compiling, try to run a
     # program that includes a *reference* to aio_write but does not call it
     # If the libraries are not set up correctly, then this will fail.
 
     AC_MSG_CHECKING([whether aio routines can be used])
-    # Include aio.h and the aiocb struct (since we'll need these to 
-    # actually use the aio_write interface).  Note that this will 
-    # fail for some pre-POSIX implementations of the aio interface 
+    # Include aio.h and the aiocb struct (since we'll need these to
+    # actually use the aio_write interface).  Note that this will
+    # fail for some pre-POSIX implementations of the aio interface
     # (an old IBM interface needs an fd argument as well)
-    AC_TRY_RUN([
-#include <sys/types.h>
-#ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
-#ifdef HAVE_AIO_H
-#include <aio.h>
-#endif
-#ifdef HAVE_SYS_AIO_H
-#include <sys/aio.h>
-#endif
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
+        #include <sys/types.h>
+        #ifdef HAVE_SIGNAL_H
+        #include <signal.h>
+        #endif
+        #ifdef HAVE_AIO_H
+        #include <aio.h>
+        #endif
+        #ifdef HAVE_SYS_AIO_H
+        #include <sys/aio.h>
+        #endif
 	int main(int argc, char **argv)
 	{
             struct aiocb *aiocbp;
 	    if (argc > 10) aio_write(aiocbp);
 	    return 0;
 	}
-	],
+	]])],
 	aio_runs=yes
 	AC_MSG_RESULT(yes),
 	aio_runs=no
@@ -1066,7 +1102,7 @@ if test "$ac_cv_header_aio_h" = "yes" -o "$ac_cv_header_sys_aio_h" = "yes" -o "x
     if test "$aio_runs" != "no" ; then
 	AC_DEFINE(ROMIO_HAVE_WORKING_AIO, 1, Define if AIO calls seem to work)
     fi
-    
+
     # now about that old IBM interface...
     # modern AIO interfaces have the file descriptor in the aiocb structure,
     # and will set ROMIO_HAVE_STRUCT_AIOCB_WITH_AIO_FILDES.  Old IBM
@@ -1078,17 +1114,17 @@ if test "$ac_cv_header_aio_h" = "yes" -o "$ac_cv_header_sys_aio_h" = "yes" -o "x
     # aio_read correctly
 
     AC_MSG_CHECKING([for obsolete two-argument aio_write])
-    AC_TRY_RUN([
-#include <sys/types.h>
-#ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
-#ifdef HAVE_AIO_H
-#include <aio.h>
-#endif
-#ifdef HAVE_SYS_AIO_H
-#include <sys/aio.h>
-#endif
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
+        #include <sys/types.h>
+        #ifdef HAVE_SIGNAL_H
+        #include <signal.h>
+        #endif
+        #ifdef HAVE_AIO_H
+        #include <aio.h>
+        #endif
+        #ifdef HAVE_SYS_AIO_H
+        #include <sys/aio.h>
+        #endif
 	int main(int argc, char **argv)
 	{
 		int fd;
@@ -1096,10 +1132,10 @@ if test "$ac_cv_header_aio_h" = "yes" -o "$ac_cv_header_sys_aio_h" = "yes" -o "x
 		if (argc > 10) aio_write(fd, aiocbp);
 		return 0;
 	}
-	],
+	]])],
 	aio_two_arg_write=yes
 	AC_MSG_RESULT(yes),
-	aio_two_arg_write=no 
+	aio_two_arg_write=no
 	AC_MSG_RESULT(no),
 	aio_two_arg_write=no
 	AC_MSG_RESULT(no: cannot test when cross-compiling)
@@ -1111,27 +1147,27 @@ if test "$ac_cv_header_aio_h" = "yes" -o "$ac_cv_header_sys_aio_h" = "yes" -o "x
     fi
 
     AC_MSG_CHECKING([for obsolete two-argument aio_suspend])
-    AC_TRY_RUN([
-#include <sys/types.h>
-#ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
-#ifdef HAVE_AIO_H
-#include <aio.h>
-#endif
-#ifdef HAVE_SYS_AIO_H
-#include <sys/aio.h>
-#endif
+    AC_RUN_IFELSE([AC_LANG_SOURCE([[
+        #include <sys/types.h>
+        #ifdef HAVE_SIGNAL_H
+        #include <signal.h>
+        #endif
+        #ifdef HAVE_AIO_H
+        #include <aio.h>
+        #endif
+        #ifdef HAVE_SYS_AIO_H
+        #include <sys/aio.h>
+        #endif
 	int main(int argc, char **argv)
 	{
 		struct aiocb *aiocbp;
 		if (argc > 10) aio_suspend(1, &aiocbp);
 		return 0;
 	}
-	],
+	]])],
 	aio_two_arg_suspend=yes
 	AC_MSG_RESULT(yes),
-	aio_two_arg_suspend=no 
+	aio_two_arg_suspend=no
 	AC_MSG_RESULT(no),
 	aio_two_arg_suspend=no
 	AC_MSG_RESULT(no: cannot test when cross compiling)
@@ -1189,151 +1225,44 @@ AS_CASE([$host_os],
 #
 # Check for statfs (many) and specifically f_fstypename field (BSD)
 #
-AC_CHECK_HEADERS(sys/vfs.h sys/param.h sys/mount.h sys/statvfs.h)
-AC_CHECK_FUNCS([statfs])
-AC_MSG_CHECKING([whether struct statfs properly defined])
-AC_TRY_COMPILE([
-#ifdef HAVE_SYS_VFS_H
-#include <sys/vfs.h>
-#endif
-#ifdef HAVE_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
-#ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>
-#endif
-    ],[
-    struct statfs f;
-    ],
-    pac_cv_have_statfs=yes,pac_cv_have_statfs=no
-)
-AC_MSG_RESULT($pac_cv_have_statfs)
-# At this point, we could check for whether defining 
-# __SWORD_TYPE as sizet_t or int/long (size of pointer)
-# would help.  FIXME
-
-if test "$pac_cv_have_statfs" = yes ; then
-    AC_DEFINE(HAVE_STRUCT_STATFS,1,[Define if struct statfs can be compiled])
-fi
-AC_MSG_CHECKING([for f_type member of statfs structure])
-AC_TRY_COMPILE([
-#ifdef HAVE_SYS_VFS_H
-#include <sys/vfs.h>
-#endif
-#ifdef HAVE_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
-#ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>
-#endif
-#ifdef HAVE_STRING_H
-#include <string.h>
-#endif
-    ],[
-    struct statfs f;
-    memset(&f, 0, sizeof(f));
-    f.f_type = 0;
-    ],
-    pac_cv_have_statfs_f_type=yes,
-    pac_cv_have_statfs_f_type=no
-)
-AC_MSG_RESULT($pac_cv_have_statfs_f_type)
-if test $pac_cv_have_statfs_f_type = yes ; then
-    AC_DEFINE(ROMIO_HAVE_STRUCT_STATFS_WITH_F_TYPE, 1,[Define if statfs has f_type])
-fi
+AC_CHECK_HEADERS(sys/vfs.h sys/param.h sys/mount.h sys/statvfs.h sys/stat.h sys/type.h unistd.h)
+AC_CHECK_FUNCS([statvfs statfs stat])
+# Who would imagine so many different ways to determine "what kind of file system is this?"
+# on old systems we used to check for statfs.f_fsid, but while it can be a file
+# system type identifier it is more commonly used to generate a unique "fsid,inode" tuple
+# struct statvfs.f_basetype  -- Solaris, Irix, AIX
+# struct statfs.f_fstypename -- BSD, NetBSD-3.0+, Darwin
+# struct statfs.f_type       -- Linux
+# struct stat.st_fstype      -- NEC SX4 (!!)
 
 
-AC_MSG_CHECKING([for f_fstypename member of statfs structure])
-AC_TRY_COMPILE([
-#ifdef HAVE_SYS_VFS_H
-#include <sys/vfs.h>
-#endif
-#ifdef HAVE_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
-#ifdef HAVE_SYS_MOUNT_H
-#include <sys/mount.h>
-#endif
-#ifdef HAVE_STRING_H
-#include <string.h>
-#endif
-    ],[
-    struct statfs f;
-    memset(&f, 0, sizeof(f));
-    strncmp("nfs", f.f_fstypename, 3);
-    ],
-    pac_cv_have_statfs_f_fstypename=yes,
-    pac_cv_have_statfs_f_fstypename=no
-)
-AC_MSG_RESULT($pac_cv_have_statfs_f_fstypename)
-if test $pac_cv_have_statfs_f_fstypename = yes ; then
-    AC_DEFINE(ROMIO_HAVE_STRUCT_STATFS_WITH_F_FSTYPENAME, 1,[Define if statfs has f_fstypename])
-fi
-
-#
-# Check for stat and st_fstype field (NEC SX4)
-#
-AC_CHECK_HEADERS(sys/stat.h sys/types.h unistd.h)
-AC_CHECK_FUNCS(stat,
-    AC_DEFINE(HAVE_STAT, 1, Define if stat function is present)
-    AC_MSG_CHECKING([for st_fstype member of stat structure])
-    AC_TRY_COMPILE([
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-#ifdef HAVE_SYS_STAT_H
-#include <sys/stat.h>
-#endif
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-	],[
-	struct stat s;
-
-	s.st_fstype = NULL;
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(ROMIO_HAVE_STRUCT_STAT_WITH_ST_FSTYPE, 1, Define if struct stat has a st_fstype member),
-	AC_MSG_RESULT(no)
-    )
-)
-
-#
-# Check for statvfs and f_basetype field (Solaris, Irix, AIX, etc.)
-#
-AC_CHECK_HEADERS(sys/types.h sys/statvfs.h sys/vfs.h)
-AC_CHECK_FUNCS(statvfs,
-    AC_DEFINE(HAVE_STATVFS, 1, Define if statvfs function is present)
-    AC_MSG_CHECKING([for f_basetype member of statvfs structure])
-    AC_TRY_COMPILE([
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
-#ifdef HAVE_SYS_VFS_H
-#include <sys/vfs.h>
-#endif
-#ifdef HAVE_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-	], [[
-	struct statvfs foo;
-
-	foo.f_basetype[0] = 'a';
-	]],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(ROMIO_HAVE_STRUCT_STATVFS_WITH_F_BASETYPE, 1, defined if struct statvfs has a f_basetype member),
-	AC_MSG_RESULT(no)
-    )
-)
+AC_CHECK_MEMBERS([struct statvfs.f_basetype,
+                  struct statfs.f_fstypename,
+                  struct statfs.f_type,
+                  struct stat.st_fstype],[],[],
+             AC_INCLUDES_DEFAULT
+             [#ifdef HAVE_SYS_VFS_H
+              #include <sys/vfs.h>
+              #endif
+              #ifdef HAVE_SYS_PARAM_H
+              #include <sys/param.h>
+              #endif
+              #ifdef HAVE_SYS_MOUNT_H
+              #include <sys/mount.h>
+              #endif
+              #ifdef HAVE_SYS_STATFS_H
+              #include <sys/statfs.h>
+              #endif
+              #ifdef HAVE_SYS_STAT_H
+              #include <sys/stat.h>
+              #endif
+              #ifdef HAVE_SYS_TYPE_H
+              #include <sys/type.h>
+              #endif
+              #ifdef HAVE_UNISTD_H
+              #include <unistd.h>
+              #endif
+              ])
 
 AC_CHECK_TYPE([blksize_t],[],[AC_DEFINE_UNQUOTED([blksize_t],[__blksize_t],[Provide blksize_t if not available]) ], [[
 	       #ifdef HAVE_SYS_TYPES_H
@@ -1368,9 +1297,6 @@ AC_CHECK_DECLS([pwrite])
 ####################################################################
 
 if test -n "$mpi_mpich"; then
-   if test -z "$arch_SX4" ; then
-      MPIOF_H_INCLUDED=1
-   fi
    if test "$FROM_MPICH" = no; then
       AC_DEFINE(NEEDS_MPI_TEST,1,[Define if mpi_test needed])
       AC_DEFINE(MPICH,1,[Define if using MPICH])
@@ -1393,30 +1319,30 @@ if test -z "$srcdir" -o "$srcdir" = "." ; then srcdir="$ROMIO_HOME" ; fi
 AC_SUBST(srcdir)
 
 # preserve these values across a config.status --recheck
-AC_ARG_VAR([master_top_srcdir],[set by the MPICH configure to indicate the MPICH source root])
-AC_ARG_VAR([master_top_builddir],[set by the MPICH configure to indicate the MPICH build root])
+AC_ARG_VAR([main_top_srcdir],[set by the MPICH configure to indicate the MPICH source root])
+AC_ARG_VAR([main_top_builddir],[set by the MPICH configure to indicate the MPICH build root])
 
 # The master_top_srcdir is the location of the source for the building
-# package.  This is used only as part of the MPICH build, including 
+# package.  This is used only as part of the MPICH build, including
 # the documentation targets mandoc, htmldoc, and latexdoc
-if test -z "$master_top_srcdir" ; then
+if test -z "$main_top_srcdir" ; then
     if test "$FROM_MPICH" = yes ; then
-        AC_MSG_WARN([Could not determine master_top_srcdir])
+        AC_MSG_WARN([Could not determine main_top_srcdir])
     fi
 fi
 #
-# Get the master builddir (which may be imported from above)
-if test -z "$master_top_builddir" ; then
+# Get the main builddir (which may be imported from above)
+if test -z "$main_top_builddir" ; then
     if test "$FROM_MPICH" = yes ; then
         # this variable is essential to proper build operation
-        AC_MSG_ERROR([Could not determine master_top_srcdir])
+        AC_MSG_ERROR([Could not determine main_top_srcdir])
     fi
-    master_top_builddir=`pwd`
+    main_top_builddir=`pwd`
 fi
 # Make sure the alternate spelling is used until we clean up all of the code
-master_topbuild_dir=$master_top_builddir
-export master_topbuild_dir
-AC_SUBST(master_topbuild_dir)
+main_topbuild_dir=$main_top_builddir
+export main_topbuild_dir
+AC_SUBST(main_topbuild_dir)
 
 # The following definitions are needed within adio/common/status_setb.c
 if test "$FROM_MPICH" = yes ; then
@@ -1428,14 +1354,14 @@ if test "$FROM_MPICH" = no ; then
         LIBNAME="$top_build_dir/lib/libmpio.a"
     fi
     #
-    if test ! -d $top_build_dir/lib ; then 
+    if test ! -d $top_build_dir/lib ; then
         mkdir $top_build_dir/lib
     fi
 else
     MPILIBNAME=${MPILIBNAME:-mpich}
     if test -z "$LIBNAME" ; then
-        if test -d "$master_top_builddir/lib" ; then
-            LIBNAME=$master_top_builddir/lib/lib${MPILIBNAME}.a
+        if test -d "$main_top_builddir/lib" ; then
+            LIBNAME=$main_top_builddir/lib/lib${MPILIBNAME}.a
         else
             LIBNAME="$ROMIO_HOME/lib${MPILIBNAME}.a"
 	fi
@@ -1460,7 +1386,7 @@ AC_SUBST(DOCTEXT)
 if test $NOF77 = 1 ; then
    F77=":"
 else
-   FORTRAN_TEST="fperf fcoll_test fmisc pfcoll_test" 
+   FORTRAN_TEST="fperf fcoll_test fmisc pfcoll_test"
 fi
 #
 if test $WITHIN_KNOWN_MPI_IMPL = no ; then
@@ -1472,7 +1398,7 @@ fi
 #
 if test "$MPI_INCLUDE_DIR" = "." ; then
    ROMIO_INCLUDE="-I../include"
-else 
+else
    ROMIO_INCLUDE="-I../include -I$MPI_INCLUDE_DIR"
 fi
 #
@@ -1512,16 +1438,16 @@ elif test $FROM_MPICH = yes ; then
    # CC="$CC -I${use_top_srcdir}/src/include -I${top_build_dir}/src/include"
    # TEST_CC="$CC"
    # MPI_LIB="$LIBNAME"
-   # To allow ROMIO to work with the LIBTOOL scripts, we want to 
+   # To allow ROMIO to work with the LIBTOOL scripts, we want to
    # work directly with the CC, not the mpicc, compiler.
    # Note that in the "FROM_MPICH" case, the CPPFLAGS and INCLUDES are already
    # properly set
    #CC=${top_build_dir}/bin/mpicc
    #
-   # set the compilers to the ones in MPICH bin directory (master_top_builddir/bin)
+   # set the compilers to the ones in MPICH bin directory (main_top_builddir/bin)
    TEST_CC='$(bindir)/mpicc'
    TEST_F77='$(bindir)/mpifort'
-   MPI_H_INCLUDE="-I${master_top_builddir}/src/include"
+   MPI_H_INCLUDE="-I${main_top_builddir}/src/include -I${main_top_srcdir}/src/include"
    ROMIO_INCLUDE=""
    USER_CFLAGS=""
    USER_FFLAGS=""
@@ -1538,6 +1464,7 @@ elif test $FROM_MPICH = yes ; then
    AC_DEFINE(HAVE_MPI_TYPE_SIZE_X, 1, [Define if MPI library provides MPI_TYPE_SIZE_X])
    AC_DEFINE(HAVE_MPI_STATUS_SET_ELEMENTS_X, 1, [Define if MPI library provides MPI_STATUS_SET_ELEMENTS_X])
    AC_DEFINE(HAVE_DECL_MPI_COMBINER_HINDEXED_BLOCK, 1, [Define if MPI library provides HINDEXED_BLOCK datatype])
+   AC_DEFINE(HAVE_MPIX_TYPE_IOV, 1, [Define if MPI library provides MPIX_Type_iov and MPIX_Type_iov_len])
 fi
 #
 #
@@ -1548,8 +1475,10 @@ if test $WITHIN_KNOWN_MPI_IMPL = no ; then
    PAC_TEST_MPIR_STATUS_SET_BYTES
    PAC_TEST_MPI_GREQUEST
    AC_DEFINE(PRINT_ERR_MSG,1,[Define for printing error messages])
-   AC_CHECK_TYPE([MPI_Count],[],[AC_DEFINE_UNQUOTED([MPI_Count],[MPI_Aint],[Define to "MPI_Aint" if MPI does not provide MPI_Count]) ], [[#include <mpi.h>]])
-   PAC_TEST_NEEDS_CONST
+   AC_CHECK_TYPE([MPI_Count],[],
+                 [AC_DEFINE_UNQUOTED([MPI_Count],[MPI_Aint],
+                 [Define to "MPI_Aint" if MPI does not provide MPI_Count])],
+                 [[#include <mpi.h>]])
    AC_CHECK_DECLS([MPI_COMBINER_HINDEXED_BLOCK], [], [], [[#include <mpi.h>]])
    AC_CHECK_FUNCS(MPI_Type_size_x MPI_Status_set_elements_x)
 fi
@@ -1642,13 +1571,7 @@ AC_SUBST(FILE_SYS_DIRS)
 CFLAGS="$CFLAGS -DHAVE_ROMIOCONF_H"
 #
 
-if test -n "$MPIOF_H_INCLUDED"; then
-   F77MPIOINC=""
-else 
-   F77MPIOINC="include 'mpiof.h'"
-fi
-
-echo "setting SYSDEP_INC to $SYSDEP_INC"
+AC_MSG_NOTICE([setting SYSDEP_INC to $SYSDEP_INC])
 AC_SUBST(SYSDEP_INC)
 
 AC_C_RESTRICT
@@ -1657,13 +1580,13 @@ PAC_C_GNU_ATTRIBUTE
 # support gcov test coverage information
 PAC_ENABLE_COVERAGE
 
-echo "setting CC to $CC"
-echo "setting F77 to $F77"
-echo "setting TEST_CC to $TEST_CC"
-echo "setting TEST_F77 to $TEST_F77"
-echo "setting CFLAGS to $CFLAGS"
-echo "setting USER_CFLAGS to $USER_CFLAGS"
-echo "setting USER_FFLAGS to $USER_FFLAGS"
+AC_MSG_NOTICE([setting CC to $CC])
+AC_MSG_NOTICE([setting F77 to $F77])
+AC_MSG_NOTICE([setting TEST_CC to $TEST_CC])
+AC_MSG_NOTICE([setting TEST_F77 to $TEST_F77])
+AC_MSG_NOTICE([setting CFLAGS to $CFLAGS])
+AC_MSG_NOTICE([setting USER_CFLAGS to $USER_CFLAGS])
+AC_MSG_NOTICE([setting USER_FFLAGS to $USER_FFLAGS])
 
 AC_SUBST(ARCH)
 AC_SUBST(FILE_SYSTEM)
@@ -1689,8 +1612,6 @@ AC_SUBST(TEST_LIBNAME)
 AC_SUBST(LL)
 AC_SUBST(F77GETARG)
 AC_SUBST(F77IARGC)
-AC_SUBST(F77MPIOINC)
-AC_SUBST(FTESTDEFINE)
 AC_SUBST(FORTRAN_MPI_OFFSET)
 AC_SUBST(FROM_MPICH)
 AC_SUBST(FROM_LAM)
@@ -1744,9 +1665,9 @@ if test ! -d mpi2-other ; then mkdir mpi2-other ; fi
 if test ! -d mpi-io ; then mkdir mpi-io ; fi
 if test ! -d mpi-io/glue ; then mkdir mpi-io/glue ; fi
 
-# Create makefiles for all of the adio devices.  Only the ones that 
+# Create makefiles for all of the adio devices.  Only the ones that
 # are active will be called by the top level ROMIO make
-AC_OUTPUT_COMMANDS([chmod 755 util/romioinstall test/runtests])
+AC_CONFIG_COMMANDS([chmod], [chmod 755 util/romioinstall test/runtests])
 AC_CONFIG_FILES([
     Makefile
     localdefs

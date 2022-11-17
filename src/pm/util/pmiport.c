@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpichconf.h"
@@ -87,6 +86,7 @@ typedef unsigned int socklen_t;
 int PMIServGetPort(int *fdout, char *portString, int portLen)
 {
     int fd = -1;
+    /* FIXME: delay IPv6 fix (mpl_sockaddr.c) until the redundancy with pm/hydra/utils/sock/sock.c is resolved. */
     struct sockaddr_in sa;
     int optval = 1;
     int portnum;

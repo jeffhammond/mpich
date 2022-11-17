@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -18,7 +17,7 @@ int main(int argc, char **argv)
     int i, isleft;
     MPI_Comm test_comm, new_comm[ITERS];
     int in[ITERS], out[ITERS], sol;
-    int rank, size, rsize, rrank;
+    int rank, size, rsize;
     MPI_Request sreq[ITERS * 2];
     int root;
 

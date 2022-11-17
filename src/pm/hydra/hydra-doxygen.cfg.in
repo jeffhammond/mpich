@@ -278,10 +278,10 @@ TYPEDEF_HIDES_STRUCT   = YES
 # For small to medium size projects (<1000 input files) the default value is
 # probably good enough. For larger projects a too small cache size can cause
 # doxygen to be busy swapping symbols to and from disk most of the time
-# causing a significant performance penality.
+# causing a significant performance penalty.
 # If the system has enough physical memory increasing the cache will improve the
 # performance by keeping more symbols in memory. Note that the value works on
-# a logarithmic scale so increasing the size by one will rougly double the
+# a logarithmic scale so increasing the size by one will roughly double the
 # memory usage. The cache size is given by this formula:
 # 2^(16+SYMBOL_CACHE_SIZE). The valid range is 0..9, the default is 0,
 # corresponding to a cache size of 2^16 = 65536 symbols
@@ -570,7 +570,6 @@ WARN_LOGFILE           =
 
 INPUT                  = @top_srcdir@/tools/bind/bind.h \
 		       @top_srcdir@/tools/bootstrap/include/bsci.h.in \
-		       @top_srcdir@/tools/ckpoint/ckpoint.h \
 		       @top_srcdir@/tools/rmk/include/rmki.h.in \
 		       @top_srcdir@/pm/include/pmci.h
 
@@ -863,7 +862,7 @@ HHC_LOCATION           =
 
 # If the GENERATE_HTMLHELP tag is set to YES, the GENERATE_CHI flag
 # controls if a separate .chi index file is generated (YES) or that
-# it should be included in the master .chm file (NO).
+# it should be included in the main .chm file (NO).
 
 GENERATE_CHI           = NO
 

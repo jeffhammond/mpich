@@ -1,16 +1,21 @@
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 #include <mpi.h>
 #include <stdio.h>
 #include "mpitest.h"
 
 int main(int argc, char *argv[])
 {
-    int rank, size;
+    int rank;
     int errclass, errs = 0, mpi_errno;
 
     MTest_Init(&argc, &argv);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     /*test comm_size for NULL variable */
     mpi_errno = MPI_Comm_size(MPI_COMM_WORLD, NULL);

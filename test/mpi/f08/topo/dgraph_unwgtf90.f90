@@ -1,8 +1,8 @@
-! -*- Mode: Fortran; -*-
 !
-!  (C) 2011 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
 !
+
 !     This program is Fortran version of dgraph_unwgt.c
 !     Specify a distributed graph of a bidirectional ring of the MPI_COMM_WORLD,
 !     i.e. everyone only talks to left and right neighbors.
@@ -151,7 +151,7 @@
 
 ! now create one with MPI_WEIGHTS_EMPTY
 ! NOTE that MPI_WEIGHTS_EMPTY was added in MPI-3 and does not
-! appear before then.  Incluing this test means that this test cannot
+! appear before then.  Including this test means that this test cannot
 ! be compiled if the MPI version is less than 3 (see the testlist file)
 
       degs(1) = 0;

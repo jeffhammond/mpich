@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include "mpitest.h"
@@ -24,7 +24,7 @@ void addem(int *invec, int *inoutvec, int *len, MPI_Datatype * dtype)
     (see 4.9.4).  The order is important.
 
     Note that the computation is in process rank (in the communicator)
-    order, independant of the root.
+    order, independent of the root.
  */
 void assoc(int *invec, int *inoutvec, int *len, MPI_Datatype * dtype)
 {

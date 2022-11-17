@@ -1,13 +1,19 @@
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpi.h"
 #include "mpitest.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef OP_LARGE
+#define COUNT_TYPE MPI_Count
+#define MPI_Op_create MPI_Op_create_c
+#else
+#define COUNT_TYPE int
+#endif
 
 /*
  * Test user-defined operations with a large number of elements.
@@ -18,13 +24,13 @@
 #define MAX_ERRS 10
 #define MAX_COUNT 1200000
 
-void myop(void *cinPtr, void *coutPtr, int *count, MPI_Datatype * dtype);
+void myop(void *cinPtr, void *coutPtr, COUNT_TYPE * count, MPI_Datatype * dtype);
 
 /*
  * myop takes a datatype that is a triple of doubles, and computes
  * the sum, max, min of the respective elements of the triple.
  */
-void myop(void *cinPtr, void *coutPtr, int *count, MPI_Datatype * dtype)
+void myop(void *cinPtr, void *coutPtr, COUNT_TYPE * count, MPI_Datatype * dtype)
 {
     int i, n = *count;
     double const *cin = (double *) cinPtr;

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdlib.h>
@@ -22,7 +21,7 @@
 
 int main(int argc, char *argv[])
 {
-    int rank, size, i, type_size;
+    int rank, size, type_size;
     int errs = 0;
 
     MPI_Init(&argc, &argv);

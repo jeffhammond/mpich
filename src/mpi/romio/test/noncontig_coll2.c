@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <string.h>
@@ -14,10 +14,13 @@
  *
  * . generalized file writing/reading to handle arbitrary number of processors
  * . provides the "cb_config_list" hint with several permutations of the
- *   avaliable processors.
+ *   available processors.
  *   [ makes use of code copied from ROMIO's ADIO code to collect the names of
  *   the processors ]
  */
+
+
+#define MPI_CHECK(fn) { int _errcode; _errcode = (fn); if (_errcode != MPI_SUCCESS) handle_error(_errcode, #fn); }
 
 /* we are going to muck with this later to make it evenly divisible by however many compute nodes we have */
 #define STARTING_SIZE 5000
@@ -390,7 +393,7 @@ int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char 
     t[1] = typevec;
     t[2] = MPI_UB;
 
-    MPI_Type_struct(3, b, d, t, &newtype);
+    MPI_Type_create_struct(3, b, d, t, &newtype);
     MPI_Type_commit(&newtype);
     MPI_Type_free(&typevec);
 
@@ -407,7 +410,7 @@ int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char 
         handle_error(errcode, "MPI_File_open");
     }
 
-    MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", info);
+    MPI_CHECK(MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", info));
 
     for (i = 0; i < SIZE; i++)
         buf[i] = SEEDER(mynod, i, SIZE);
@@ -457,7 +460,7 @@ int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char 
             errors++;
         }
     }
-    MPI_File_close(&fh);
+    MPI_CHECK(MPI_File_close(&fh));
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -469,7 +472,7 @@ int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char 
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, info, &fh);
+    MPI_CHECK(MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, info, &fh));
 
     for (i = 0; i < SIZE; i++)
         buf[i] = SEEDER(mynod, i, SIZE);
@@ -510,7 +513,7 @@ int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char 
         }
     }
 
-    MPI_File_close(&fh);
+    MPI_CHECK(MPI_File_close(&fh));
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -522,9 +525,9 @@ int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char 
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, info, &fh);
+    MPI_CHECK(MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, info, &fh));
 
-    MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", info);
+    MPI_CHECK(MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", info));
 
     for (i = 0; i < SIZE; i++)
         buf[i] = SEEDER(mynod, i, SIZE);
@@ -551,7 +554,12 @@ int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char 
         }
     }
 
-    MPI_File_close(&fh);
+    MPI_CHECK(MPI_File_close(&fh));
+
+    /* delete the file */
+    if (!mynod)
+        MPI_File_delete(filename, info);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     MPI_Type_free(&newtype);
     free(buf);

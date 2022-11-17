@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     int errs = 0;
     int wrank, wsize;
     int periods[1] = { 0 };
-    MPI_Comm cart, dgraph, graph;
+    MPI_Comm cart;
     int sendbuf[2];
     int recvbuf[2] = { 0xdeadbeef, 0xdeadbeef };
     int sendcounts[2] = { 1, 1 };

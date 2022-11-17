@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2013 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test is adapted from test/mpi/mpi_t/mpit_vars.c.
@@ -28,11 +27,12 @@ const int NTHREADS = 8;
 static int verbose = 0;
 #define DOPRINT (verbose && myThreadId == 0)
 
-char *mpit_scopeToStr(int scope);
-char *mpit_bindingToStr(int binding);
-char *mpit_validDtypeStr(MPI_Datatype datatype);
-char *mpit_varclassToStr(int varClass);
-char *mpit_verbosityToStr(int verbosity);
+const char *mpit_scopeToStr(int scope);
+const char *mpit_bindingToStr(int binding);
+const char *mpit_validDtypeStr(MPI_Datatype datatype);
+const char *mpit_varclassToStr(int varClass);
+const char *mpit_verbosityToStr(int verbosity);
+const char *mpit_errclassToStr(int err);
 int perfvarReadInt(int pvarIndex, int isContinuous, int *found);
 unsigned int perfvarReadUint(int pvarIndex, int isContinuous, int *found);
 double perfvarReadDouble(int pvarIndex, int isContinuous, int *found);
@@ -40,7 +40,7 @@ int PrintControlVars(FILE * fp, int myThreadId);
 int PrintPerfVars(FILE * fp, int myThreadId);
 int PrintCategories(FILE * fp, int myThreadId);
 
-MTEST_THREAD_RETURN_TYPE RunTest(void *p)
+static MTEST_THREAD_RETURN_TYPE RunTest(void *p)
 {
     int myThreadId = (int) (long) p;
 
@@ -292,9 +292,9 @@ int PrintCategories(FILE * fp, int myThreadId)
 
 /* --- Support routines --- */
 
-char *mpit_validDtypeStr(MPI_Datatype datatype)
+const char *mpit_validDtypeStr(MPI_Datatype datatype)
 {
-    char *p = 0;
+    const char *p = 0;
     if (datatype == MPI_INT)
         p = "MPI_INT";
     else if (datatype == MPI_UNSIGNED)
@@ -325,9 +325,9 @@ char *mpit_validDtypeStr(MPI_Datatype datatype)
     return p;
 }
 
-char *mpit_scopeToStr(int scope)
+const char *mpit_scopeToStr(int scope)
 {
-    char *p = 0;
+    const char *p = 0;
     switch (scope) {
         case MPI_T_SCOPE_CONSTANT:
             p = "SCOPE_CONSTANT";
@@ -351,15 +351,15 @@ char *mpit_scopeToStr(int scope)
             p = "SCOPE_ALL_EQ";
             break;
         default:
-            p = "Unrecoginized scope";
+            p = "Unrecognized scope";
             break;
     }
     return p;
 }
 
-char *mpit_bindingToStr(int binding)
+const char *mpit_bindingToStr(int binding)
 {
-    char *p;
+    const char *p;
     switch (binding) {
         case MPI_T_BIND_NO_OBJECT:
             p = "NO_OBJECT";
@@ -400,9 +400,9 @@ char *mpit_bindingToStr(int binding)
     return p;
 }
 
-char *mpit_varclassToStr(int varClass)
+const char *mpit_varclassToStr(int varClass)
 {
-    char *p = 0;
+    const char *p = 0;
     switch (varClass) {
         case MPI_T_PVAR_CLASS_STATE:
             p = "CLASS_STATE";
@@ -441,9 +441,9 @@ char *mpit_varclassToStr(int varClass)
     return p;
 }
 
-char *mpit_verbosityToStr(int verbosity)
+const char *mpit_verbosityToStr(int verbosity)
 {
-    char *p = 0;
+    const char *p = 0;
     switch (verbosity) {
         case MPI_T_VERBOSITY_USER_BASIC:
             p = "VERBOSITY_USER_BASIC";
@@ -479,9 +479,9 @@ char *mpit_verbosityToStr(int verbosity)
     return p;
 }
 
-char *mpit_errclassToStr(int err)
+const char *mpit_errclassToStr(int err)
 {
-    char *p = 0;
+    const char *p = 0;
     switch (err) {
         case MPI_T_ERR_MEMORY:
             p = "ERR_MEMORY";
@@ -494,9 +494,6 @@ char *mpit_errclassToStr(int err)
             break;
         case MPI_T_ERR_INVALID_INDEX:
             p = "ERR_INVALID_INDEX";
-            break;
-        case MPI_T_ERR_INVALID_ITEM:
-            p = "ERR_INVALID_ITEM";
             break;
         case MPI_T_ERR_INVALID_HANDLE:
             p = "ERR_INVALID_HANDLE";

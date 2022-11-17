@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -29,15 +27,11 @@
  * block (when there are only a few isend/irecvs left).
  */
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Alltoall_intra_scattered
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Alltoall_intra_scattered(const void *sendbuf,
-                                  int sendcount,
+                                  MPI_Aint sendcount,
                                   MPI_Datatype sendtype,
                                   void *recvbuf,
-                                  int recvcount,
+                                  MPI_Aint recvcount,
                                   MPI_Datatype recvtype,
                                   MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
@@ -48,9 +42,6 @@ int MPIR_Alltoall_intra_scattered(const void *sendbuf,
     MPIR_Request **reqarray;
     MPI_Status *starray;
     MPIR_CHKLMEM_DECL(6);
-
-    if (recvcount == 0)
-        return MPI_SUCCESS;
 
     comm_size = comm_ptr->local_size;
     rank = comm_ptr->rank;
@@ -83,8 +74,7 @@ int MPIR_Alltoall_intra_scattered(const void *sendbuf,
                                    dst * recvcount * recvtype_extent,
                                    recvcount, recvtype, dst,
                                    MPIR_ALLTOALL_TAG, comm_ptr, &reqarray[i]);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
         }
 
         for (i = 0; i < ss; i++) {
@@ -93,8 +83,7 @@ int MPIR_Alltoall_intra_scattered(const void *sendbuf,
                                    dst * sendcount * sendtype_extent,
                                    sendcount, sendtype, dst,
                                    MPIR_ALLTOALL_TAG, comm_ptr, &reqarray[i + ss], errflag);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
         }
 
         /* ... then wait for them to finish: */

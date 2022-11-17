@@ -1,10 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
-#include "mpiimpl.h"
 #include "cdesc.h"
 
 int MPIR_Comm_spawn_c(const char *command, char *argv_f, int maxprocs, MPI_Info info, int root,
@@ -27,7 +25,7 @@ int MPIR_Comm_spawn_c(const char *command, char *argv_f, int maxprocs, MPI_Info 
         PMPI_Comm_spawn(command, argv_c, maxprocs, info, root, comm, intercomm, array_of_errcodes);
 
     if (argv_c != MPI_ARGV_NULL) {
-        MPL_free(argv_c);
+        free(argv_c);
     }
 
   fn_exit:

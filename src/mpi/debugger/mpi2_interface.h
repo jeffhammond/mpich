@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2007 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 /*
  * Prototype of the MPI2 debugger interface
  */
@@ -41,7 +41,7 @@ typedef unsigned char MPI2DD_BYTE_T;
 #define MPI2DD_MPIFLAG_PARTIAL_ATTACH_OK 0x40
 
 /* These structures are defined so that the debugger can find items
-   easily, even in the absense of detailed symbol table information,
+   easily, even in the absence of detailed symbol table information,
    since the layout is fixed. */
 
 typedef struct MPI2DD_PROCDESC {

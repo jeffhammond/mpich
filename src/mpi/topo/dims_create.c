@@ -1,18 +1,10 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
 
-/*
- * This CVAR is used for debugging support.  An alternative would be
- * to use the MPIU_DBG interface, which predates the CVAR interface,
- * and also provides different levels of debugging support.  In the
- * long run, the MPIU_DBG interface should be updated to make use of
- * CVARs.
- */
 /*
 === BEGIN_MPI_T_CVAR_INFO_BLOCK ===
 
@@ -35,62 +27,24 @@ cvars:
 === END_MPI_T_CVAR_INFO_BLOCK ===
 */
 
-/* -- Begin Profiling Symbol Block for routine MPI_Dims_create */
-#if defined(HAVE_PRAGMA_WEAK)
-#pragma weak MPI_Dims_create = PMPI_Dims_create
-#elif defined(HAVE_PRAGMA_HP_SEC_DEF)
-#pragma _HP_SECONDARY_DEF PMPI_Dims_create  MPI_Dims_create
-#elif defined(HAVE_PRAGMA_CRI_DUP)
-#pragma _CRI duplicate MPI_Dims_create as PMPI_Dims_create
-#elif defined(HAVE_WEAK_ATTRIBUTE)
-int MPI_Dims_create(int nnodes, int ndims, int dims[])
-    __attribute__ ((weak, alias("PMPI_Dims_create")));
-#endif
-/* -- End Profiling Symbol Block */
+static MPIR_T_pvar_timer_t PVAR_TIMER_dims_getdivs;
+static MPIR_T_pvar_timer_t PVAR_TIMER_dims_sort;
+static MPIR_T_pvar_timer_t PVAR_TIMER_dims_fact;
+static MPIR_T_pvar_timer_t PVAR_TIMER_dims_basefact;
+static MPIR_T_pvar_timer_t PVAR_TIMER_dims_div;
+static MPIR_T_pvar_timer_t PVAR_TIMER_dims_bal;
 
-
-
-/* Because we store factors with their multiplicities, a small array can
-   store all of the factors for a large number (grows *faster* than n
-   factorial). */
-#define MAX_FACTORS 10
-/* 2^20 is a millon */
-#define MAX_DIMS    20
-
-typedef struct Factors {
-    int val, cnt;
-} Factors;
-
-/* These routines may be global if we are not using weak symbols */
-PMPI_LOCAL int MPIR_Dims_create_init(void);
-PMPI_LOCAL int MPIR_Dims_create_impl(int nnodes, int ndims, int dims[]);
-
-/* Define MPICH_MPI_FROM_PMPI if weak symbols are not supported to build
-   the MPI routines.  You can use USE_WEAK_SYMBOLS to see if MPICH is
-   using weak symbols to implement the MPI routines. */
-
-#ifndef MPICH_MPI_FROM_PMPI
-#undef MPI_Dims_create
-#define MPI_Dims_create PMPI_Dims_create
-
-PMPI_LOCAL MPIR_T_pvar_timer_t PVAR_TIMER_dims_getdivs;
-PMPI_LOCAL MPIR_T_pvar_timer_t PVAR_TIMER_dims_sort;
-PMPI_LOCAL MPIR_T_pvar_timer_t PVAR_TIMER_dims_fact;
-PMPI_LOCAL MPIR_T_pvar_timer_t PVAR_TIMER_dims_basefact;
-PMPI_LOCAL MPIR_T_pvar_timer_t PVAR_TIMER_dims_div;
-PMPI_LOCAL MPIR_T_pvar_timer_t PVAR_TIMER_dims_bal;
-
-PMPI_LOCAL unsigned long long PVAR_COUNTER_dims_npruned;
-PMPI_LOCAL unsigned long long PVAR_COUNTER_dims_ndivmade;
-PMPI_LOCAL unsigned long long PVAR_COUNTER_dims_optbalcalls;
+static unsigned long long PVAR_COUNTER_dims_npruned;
+static unsigned long long PVAR_COUNTER_dims_ndivmade;
+static unsigned long long PVAR_COUNTER_dims_optbalcalls;
 
 /* MPI_Dims_create and PMPI_Dims_create must see the same variable for this
    one-time initialization flag.  If this file must be compiled twice,
    this variable is defined here and as external for the other build. */
-volatile int MPIR_DIMS_initPCVars = 1;
+static volatile int MPIR_DIMS_initPCVars = 1;
 
 /* This routine is called once to define any PVARS and CVARS */
-PMPI_LOCAL int MPIR_Dims_create_init(void)
+static int MPIR_Dims_create_init(void)
 {
 
     MPIR_T_PVAR_TIMER_REGISTER_STATIC(DIMS,
@@ -154,6 +108,17 @@ PMPI_LOCAL int MPIR_Dims_create_init(void)
    which will significantly reduce the number of elements included here.
 */
 #include "primes.h"
+
+/* Because we store factors with their multiplicities, a small array can
+   store all of the factors for a large number (grows *faster* than n
+   factorial). */
+#define MAX_FACTORS 10
+/* 2^20 is a million */
+#define MAX_DIMS    20
+
+typedef struct Factors {
+    int val, cnt;
+} Factors;
 
 /* Local only routines.  These should *not* have standard prefix */
 static int factor_num(int, Factors[], int *);
@@ -257,8 +222,6 @@ static int ndivisors_from_factor(int nf, const Factors * factors)
     return ndiv;
 }
 
-#undef FCNAME
-#define FCNAME "factor_to_divisors"
 static int factor_to_divisors(int nf, Factors * factors, int ndiv, int divs[])
 {
     int i, powers[MAX_FACTORS], curbase[MAX_FACTORS], nd, idx, val, mpi_errno;
@@ -371,7 +334,7 @@ static int factor_to_divisors(int nf, Factors * factors, int ndiv, int divs[])
  *
  * First, distribute factors to dims[0..nd-1].  The purpose is to get the
  * initial factors set and to ensure that the smallest dimension is > 1.
- * Second, distibute the remaining factors, starting with the largest, to
+ * Second, distribute the remaining factors, starting with the largest, to
  * the elements of dims with the smallest index i such that
  *   dims[i-1] > dims[i]*val
  * or to dims[0] if no i satisfies.
@@ -413,9 +376,6 @@ static void factor_to_dims_by_rr(int nf, Factors f[], int nd, int dims[])
    values are known.  Then pass in the entire array.  This is needed
    to get the correct values for "ties" between the first and last values.
  */
-#undef FC_NAME
-#define FC_NAME "optbalance"
-
 static int optbalance(int n, int idx, int nd, int ndivs, const int divs[],
                       int trydims[], int *curbal_p, int optdims[])
 {
@@ -436,8 +396,6 @@ static int optbalance(int n, int idx, int nd, int ndivs, const int divs[],
         MPIR_CHKLMEM_DECL(1);
         int *newdivs;
         MPIR_CHKLMEM_MALLOC(newdivs, int *, ndivs * sizeof(int), mpi_errno, "divs", MPL_MEM_COMM);
-        if (mpi_errno)
-            return mpi_errno;
 
         /* At least 3 divisors to set (0...idx).  We try all choices
          * recursively, but stop looking when we can easily tell that
@@ -466,8 +424,11 @@ static int optbalance(int n, int idx, int nd, int ndivs, const int divs[],
             if (q % f == 0) {
                 newdivs[nndivs++] = f;
                 sf = f;
-            } else {
+            } else if (k + 1 < ndivs) {
                 sf = divs[k + 1];
+            } else {
+                /* run out of next factors, bail out */
+                break;
             }
             if (idx < nd - 1 && sf - min > curbal) {
                 MPIR_T_PVAR_COUNTER_INC(DIMS, dims_npruned, 1);
@@ -508,8 +469,10 @@ static int optbalance(int n, int idx, int nd, int ndivs, const int divs[],
             }
             MPIR_T_PVAR_TIMER_END(DIMS, dims_div);
             /* recursively try to find the best subset */
-            if (nndivs > 0)
-                optbalance(q, idx - 1, nd, nndivs, newdivs, trydims, curbal_p, optdims);
+            if (nndivs > 0) {
+                mpi_errno = optbalance(q, idx - 1, nd, nndivs, newdivs, trydims, curbal_p, optdims);
+                MPIR_ERR_CHECK(mpi_errno);
+            }
         }
         MPIR_CHKLMEM_FREEALL();
     } else if (idx == 1) {
@@ -537,7 +500,7 @@ static int optbalance(int n, int idx, int nd, int ndivs, const int divs[],
             }
             /* No valid solution.  Exit without changing current optdims */
             MPIR_T_PVAR_COUNTER_INC(DIMS, dims_npruned, 1);
-            return 0;
+            goto fn_exit;
         }
         if (MPIR_CVAR_DIMS_VERBOSE) {
             MPL_msg_printf("Found best factors %d,%d, from divs[%d]\n", q, f, k - 1);
@@ -571,10 +534,13 @@ static int optbalance(int n, int idx, int nd, int ndivs, const int divs[],
             *curbal_p = n - min;
         }
     }
-    return 0;
-  fn_fail:
+
+  fn_exit:
     return mpi_errno;
+  fn_fail:
+    goto fn_exit;
 }
+
 
 
 /* FIXME: The error checking should really be part of MPI_Dims_create,
@@ -583,7 +549,7 @@ static int optbalance(int n, int idx, int nd, int ndivs, const int divs[],
    removing the need to check for errors */
 
 
-PMPI_LOCAL int MPIR_Dims_create_impl(int nnodes, int ndims, int dims[])
+int MPIR_Dims_create_impl(int nnodes, int ndims, int dims[])
 {
     Factors f[MAX_FACTORS];
     int nf, nprimes = 0, i, j, k, val, nextidx;
@@ -593,6 +559,17 @@ PMPI_LOCAL int MPIR_Dims_create_impl(int nnodes, int ndims, int dims[])
     int chosen[MAX_DIMS], foundDecomp;
     int *divs;
     MPIR_CHKLMEM_DECL(1);
+
+    /* Initialize pvars and cvars if this is the first call */
+    if (MPIR_DIMS_initPCVars) {
+        MPIR_Dims_create_init();
+        MPIR_DIMS_initPCVars = 0;
+    }
+
+    if (MPIR_Process.dimsCreate != NULL) {
+        mpi_errno = MPIR_Process.dimsCreate(nnodes, ndims, dims);
+        goto fn_exit;
+    }
 
     /* Find the number of unspecified dimensions in dims and the product
      * of the positive values in dims */
@@ -803,10 +780,11 @@ PMPI_LOCAL int MPIR_Dims_create_impl(int nnodes, int ndims, int dims[])
             MPL_msg_printf("%d%c", chosen[i], (i + 1 < dims_needed) ? 'x' : '\n');
     }
     MPIR_T_PVAR_TIMER_START(DIMS, dims_bal);
-    optbalance(nnodes, dims_needed - nextidx - 1, dims_needed - nextidx,
-               ndivs, divs, trydims, &curbal, chosen + nextidx);
+    mpi_errno = optbalance(nnodes, dims_needed - nextidx - 1, dims_needed - nextidx,
+                           ndivs, divs, trydims, &curbal, chosen + nextidx);
     MPIR_T_PVAR_TIMER_END(DIMS, dims_bal);
     MPIR_CHKLMEM_FREEALL();
+    MPIR_ERR_CHECK(mpi_errno);
 
     if (MPIR_CVAR_DIMS_VERBOSE) {
         MPL_msg_printf("N: final decomp is: ");
@@ -821,97 +799,8 @@ PMPI_LOCAL int MPIR_Dims_create_impl(int nnodes, int ndims, int dims[])
         }
     }
 
-    return MPI_SUCCESS;
-  fn_fail:
-    return mpi_errno;
-}
-
-#else
-/* MPI_Dims_create and PMPI_Dims_create must see the same variable for this
-   one-time initialization flag */
-extern volatile int MPIR_DIMS_initPCVars;
-
-#endif /* PMPI Local */
-
-#undef FUNCNAME
-#define FUNCNAME MPI_Dims_create
-#undef FCNAME
-#define FCNAME "MPI_Dims_create"
-
-/*@
-    MPI_Dims_create - Creates a division of processors in a cartesian grid
-
-Input Parameters:
-+ nnodes - number of nodes in a grid (integer)
-- ndims - number of cartesian dimensions (integer)
-
-Input/Output Parameters:
-. dims - integer array of size  'ndims' specifying the number of nodes in each
- dimension.  A value of 0 indicates that 'MPI_Dims_create' should fill in a
- suitable value.
-
-.N ThreadSafe
-
-.N Fortran
-
-.N Errors
-.N MPI_SUCCESS
-@*/
-int MPI_Dims_create(int nnodes, int ndims, int dims[])
-{
-    int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_TERSE_STATE_DECL(MPID_STATE_MPI_DIMS_CREATE);
-
-    MPIR_ERRTEST_INITIALIZED_ORDIE();
-    MPIR_FUNC_TERSE_ENTER(MPID_STATE_MPI_DIMS_CREATE);
-
-    if (ndims == 0)
-        goto fn_exit;
-
-    /* Validate parameters and objects (post conversion) */
-#ifdef HAVE_ERROR_CHECKING
-    {
-        MPID_BEGIN_ERROR_CHECKS;
-        {
-            MPIR_ERRTEST_ARGNEG(nnodes, "nnodes", mpi_errno);
-            MPIR_ERRTEST_ARGNEG(ndims, "ndims", mpi_errno);
-            MPIR_ERRTEST_ARGNULL(dims, "dims", mpi_errno);
-        }
-        MPID_END_ERROR_CHECKS;
-    }
-#endif /* HAVE_ERROR_CHECKING */
-
-    /* Initialize pvars and cvars if this is the first call */
-    if (MPIR_DIMS_initPCVars) {
-        MPIR_Dims_create_init();
-        MPIR_DIMS_initPCVars = 0;
-    }
-
-    /* ... body of routine ...  */
-    if (MPIR_Process.dimsCreate != NULL) {
-        mpi_errno = MPIR_Process.dimsCreate(nnodes, ndims, dims);
-    } else {
-        mpi_errno = MPIR_Dims_create_impl(nnodes, ndims, dims);
-    }
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
-    /* ... end of body of routine ... */
-
   fn_exit:
-    MPIR_FUNC_TERSE_EXIT(MPID_STATE_MPI_DIMS_CREATE);
     return mpi_errno;
-
-    /* --BEGIN ERROR HANDLING-- */
   fn_fail:
-#ifdef HAVE_ERROR_CHECKING
-    {
-        mpi_errno =
-            MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
-                                 "**mpi_dims_create", "**mpi_dims_create %d %d %p", nnodes, ndims,
-                                 dims);
-    }
-#endif
-    mpi_errno = MPIR_Err_return_comm(NULL, FCNAME, mpi_errno);
     goto fn_exit;
-    /* --END ERROR HANDLING-- */
 }

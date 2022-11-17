@@ -1,38 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2011 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
 
-/* -- Begin Profiling Symbol Block for routine MPI_Get_elements_x */
-#if defined(HAVE_PRAGMA_WEAK)
-#pragma weak MPI_Get_elements_x = PMPI_Get_elements_x
-#elif defined(HAVE_PRAGMA_HP_SEC_DEF)
-#pragma _HP_SECONDARY_DEF PMPI_Get_elements_x  MPI_Get_elements_x
-#elif defined(HAVE_PRAGMA_CRI_DUP)
-#pragma _CRI duplicate MPI_Get_elements_x as PMPI_Get_elements_x
-#elif defined(HAVE_WEAK_ATTRIBUTE)
-int MPI_Get_elements_x(const MPI_Status * status, MPI_Datatype datatype, MPI_Count * count)
-    __attribute__ ((weak, alias("PMPI_Get_elements_x")));
-#endif
-/* -- End Profiling Symbol Block */
-
 /* Internal helper routines.  If you want to get the number of elements from
  * within the MPI library, call MPIR_Get_elements_x_impl instead. */
-PMPI_LOCAL MPI_Count MPIR_Type_get_basic_type_elements(MPI_Count * bytes_p,
-                                                       MPI_Count count, MPI_Datatype datatype);
-PMPI_LOCAL MPI_Count MPIR_Type_get_elements(MPI_Count * bytes_p,
-                                            MPI_Count count, MPI_Datatype datatype);
-
-/* Define MPICH_MPI_FROM_PMPI if weak symbols are not supported to build
-   the MPI routines */
-#ifndef MPICH_MPI_FROM_PMPI
-#undef MPI_Get_elements_x
-#define MPI_Get_elements_x PMPI_Get_elements_x
-
-/* any non-MPI functions go here, especially non-static ones */
 
 /* MPIR_Type_get_basic_type_elements()
  *
@@ -60,8 +34,8 @@ PMPI_LOCAL MPI_Count MPIR_Type_get_elements(MPI_Count * bytes_p,
  * basic datatypes; I'm currently interpreting this to *not* include these
  * reduction types, as they are considered structs.
  */
-PMPI_LOCAL MPI_Count MPIR_Type_get_basic_type_elements(MPI_Count * bytes_p,
-                                                       MPI_Count count, MPI_Datatype datatype)
+static MPI_Count MPIR_Type_get_basic_type_elements(MPI_Count * bytes_p,
+                                                   MPI_Count count, MPI_Datatype datatype)
 {
     MPI_Count elements, usable_bytes, used_bytes, type1_sz, type2_sz;
 
@@ -153,8 +127,7 @@ PMPI_LOCAL MPI_Count MPIR_Type_get_basic_type_elements(MPI_Count * bytes_p,
  * This is called from MPI_Get_elements() when it sees a type with multiple
  * element types (datatype_ptr->element_sz = -1).  This function calls itself too.
  */
-PMPI_LOCAL MPI_Count MPIR_Type_get_elements(MPI_Count * bytes_p,
-                                            MPI_Count count, MPI_Datatype datatype)
+static MPI_Count MPIR_Type_get_elements(MPI_Count * bytes_p, MPI_Count count, MPI_Datatype datatype)
 {
     MPIR_Datatype *datatype_ptr = NULL;
 
@@ -163,10 +136,7 @@ PMPI_LOCAL MPI_Count MPIR_Type_get_elements(MPI_Count * bytes_p,
     /* if we have gotten down to a type with only one element type,
      * call MPIR_Type_get_basic_type_elements() and return.
      */
-    if (HANDLE_GET_KIND(datatype) == HANDLE_KIND_BUILTIN ||
-        datatype == MPI_FLOAT_INT ||
-        datatype == MPI_DOUBLE_INT ||
-        datatype == MPI_LONG_INT || datatype == MPI_SHORT_INT || datatype == MPI_LONG_DOUBLE_INT) {
+    if (MPIR_DATATYPE_IS_PREDEFINED(datatype)) {
         return MPIR_Type_get_basic_type_elements(bytes_p, count, datatype);
     } else if (datatype_ptr->builtin_element_size >= 0) {
         MPI_Datatype basic_type = MPI_DATATYPE_NULL;
@@ -178,13 +148,14 @@ PMPI_LOCAL MPI_Count MPIR_Type_get_elements(MPI_Count * bytes_p,
         /* we have bytes left and still don't have a single element size; must
          * recurse.
          */
-        int i, j, *ints;
-        MPI_Count typecount = 0, nr_elements = 0, last_nr_elements;
+        int *ints;
         MPI_Aint *aints;
+        MPI_Aint *counts;
         MPI_Datatype *types;
 
         /* Establish locations of arrays */
-        MPIR_Type_access_contents(datatype_ptr->handle, &ints, &aints, &types);
+        MPIR_Datatype_contents *cp = datatype_ptr->contents;
+        MPIR_Datatype_access_contents(cp, &ints, &aints, &counts, &types);
         if (!ints || !aints || !types)
             return MPI_ERR_TYPE;
 
@@ -193,29 +164,39 @@ PMPI_LOCAL MPI_Count MPIR_Type_get_elements(MPI_Count * bytes_p,
             case MPI_COMBINER_DUP:
             case MPI_COMBINER_RESIZED:
                 return MPIR_Type_get_elements(bytes_p, count, *types);
-                break;
             case MPI_COMBINER_CONTIGUOUS:
             case MPI_COMBINER_VECTOR:
-            case MPI_COMBINER_HVECTOR_INTEGER:
             case MPI_COMBINER_HVECTOR:
-                /* count is first in ints array */
-                return MPIR_Type_get_elements(bytes_p, count * (*ints), *types);
-                break;
+            case MPI_COMBINER_SUBARRAY:
+                if (cp->nr_counts == 0) {
+                    /* count is first in ints array */
+                    return MPIR_Type_get_elements(bytes_p, count * ints[0], *types);
+                } else {
+                    return MPIR_Type_get_elements(bytes_p, count * counts[0], *types);
+                }
             case MPI_COMBINER_INDEXED_BLOCK:
             case MPI_COMBINER_HINDEXED_BLOCK:
-                /* count is first in ints array, blocklength is second */
-                return MPIR_Type_get_elements(bytes_p, count * ints[0] * ints[1], *types);
-                break;
-            case MPI_COMBINER_INDEXED:
-            case MPI_COMBINER_HINDEXED_INTEGER:
-            case MPI_COMBINER_HINDEXED:
-                for (i = 0; i < (*ints); i++) {
-                    /* add up the blocklengths to get a max. # of the next type */
-                    typecount += ints[i + 1];
+                if (cp->nr_counts == 0) {
+                    /* count is first in ints array, blocklength is second */
+                    return MPIR_Type_get_elements(bytes_p, count * ints[0] * ints[1], *types);
+                } else {
+                    return MPIR_Type_get_elements(bytes_p, count * counts[0] * counts[1], *types);
                 }
-                return MPIR_Type_get_elements(bytes_p, count * typecount, *types);
-                break;
-            case MPI_COMBINER_STRUCT_INTEGER:
+            case MPI_COMBINER_INDEXED:
+            case MPI_COMBINER_HINDEXED:
+                {
+                    MPI_Aint typecount = 0;     /* total number of subtypes */
+                    if (cp->nr_counts == 0) {
+                        for (int i = 0; i < ints[0]; i++) {
+                            typecount += ints[i + 1];
+                        }
+                    } else {
+                        for (MPI_Aint i = 0; i < counts[0]; i++) {
+                            typecount += counts[i + 1];
+                        }
+                    }
+                    return MPIR_Type_get_elements(bytes_p, count * typecount, *types);
+                }
             case MPI_COMBINER_STRUCT:
                 /* In this case we can't simply multiply the count of the next
                  * type by the count of the current type, because we need to
@@ -225,46 +206,67 @@ PMPI_LOCAL MPI_Count MPIR_Type_get_elements(MPI_Count * bytes_p,
                  * We need to keep going until we get less elements than expected
                  * or we run out of bytes.
                  */
+                if (cp->nr_counts == 0) {
+                    MPI_Count nr_elements = 0;
+                    MPI_Count last_nr_elements = 1;     /* seed value */
+                    for (MPI_Aint j = 0;
+                         (count < 0 || j < count) && *bytes_p > 0 && last_nr_elements > 0; j++) {
+                        /* recurse on each type; bytes are reduced in calls */
+                        for (int i = 0; i < ints[0]; i++) {
+                            /* skip zero-count elements of the struct */
+                            if (ints[i + 1] == 0)
+                                continue;
 
+                            last_nr_elements =
+                                MPIR_Type_get_elements(bytes_p, ints[i + 1], types[i]);
+                            nr_elements += last_nr_elements;
 
-                last_nr_elements = 1;   /* seed value */
-                for (j = 0; (count < 0 || j < count) && *bytes_p > 0 && last_nr_elements > 0; j++) {
-                    /* recurse on each type; bytes are reduced in calls */
-                    for (i = 0; i < (*ints); i++) {
-                        /* skip zero-count elements of the struct */
-                        if (ints[i + 1] == 0)
-                            continue;
+                            MPIR_Assert(last_nr_elements >= 0);
 
-                        last_nr_elements = MPIR_Type_get_elements(bytes_p, ints[i + 1], types[i]);
-                        nr_elements += last_nr_elements;
-
-                        MPIR_Assert(last_nr_elements >= 0);
-
-                        if (last_nr_elements < ints[i + 1])
-                            break;
+                            if (last_nr_elements < ints[i + 1])
+                                break;
+                        }
                     }
+                    return nr_elements;
+                } else {
+                    MPI_Count nr_elements = 0;
+                    MPI_Count last_nr_elements = 1;     /* seed value */
+                    for (MPI_Aint j = 0;
+                         (count < 0 || j < count) && *bytes_p > 0 && last_nr_elements > 0; j++) {
+                        /* recurse on each type; bytes are reduced in calls */
+                        for (int i = 0; i < counts[0]; i++) {
+                            /* skip zero-count elements of the struct */
+                            if (counts[i + 1] == 0)
+                                continue;
+
+                            last_nr_elements =
+                                MPIR_Type_get_elements(bytes_p, counts[i + 1], types[i]);
+                            nr_elements += last_nr_elements;
+
+                            MPIR_Assert(last_nr_elements >= 0);
+
+                            if (last_nr_elements < counts[i + 1])
+                                break;
+                        }
+                    }
+                    return nr_elements;
                 }
-                return nr_elements;
-                break;
-            case MPI_COMBINER_SUBARRAY:
             case MPI_COMBINER_DARRAY:
             case MPI_COMBINER_F90_REAL:
             case MPI_COMBINER_F90_COMPLEX:
             case MPI_COMBINER_F90_INTEGER:
+            case MPI_COMBINER_HVECTOR_INTEGER:
+            case MPI_COMBINER_HINDEXED_INTEGER:
+            case MPI_COMBINER_STRUCT_INTEGER:
             default:
                 /* --BEGIN ERROR HANDLING-- */
                 MPIR_Assert(0);
                 return -1;
-                break;
                 /* --END ERROR HANDLING-- */
         }
     }
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Get_elements_x_impl
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 /* MPIR_Get_elements_x_impl
  *
  * Arguments:
@@ -281,7 +283,7 @@ int MPIR_Get_elements_x_impl(MPI_Count * byte_count, MPI_Datatype datatype, MPI_
     int mpi_errno = MPI_SUCCESS;
     MPIR_Datatype *datatype_ptr = NULL;
 
-    if (HANDLE_GET_KIND(datatype) != HANDLE_KIND_BUILTIN) {
+    if (!HANDLE_IS_BUILTIN(datatype)) {
         MPIR_Datatype_get_ptr(datatype, datatype_ptr);
     }
 
@@ -290,15 +292,12 @@ int MPIR_Get_elements_x_impl(MPI_Count * byte_count, MPI_Datatype datatype, MPI_
      * - derived type with a zero size
      * - type with multiple element types (nastiest)
      */
-    if (HANDLE_GET_KIND(datatype) == HANDLE_KIND_BUILTIN ||
+    if (HANDLE_IS_BUILTIN(datatype) ||
         (datatype_ptr->builtin_element_size != -1 && datatype_ptr->size > 0)) {
-        /* QUESTION: WHAT IF SOMEONE GAVE US AN MPI_UB OR MPI_LB???
-         */
-
         /* in both cases we do not limit the number of types that might
          * be in bytes
          */
-        if (HANDLE_GET_KIND(datatype) != HANDLE_KIND_BUILTIN) {
+        if (!HANDLE_IS_BUILTIN(datatype)) {
             MPI_Datatype basic_type = MPI_DATATYPE_NULL;
             MPIR_Datatype_get_basic_type(datatype_ptr->basic_type, basic_type);
             *elements = MPIR_Type_get_basic_type_elements(byte_count, -1, basic_type);
@@ -335,105 +334,4 @@ int MPIR_Get_elements_x_impl(MPI_Count * byte_count, MPI_Datatype datatype, MPI_
     }
 
     return mpi_errno;
-}
-
-#endif /* MPICH_MPI_FROM_PMPI */
-
-#undef FUNCNAME
-#define FUNCNAME MPI_Get_elements_x
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-/* N.B. "count" is the name mandated by the MPI-3 standard, but it should
- * probably be called "elements" instead and is handled that way in the _impl
- * routine [goodell@ 2012-11-05 */
-/*@
-MPI_Get_elements_x - Returns the number of basic elements
-                     in a datatype
-
-Input Parameters:
-+ status - return status of receive operation (Status)
-- datatype - datatype used by receive operation (handle)
-
-Output Parameters:
-. count - number of received basic elements (integer)
-
-.N ThreadSafe
-
-.N Fortran
-
-.N Errors
-@*/
-int MPI_Get_elements_x(const MPI_Status * status, MPI_Datatype datatype, MPI_Count * count)
-{
-    int mpi_errno = MPI_SUCCESS;
-    MPI_Count byte_count;
-    MPIR_FUNC_TERSE_STATE_DECL(MPID_STATE_MPI_GET_ELEMENTS_X);
-
-    MPID_THREAD_CS_ENTER(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
-    MPIR_FUNC_TERSE_ENTER(MPID_STATE_MPI_GET_ELEMENTS_X);
-
-    /* Validate parameters, especially handles needing to be converted */
-#ifdef HAVE_ERROR_CHECKING
-    {
-        MPID_BEGIN_ERROR_CHECKS;
-        {
-            MPIR_ERRTEST_DATATYPE(datatype, "datatype", mpi_errno);
-
-            /* TODO more checks may be appropriate */
-            if (mpi_errno != MPI_SUCCESS)
-                goto fn_fail;
-        }
-        MPID_END_ERROR_CHECKS;
-    }
-#endif /* HAVE_ERROR_CHECKING */
-
-    /* Convert MPI object handles to object pointers */
-
-    /* Validate parameters and objects (post conversion) */
-#ifdef HAVE_ERROR_CHECKING
-    {
-        MPID_BEGIN_ERROR_CHECKS;
-        {
-            if (HANDLE_GET_KIND(datatype) != HANDLE_KIND_BUILTIN) {
-                MPIR_Datatype *datatype_ptr = NULL;
-                MPIR_Datatype_get_ptr(datatype, datatype_ptr);
-                MPIR_Datatype_valid_ptr(datatype_ptr, mpi_errno);
-                MPIR_Datatype_committed_ptr(datatype_ptr, mpi_errno);
-            }
-
-            /* TODO more checks may be appropriate (counts, in_place, buffer aliasing, etc) */
-            if (mpi_errno != MPI_SUCCESS)
-                goto fn_fail;
-        }
-        MPID_END_ERROR_CHECKS;
-    }
-#endif /* HAVE_ERROR_CHECKING */
-
-    /* ... body of routine ...  */
-
-    byte_count = MPIR_STATUS_GET_COUNT(*status);
-    mpi_errno = MPIR_Get_elements_x_impl(&byte_count, datatype, count);
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
-
-    /* ... end of body of routine ... */
-
-  fn_exit:
-    MPIR_FUNC_TERSE_EXIT(MPID_STATE_MPI_GET_ELEMENTS_X);
-    MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
-    return mpi_errno;
-
-  fn_fail:
-    /* --BEGIN ERROR HANDLING-- */
-#ifdef HAVE_ERROR_CHECKING
-    {
-        mpi_errno =
-            MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
-                                 "**mpi_get_elements_x", "**mpi_get_elements_x %p %D %p", status,
-                                 datatype, count);
-    }
-#endif
-    mpi_errno = MPIR_Err_return_comm(NULL, FCNAME, mpi_errno);
-    goto fn_exit;
-    /* --END ERROR HANDLING-- */
 }

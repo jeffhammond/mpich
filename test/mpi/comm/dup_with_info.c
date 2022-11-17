@@ -1,14 +1,13 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include "mpitest.h"
 
-int run_tests(MPI_Comm comm)
+static int run_tests(MPI_Comm comm)
 {
     int rank, size, wrank, wsize, dest, a, b, errs = 0;
     MPI_Status status;

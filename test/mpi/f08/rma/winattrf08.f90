@@ -1,15 +1,18 @@
+!
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
+!
+
 ! This file created from test/mpi/f77/rma/winattrf.f with f77tof90
-! -*- Mode: Fortran; -*-
-!
-!  (C) 2003 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
-!
+
       program main
-      use mpi
+      use mpi_f08
       integer errs, ierr
       integer (kind=MPI_ADDRESS_KIND) extrastate, valin, valout, val
 
-      integer comm, win, buf(10)
+      type(MPI_Comm) comm
+      type(MPI_Win) win
+      integer buf(10)
       integer curcount, keyval
       logical flag
       external mycopyfn, mydelfn
@@ -146,8 +149,9 @@
 ! (and because of alias rules, can be) no MPI_Win_dup function
       subroutine mycopyfn( oldwin, keyval, extrastate, valin, valout, &
       &                     flag, ierr )
-      use mpi
-      integer oldwin, keyval, ierr
+      use mpi_f08
+      type(MPI_Win) oldwin
+      integer keyval, ierr
       integer (kind=MPI_ADDRESS_KIND) extrastate, valin, valout, val
 
       logical flag
@@ -164,8 +168,9 @@
       end
 !
       subroutine mydelfn( win, keyval, val, extrastate, ierr )
-      use mpi
-      integer win, keyval, ierr
+      use mpi_f08
+      type(MPI_Win) win
+      integer  keyval, ierr
       integer (kind=MPI_ADDRESS_KIND) extrastate, valin, valout, val
 
       integer callcount, delcount

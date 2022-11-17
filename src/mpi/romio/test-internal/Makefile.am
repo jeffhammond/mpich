@@ -1,8 +1,7 @@
-# -*- Mode: Makefile; -*-
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
 # This directory is only listed in DIST_SUBDIRS, not SUBDIRS, so its contents
 # will not be built by default, but it will participate in "make distclean" and
@@ -11,7 +10,7 @@
 # override the normal compilers for the tests
 CC = $(TEST_CC)
 
-# because := is not universally avalible, we have to play games to use the
+# because := is not universally available, we have to play games to use the
 # user-specified LDFLAGS and OUR_LIBS env. variables (if set)
 OUR_LIBS = $(TEST_LIBNAME) $(MPI_LIB) $(ROMIO_LIBLIST)
 

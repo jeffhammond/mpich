@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include "mpitestconf.h"
 #include <stdio.h>
@@ -26,8 +25,6 @@ int main(int argc, char *argv[])
     char cinbuf[3], coutbuf[3];
     signed char scinbuf[3], scoutbuf[3];
     unsigned char ucinbuf[3], ucoutbuf[3];
-    float finbuf[3], foutbuf[3];
-    double dinbuf[3], doutbuf[3];
 
     MTest_Init(&argc, &argv);
 
@@ -172,7 +169,7 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    MPI_Errhandler_set(comm, MPI_ERRORS_ARE_FATAL);
+    MPI_Comm_set_errhandler(comm, MPI_ERRORS_ARE_FATAL);
     MTest_Finalize(errs);
     return MTestReturnValue(errs);
 }

@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #ifndef MPIR_MEM_H_INCLUDED
 #define MPIR_MEM_H_INCLUDED
 
@@ -50,7 +50,7 @@ extern "C" {
 
   Rules for memory management:
 
-  MPICH explicity prohibits the appearence of 'malloc', 'free',
+  MPICH explicitly prohibits the appearance of 'malloc', 'free',
   'calloc', 'realloc', or 'strdup' in any code implementing a device or
   MPI call (of course, users may use any of these calls in their code).
   Instead, you must use 'MPL_malloc' etc.; if these are defined
@@ -84,30 +84,11 @@ extern "C" {
         memcpy((dst), (src), (len));            \
     } while (0)
 
-#ifdef USE_MEMORY_TRACING
-
-/* Define these as invalid C to catch their use in the code */
-#define malloc(a)         'Error use MPL_malloc' :::
-#define calloc(a,b)       'Error use MPL_calloc' :::
-#define free(a)           'Error use MPL_free'   :::
-#define realloc(a)        'Error use MPL_realloc' :::
-/* These two functions can't be guarded because we use #include <sys/mman.h>
- * throughout the code to be able to use other symbols in that header file.
- * Because we include that header directly, we bypass this guard and cause
- * compile problems.
- * #define mmap(a,b,c,d,e,f) 'Error use MPL_mmap'   :::
- * #define munmap(a,b)       'Error use MPL_munmap' :::
- */
-#if defined(strdup) || defined(__strdup)
-#undef strdup
-#endif                          /* defined(strdup) || defined(__strdup) */
-    /* The ::: should cause the compiler to choke; the string
-     * will give the explanation */
-#undef strdup                   /* in case strdup is a macro */
-#define strdup(a)         'Error use MPL_strdup' :::
-
-#endif                          /* USE_MEMORY_TRACING */
-
+#define MPIR_Memcpy_stream(dst, src, len)       \
+    do {                                        \
+        CHECK_MEMCPY((dst),(src),(len));        \
+        MPL_Memcpy_stream((dst), (src), (len)); \
+    } while (0)
 
 /* Memory allocation macros. See document. */
 
@@ -116,7 +97,7 @@ extern "C" {
 #ifdef HAVE_ERROR_CHECKING
 #define MPIR_CHKMEM_SETERR(rc_,nbytes_,name_)                           \
     rc_=MPIR_Err_create_code(MPI_SUCCESS,                               \
-                             MPIR_ERR_RECOVERABLE, FCNAME, __LINE__,    \
+                             MPIR_ERR_RECOVERABLE, __func__, __LINE__,    \
                              MPI_ERR_OTHER, "**nomem2", "**nomem2 %d %s", nbytes_, name_)
 #else                           /* HAVE_ERROR_CHECKING */
 #define MPIR_CHKMEM_SETERR(rc_,nbytes_,name_) rc_=MPI_ERR_OTHER
@@ -124,26 +105,6 @@ extern "C" {
 
     /* CHKPMEM_REGISTER is used for memory allocated within another routine */
 
-/* Memory used and freed within the current scope (alloca if feasible) */
-/* Configure with --enable-alloca to set USE_ALLOCA */
-#if defined(HAVE_ALLOCA) && defined(USE_ALLOCA)
-#ifdef HAVE_ALLOCA_H
-#include <alloca.h>
-#endif                          /* HAVE_ALLOCA_H */
-/* Define decl with a dummy definition to allow us to put a semi-colon
-   after the macro without causing the declaration block to end (restriction
-   imposed by C) */
-#define MPIR_CHKLMEM_DECL(n_) int dummy_ ATTRIBUTE((unused))
-#define MPIR_CHKLMEM_FREEALL()
-#define MPIR_CHKLMEM_MALLOC_ORSTMT(pointer_,type_,nbytes_,rc_,name_,class_,stmt_) \
-    {                                                                   \
-        pointer_ = (type_)alloca(nbytes_);                              \
-        if (!(pointer_) && (nbytes_ > 0)) {                             \
-            MPIR_CHKMEM_SETERR(rc_,nbytes_,name_);                      \
-            stmt_;                                                      \
-        }                                                               \
-    }
-#else                           /* defined(HAVE_ALLOCA) && defined(USE_ALLOCA) */
 #define MPIR_CHKLMEM_DECL(n_)                                   \
     void *(mpiu_chklmem_stk_[n_]) = { NULL };                   \
     int mpiu_chklmem_stk_sp_=0;                                 \
@@ -154,7 +115,7 @@ extern "C" {
         pointer_ = (type_)MPL_malloc(nbytes_,class_);                   \
         if (pointer_) {                                                 \
             MPIR_Assert(mpiu_chklmem_stk_sp_<mpiu_chklmem_stk_sz_);     \
-            mpiu_chklmem_stk_[mpiu_chklmem_stk_sp_++] = pointer_;       \
+            mpiu_chklmem_stk_[mpiu_chklmem_stk_sp_++] = (void *) pointer_; \
         } else if (nbytes_ > 0) {                                       \
             MPIR_CHKMEM_SETERR(rc_,nbytes_,name_);                      \
             stmt_;                                                      \
@@ -166,7 +127,7 @@ extern "C" {
             MPL_free(mpiu_chklmem_stk_[--mpiu_chklmem_stk_sp_]);        \
         }                                                               \
     } while (0)
-#endif                          /* defined(HAVE_ALLOCA) && defined(USE_ALLOCA) */
+
 #define MPIR_CHKLMEM_MALLOC(pointer_,type_,nbytes_,rc_,name_,class_)    \
     MPIR_CHKLMEM_MALLOC_ORJUMP(pointer_,type_,nbytes_,rc_,name_,class_)
 #define MPIR_CHKLMEM_MALLOC_ORJUMP(pointer_,type_,nbytes_,rc_,name_,class_) \

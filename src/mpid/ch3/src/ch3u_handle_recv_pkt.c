@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
@@ -12,7 +11,7 @@
  * This file contains the dispatch routine called by the ch3 progress 
  * engine to process messages.  
  *
- * This file is in transistion
+ * This file is in transition
  *
  * Where possible, the routines that create and send all packets of
  * a particular type are in the same file that contains the implementation 
@@ -48,19 +47,14 @@
    currently do not support that in the CH3 device. */
 #define MPIDI_CH3U_Handle_ordered_recv_pkt MPIDI_CH3U_Handle_recv_pkt 
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3U_Handle_ordered_recv_pkt
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3U_Handle_ordered_recv_pkt(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt, void *data,
 				       intptr_t *buflen, MPIR_Request ** rreqp)
 {
     int mpi_errno = MPI_SUCCESS;
     static MPIDI_CH3_PktHandler_Fcn *pktArray[MPIDI_CH3_PKT_END_CH3+1];
     static int needsInit = 1;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_HANDLE_ORDERED_RECV_PKT);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3U_HANDLE_ORDERED_RECV_PKT);
+    MPIR_FUNC_ENTER;
 
     MPL_DBG_STMT(MPIDI_CH3_DBG_OTHER,VERBOSE,MPIDI_DBG_Print_packet(pkt));
 
@@ -80,7 +74,7 @@ int MPIDI_CH3U_Handle_ordered_recv_pkt(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt, v
     MPIR_Assert(pkt->type <= MPIDI_CH3_PKT_END_CH3);
     mpi_errno = pktArray[pkt->type](vc, pkt, data, buflen, rreqp);
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3U_HANDLE_ORDERED_RECV_PKT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }
 
@@ -98,10 +92,6 @@ int MPIDI_CH3U_Handle_ordered_recv_pkt(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt, v
  * data for the request has been received.  This function does not
  * actually complete the request.
  */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3U_Receive_data_found
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, void *buf, intptr_t *buflen, int *complete)
 {
     int dt_contig;
@@ -110,9 +100,8 @@ int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, void *buf, intptr_t *bufle
     MPIR_Datatype * dt_ptr = NULL;
     intptr_t data_sz;
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_RECEIVE_DATA_FOUND);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3U_RECEIVE_DATA_FOUND);
+    MPIR_FUNC_ENTER;
 
     MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"posted request found");
 	
@@ -128,7 +117,7 @@ int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, void *buf, intptr_t *bufle
 					    PRIdPTR,
 				 rreq->dev.recv_data_sz, userbuf_sz));
 	rreq->status.MPI_ERROR = MPIR_Err_create_code(MPI_SUCCESS, 
-                     MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_TRUNCATE,
+                     MPIR_ERR_RECOVERABLE, __func__, __LINE__, MPI_ERR_TRUNCATE,
 		     "**truncate", "**truncate %d %d %d %d", 
 		     rreq->status.MPI_SOURCE, rreq->status.MPI_TAG, 
 		     rreq->dev.recv_data_sz, userbuf_sz );
@@ -149,7 +138,7 @@ int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, void *buf, intptr_t *bufle
             MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"Copying contiguous data to user buffer");
             /* copy data out of the receive buffer */
             if (rreq->dev.drop_data == FALSE) {
-                MPIR_Memcpy((char*)(rreq->dev.user_buf) + dt_true_lb, buf, data_sz);
+                MPIR_Memcpy(MPIR_get_contig_ptr(rreq->dev.user_buf, dt_true_lb), buf, data_sz);
             }
             *buflen = data_sz;
             *complete = TRUE;
@@ -158,9 +147,8 @@ int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, void *buf, intptr_t *bufle
         {
             MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"IOV loaded for contiguous read");
             
-            rreq->dev.iov[0].MPL_IOV_BUF = 
-                (MPL_IOV_BUF_CAST)((char*)(rreq->dev.user_buf) + dt_true_lb);
-            rreq->dev.iov[0].MPL_IOV_LEN = data_sz;
+            rreq->dev.iov[0].iov_base = MPIR_get_contig_ptr(rreq->dev.user_buf, dt_true_lb);
+            rreq->dev.iov[0].iov_len = data_sz;
             rreq->dev.iov_count = 1;
             *buflen = 0;
             *complete = FALSE;
@@ -172,33 +160,29 @@ int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, void *buf, intptr_t *bufle
     else {
 	/* user buffer is not contiguous or is too small to hold
 	   the entire message */
-        
-	rreq->dev.segment_ptr = MPIR_Segment_alloc( );
-        MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIR_Segment_alloc");
-
- 	MPIR_Segment_init(rreq->dev.user_buf, rreq->dev.user_count, 
-			  rreq->dev.datatype, rreq->dev.segment_ptr);
-	rreq->dev.segment_first = 0;
-	rreq->dev.segment_size  = data_sz;
+        rreq->dev.msg_offset = 0;
+	rreq->dev.msgsize  = data_sz;
 
         /* if all of the data has already been received, and the
            message is not truncated, unpack it now, otherwise build an
            iov and let the channel unpack */
         if (data_sz == rreq->dev.recv_data_sz && *buflen >= data_sz)
         {
-            intptr_t last;
             MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"Copying noncontiguous data to user buffer");
-            last = data_sz;
-            MPIR_Segment_unpack(rreq->dev.segment_ptr, rreq->dev.segment_first, 
-				&last, buf);
+
+            MPI_Aint actual_unpack_bytes;
+            MPIR_Typerep_unpack(buf, data_sz, rreq->dev.user_buf, rreq->dev.user_count,
+                             rreq->dev.datatype, rreq->dev.msg_offset, &actual_unpack_bytes,
+                             MPIR_TYPEREP_FLAG_NONE);
+
             /* --BEGIN ERROR HANDLING-- */
-            if (last != data_sz)
+            if (actual_unpack_bytes != data_sz)
             {
                 /* If the data can't be unpacked, the we have a
                    mismatch between the datatype and the amount of
                    data received.  Throw away received data. */
                 MPIR_ERR_SET(rreq->status.MPI_ERROR, MPI_ERR_TYPE, "**dtypemismatch");
-                MPIR_STATUS_SET_COUNT(rreq->status, rreq->dev.segment_first);
+                MPIR_STATUS_SET_COUNT(rreq->status, rreq->dev.msg_offset);
                 *buflen = data_sz;
                 *complete = TRUE;
 		/* FIXME: Set OnDataAvail to 0?  If not, why not? */
@@ -225,22 +209,17 @@ int MPIDI_CH3U_Receive_data_found(MPIR_Request *rreq, void *buf, intptr_t *bufle
     }
 
  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3U_RECEIVE_DATA_FOUND);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 fn_fail:
     goto fn_exit;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3U_Receive_data_unexpected
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3U_Receive_data_unexpected(MPIR_Request * rreq, void *buf, intptr_t *buflen, int *complete)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_RECEIVE_DATA_UNEXPECTED);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3U_RECEIVE_DATA_UNEXPECTED);
+    MPIR_FUNC_ENTER;
 
     /* FIXME: to improve performance, allocate temporary buffer from a 
        specialized buffer pool. */
@@ -266,8 +245,8 @@ int MPIDI_CH3U_Receive_data_unexpected(MPIR_Request * rreq, void *buf, intptr_t 
     }
     else
     {
-        rreq->dev.iov[0].MPL_IOV_BUF = (MPL_IOV_BUF_CAST)((char *)rreq->dev.tmpbuf);
-        rreq->dev.iov[0].MPL_IOV_LEN = rreq->dev.recv_data_sz;
+        rreq->dev.iov[0].iov_base = (void *)((char *)rreq->dev.tmpbuf);
+        rreq->dev.iov[0].iov_len = rreq->dev.recv_data_sz;
         rreq->dev.iov_count = 1;
         rreq->dev.recv_pending_count = 2;
         *buflen = 0;
@@ -280,7 +259,7 @@ int MPIDI_CH3U_Receive_data_unexpected(MPIR_Request * rreq, void *buf, intptr_t 
     rreq->dev.OnDataAvail = MPIDI_CH3_ReqHandler_UnpackUEBufComplete;
 
  fn_fail:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3U_RECEIVE_DATA_UNEXPECTED);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }
 
@@ -289,10 +268,6 @@ int MPIDI_CH3U_Receive_data_unexpected(MPIR_Request * rreq, void *buf, intptr_t 
  * next data to arrive.  In turn, this request is attached to a virtual
  * connection.
  */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3U_Post_data_receive_found
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3U_Post_data_receive_found(MPIR_Request * rreq)
 {
     int mpi_errno = MPI_SUCCESS;	
@@ -301,9 +276,8 @@ int MPIDI_CH3U_Post_data_receive_found(MPIR_Request * rreq)
     intptr_t userbuf_sz;
     MPIR_Datatype * dt_ptr = NULL;
     intptr_t data_sz;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_POST_DATA_RECEIVE_FOUND);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3U_POST_DATA_RECEIVE_FOUND);
+    MPIR_FUNC_ENTER;
 
     MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"posted request found");
 	
@@ -319,7 +293,7 @@ int MPIDI_CH3U_Post_data_receive_found(MPIR_Request * rreq)
 					    PRIdPTR,
 				 rreq->dev.recv_data_sz, userbuf_sz));
 	rreq->status.MPI_ERROR = MPIR_Err_create_code(MPI_SUCCESS, 
-                     MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_TRUNCATE,
+                     MPIR_ERR_RECOVERABLE, __func__, __LINE__, MPI_ERR_TRUNCATE,
 		     "**truncate", "**truncate %d %d %d %d", 
 		     rreq->status.MPI_SOURCE, rreq->status.MPI_TAG, 
 		     rreq->dev.recv_data_sz, userbuf_sz );
@@ -333,9 +307,8 @@ int MPIDI_CH3U_Post_data_receive_found(MPIR_Request * rreq)
 	   entire message.  However, we haven't yet *read* the data 
 	   (this code describes how to read the data into the destination) */
 	MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"IOV loaded for contiguous read");
-	rreq->dev.iov[0].MPL_IOV_BUF = 
-	    (MPL_IOV_BUF_CAST)((char*)(rreq->dev.user_buf) + dt_true_lb);
-	rreq->dev.iov[0].MPL_IOV_LEN = data_sz;
+	rreq->dev.iov[0].iov_base = MPIR_get_contig_ptr(rreq->dev.user_buf, dt_true_lb);
+	rreq->dev.iov[0].iov_len = data_sz;
 	rreq->dev.iov_count = 1;
 	/* FIXME: We want to set the OnDataAvail to the appropriate 
 	   function, which depends on whether this is an RMA 
@@ -346,12 +319,8 @@ int MPIDI_CH3U_Post_data_receive_found(MPIR_Request * rreq)
 	/* user buffer is not contiguous or is too small to hold
 	   the entire message */
 	MPL_DBG_MSG(MPIDI_CH3_DBG_OTHER,VERBOSE,"IOV loaded for non-contiguous read");
-	rreq->dev.segment_ptr = MPIR_Segment_alloc( );
-        MPIR_ERR_CHKANDJUMP1((rreq->dev.segment_ptr == NULL), mpi_errno, MPI_ERR_OTHER, "**nomem", "**nomem %s", "MPIR_Segment_alloc");
-	MPIR_Segment_init(rreq->dev.user_buf, rreq->dev.user_count, 
-			  rreq->dev.datatype, rreq->dev.segment_ptr);
-	rreq->dev.segment_first = 0;
-	rreq->dev.segment_size = data_sz;
+	rreq->dev.msg_offset = 0;
+	rreq->dev.msgsize = data_sz;
 	mpi_errno = MPIDI_CH3U_Request_load_recv_iov(rreq);
 	if (mpi_errno != MPI_SUCCESS) {
 	    MPIR_ERR_SETFATALANDJUMP(mpi_errno,MPI_ERR_OTHER,
@@ -360,22 +329,17 @@ int MPIDI_CH3U_Post_data_receive_found(MPIR_Request * rreq)
     }
 
  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3U_POST_DATA_RECEIVE_FOUND);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
  fn_fail:
     goto fn_exit;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3U_Post_data_receive_unexpected
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3U_Post_data_receive_unexpected(MPIR_Request * rreq)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_POST_DATA_RECEIVE_UNEXPECTED);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3U_POST_DATA_RECEIVE_UNEXPECTED);
+    MPIR_FUNC_ENTER;
 
     /* FIXME: to improve performance, allocate temporary buffer from a 
        specialized buffer pool. */
@@ -390,14 +354,14 @@ int MPIDI_CH3U_Post_data_receive_unexpected(MPIR_Request * rreq)
     }
     rreq->dev.tmpbuf_sz = rreq->dev.recv_data_sz;
     
-    rreq->dev.iov[0].MPL_IOV_BUF = (MPL_IOV_BUF_CAST)rreq->dev.tmpbuf;
-    rreq->dev.iov[0].MPL_IOV_LEN = rreq->dev.recv_data_sz;
+    rreq->dev.iov[0].iov_base = (void *)rreq->dev.tmpbuf;
+    rreq->dev.iov[0].iov_len = rreq->dev.recv_data_sz;
     rreq->dev.iov_count = 1;
     rreq->dev.OnDataAvail = MPIDI_CH3_ReqHandler_UnpackUEBufComplete;
     rreq->dev.recv_pending_count = 2;
 
  fn_fail:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3U_POST_DATA_RECEIVE_UNEXPECTED);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }
 
@@ -409,16 +373,11 @@ int MPIDI_CH3U_Post_data_receive_unexpected(MPIR_Request * rreq)
    to do the same thing, e.g., the main thread in MPI_Win_lock(source=target) 
    and another thread in the progress engine.
  */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3I_Try_acquire_win_lock
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3I_Try_acquire_win_lock(MPIR_Win *win_ptr, int requested_lock)
 {
     int existing_lock;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3I_TRY_ACQUIRE_WIN_LOCK);
     
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3I_TRY_ACQUIRE_WIN_LOCK);
+    MPIR_FUNC_ENTER;
 
     existing_lock = win_ptr->current_lock_type;
 
@@ -446,12 +405,12 @@ int MPIDI_CH3I_Try_acquire_win_lock(MPIR_Win *win_ptr, int requested_lock)
         if (requested_lock == MPI_LOCK_SHARED)
             win_ptr->shared_lock_ref_cnt++;
 
-	MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3I_TRY_ACQUIRE_WIN_LOCK);
+	MPIR_FUNC_EXIT;
         return 1;
     }
     else {
         /* do not grant lock */
-	MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3I_TRY_ACQUIRE_WIN_LOCK);
+	MPIR_FUNC_EXIT;
         return 0;
     }
 }
@@ -461,7 +420,7 @@ int MPIDI_CH3I_Try_acquire_win_lock(MPIR_Win *win_ptr, int requested_lock)
 /* ------------------------------------------------------------------------ */
 /* Here are the functions that implement the packet actions.  They'll be moved
  * to more modular places where it will be easier to replace subsets of the
- * in order to experiement with alternative data transfer methods, such as
+ * in order to experiment with alternative data transfer methods, such as
  * sending some data with a rendezvous request or including data within
  * an eager message.                                                        
  *
@@ -480,9 +439,6 @@ int MPIDI_CH3I_Try_acquire_win_lock(MPIR_Win *win_ptr, int requested_lock)
 /* FIXME: we still need to implement flow control.  As a reminder, 
    we don't mark these parameters as unused, because a full implementation
    of this routine will need to make use of all 4 parameters */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_PktHandler_FlowCntlUpdate
-#undef FCNAME
 int MPIDI_CH3_PktHandler_FlowCntlUpdate( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, void *data ATTRIBUTE((unused)),
 					 intptr_t *buflen, MPIR_Request **rreqp)
 {
@@ -491,21 +447,16 @@ int MPIDI_CH3_PktHandler_FlowCntlUpdate( MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t *pkt, v
 }
 
 /* This is a dummy handler*/
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_PktHandler_EndCH3
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3_PktHandler_EndCH3( MPIDI_VC_t *vc ATTRIBUTE((unused)), 
 				 MPIDI_CH3_Pkt_t *pkt ATTRIBUTE((unused)),
 				 void *data ATTRIBUTE((unused)),
 				 intptr_t *buflen ATTRIBUTE((unused)),
 				 MPIR_Request **rreqp ATTRIBUTE((unused)) )
 {
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3_PKTHANDLER_ENDCH3);
     
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3_PKTHANDLER_ENDCH3);
+    MPIR_FUNC_ENTER;
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3_PKTHANDLER_ENDCH3);
+    MPIR_FUNC_EXIT;
 
     return MPI_SUCCESS;
 }
@@ -520,17 +471,12 @@ int MPIDI_CH3_PktHandler_EndCH3( MPIDI_VC_t *vc ATTRIBUTE((unused)),
    appropriate (this allows the compiler to reduce the cost in 
    accessing the elements of the array in some cases).
 */
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_PktHandler_Init
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3_PktHandler_Init( MPIDI_CH3_PktHandler_Fcn *pktArray[], 
 			       int arraySize  )
 {
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3_PKTHANDLER_INIT);
     
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3_PKTHANDLER_INIT);
+    MPIR_FUNC_ENTER;
 
     /* Check that the array is large enough */
     if (arraySize < MPIDI_CH3_PKT_END_CH3) {
@@ -634,7 +580,7 @@ int MPIDI_CH3_PktHandler_Init( MPIDI_CH3_PktHandler_Fcn *pktArray[],
         MPIDI_CH3_PktHandler_Revoke;
 
  fn_fail:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3_PKTHANDLER_INIT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }
     
