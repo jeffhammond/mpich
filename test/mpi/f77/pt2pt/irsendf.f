@@ -80,7 +80,7 @@ C
 C
          completed = 0
          do while (completed .lt. 2)
-            call MPI_Waitany(2, requests, index, statuses, ierr)
+            call MPI_Waitany(2, requests, index, status, ierr)
             completed = completed + 1
          end do
 C
