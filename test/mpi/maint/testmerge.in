@@ -1,10 +1,9 @@
 #! @PERL@
-# -*- Mode: Perl; -*-
-#
-#  (C) 2004 by Argonne National Laboratory.
-#      See COPYRIGHT in top-level directory.
-#
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
+
 # This file provides a way to merge a template file with a set of
 # code fragments.  This makes it simple to generate many related tests
 # from a single test harness, while ending up with relatively simple code
@@ -133,7 +132,7 @@ sub MergeTemplate {
 	    if (defined($Definitions{$name})) {
 		my $defn = $Definitions{$name};
 		my $newdefn = "";
-		# Add indentation to definition; substitute any defintions
+		# Add indentation to definition; substitute any definitions
 		foreach my $line (split(/\n/,$defn)) {
 		    print "Looking at |$line|\n" if $debug;
 		    $newdefn .= $indent . $line . "\n";

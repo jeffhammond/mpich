@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
@@ -9,11 +8,7 @@
 /*
  * MPID_Issend()
  */
-#undef FUNCNAME
-#define FUNCNAME MPID_Issend
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPID_Issend(const void * buf, int count, MPI_Datatype datatype, int rank, int tag, MPIR_Comm * comm, int context_offset,
+int MPID_Issend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int tag, MPIR_Comm * comm, int attr,
 		MPIR_Request ** request)
 {
     intptr_t data_sz;
@@ -27,10 +22,10 @@ int MPID_Issend(const void * buf, int count, MPI_Datatype datatype, int rank, in
 #endif    
     int eager_threshold = -1;
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_ISSEND);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_ISSEND);
+    MPIR_FUNC_ENTER;
 
+    int context_offset = MPIR_PT2PT_ATTR_CONTEXT_OFFSET(attr);
     MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER,VERBOSE,(MPL_DBG_FDEST,
                  "rank=%d, tag=%d, context=%d", 
                  rank, tag, comm->context_id + context_offset));
@@ -48,29 +43,19 @@ int MPID_Issend(const void * buf, int count, MPI_Datatype datatype, int rank, in
 	goto fn_exit;
     }
 
-    if (rank != MPI_PROC_NULL)
-    {
-       MPIDI_Comm_get_vc_set_active(comm, rank, &vc);
-        /* this needs to come before the sreq is created, since the override */
-        /* function is responsible for creating its own request */       
+    MPIDI_Comm_get_vc_set_active(comm, rank, &vc);
+     /* this needs to come before the sreq is created, since the override */
+     /* function is responsible for creating its own request */
 #ifdef ENABLE_COMM_OVERRIDES
-       if (vc->comm_ops && vc->comm_ops->issend)
-       {
-	  mpi_errno = vc->comm_ops->issend( vc, buf, count, datatype, rank, tag, comm, context_offset, &sreq);
-	  goto fn_exit;
-       }
+    if (vc->comm_ops && vc->comm_ops->issend)
+    {
+       mpi_errno = vc->comm_ops->issend( vc, buf, count, datatype, rank, tag, comm, context_offset, &sreq);
+       goto fn_exit;
+    }
 #endif
-    }   
    
     MPIDI_Request_create_sreq(sreq, mpi_errno, goto fn_exit);
     MPIDI_Request_set_type(sreq, MPIDI_REQUEST_TYPE_SSEND);
-    
-    if (rank == MPI_PROC_NULL)
-    {
-	MPIR_Object_set_ref(sreq, 1);
-        MPIR_cc_set(&sreq->cc, 0);
-	goto fn_exit;
-    }
     
     MPIDI_Datatype_get_info(count, datatype, dt_contig, data_sz, dt_ptr, dt_true_lb);
     
@@ -92,7 +77,7 @@ int MPID_Issend(const void * buf, int count, MPI_Datatype datatype, int rank, in
                                                       context_offset );
 	/* If we're not complete and this is a derived datatype
          * communication, then add a reference to the datatype */
-	if (sreq && (HANDLE_GET_KIND(datatype) != HANDLE_KIND_BUILTIN)) {
+	if (sreq && (!HANDLE_IS_BUILTIN(datatype))) {
 	    sreq->dev.datatype_ptr = dt_ptr;
         MPIR_Datatype_ptr_add_ref(dt_ptr);
 	}
@@ -120,6 +105,9 @@ int MPID_Issend(const void * buf, int count, MPI_Datatype datatype, int rank, in
 
   fn_exit:
     *request = sreq;
+    if (sreq) {
+        MPII_SENDQ_REMEMBER(sreq, rank, tag, comm->recvcontext_id, buf, count);
+    }
     
     MPL_DBG_STMT(MPIDI_CH3_DBG_OTHER,VERBOSE,
     {
@@ -131,6 +119,6 @@ int MPID_Issend(const void * buf, int count, MPI_Datatype datatype, int rank, in
 		  )
     
   fn_fail:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_ISSEND);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }

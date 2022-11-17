@@ -1,11 +1,9 @@
-# -*- Mode: Makefile; -*-
-# vim: set ft=automake :
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
-include $(top_srcdir)/Makefile.mtest
+include $(top_srcdir)/Makefile_single.mtest
 
 EXTRA_DIST = testlist.in
 
@@ -83,6 +81,8 @@ noinst_PROGRAMS =          \
     window_creation        \
     window_allocation      \
     window_noncontig_allocation  \
+    window_attach                   \
+    window_attach_collattach        \
     win_flavors            \
     win_shared             \
     win_shared_noncontig   \
@@ -93,6 +93,9 @@ noinst_PROGRAMS =          \
     win_zero               \
     win_large_shm          \
     win_dynamic_acc        \
+    win_dynamic_acc_collattach \
+    win_dynamic_rma_flush_get             \
+    win_dynamic_rma_flush_get_collattach  \
     get_acc_local          \
     compare_and_swap       \
     linked_list            \
@@ -133,7 +136,6 @@ noinst_PROGRAMS =          \
     reqops                 \
     req_example            \
     req_example_shm        \
-    win_info               \
     pscw_ordering          \
     pscw_ordering_shm	   \
     mutex_bench            \
@@ -185,10 +187,26 @@ noinst_PROGRAMS =          \
     rget_testall \
     get_flushlocal         \
     get_flushlocal_shm     \
-    win_shared_query_null
+    win_shared_query_null  \
+    accfence1              \
+    accpscw1               \
+    epochtest              \
+    getfence1              \
+    lock_contention_dt     \
+    lock_dt                \
+    lock_dt_flush          \
+    lock_dt_flushlocal     \
+    lockall_dt             \
+    lockall_dt_flush       \
+    lockall_dt_flushall    \
+    lockall_dt_flushlocal  \
+    lockall_dt_flushlocalall \
+    putfence1              \
+    putpscw1
 
 if BUILD_MPIX_TESTS
-noinst_PROGRAMS += aint
+noinst_PROGRAMS += aint   \
+                   aint_collattach
 endif
 
 atomic_get_short_int_SOURCES      = atomic_get.c
@@ -360,4 +378,59 @@ overlap_wins_cas_CPPFLAGS  = -DTEST_CAS $(AM_CPPFLAGS)
 get_flushlocal_shm_SOURCES        = get_flushlocal.c
 get_flushlocal_shm_CPPFLAGS       = -DUSE_WIN_ALLOCATE $(AM_CPPFLAGS)
 
-include Makefile.dtp
+accfence1_CPPFLAGS = $(AM_CPPFLAGS)
+accfence1_SOURCES = accfence1.c
+
+accpscw1_CPPFLAGS = $(AM_CPPFLAGS)
+accpscw1_SOURCES = accpscw1.c
+
+epochtest_CPPFLAGS = $(AM_CPPFLAGS)
+epochtest_SOURCES = epochtest.c
+
+getfence1_CPPFLAGS = -DUSE_GET $(AM_CPPFLAGS)
+getfence1_SOURCES = fence.c
+
+putfence1_CPPFLAGS = -DUSE_PUT $(AM_CPPFLAGS)
+putfence1_SOURCES = fence.c
+
+lock_contention_dt_CPPFLAGS = -DMULTI_ORIGIN -DSINGLE_TARGET -DUSE_FLUSH_NONE -DUSE_FLUSH_LOCAL_NONE $(AM_CPPFLAGS)
+lock_contention_dt_SOURCES = lock_x_dt.c
+
+lock_dt_CPPFLAGS = -DSINGLE_ORIGIN -DSINGLE_TARGET -DUSE_FLUSH_NONE -DUSE_FLUSH_LOCAL_NONE $(AM_CPPFLAGS)
+lock_dt_SOURCES = lock_x_dt.c
+
+lock_dt_flush_CPPFLAGS = -DSINGLE_ORIGIN -DSINGLE_TARGET -DUSE_FLUSH -DUSE_FLUSH_LOCAL_NONE $(AM_CPPFLAGS)
+lock_dt_flush_SOURCES = lock_x_dt.c
+
+lock_dt_flushlocal_CPPFLAGS = -DSINGLE_ORIGIN -DSINGLE_TARGET -DUSE_FLUSH_NONE -DUSE_FLUSH_LOCAL $(AM_CPPFLAGS)
+lock_dt_flushlocal_SOURCES = lock_x_dt.c
+
+lockall_dt_CPPFLAGS = -DSINGLE_ORIGIN -DMULTI_TARGET -DUSE_FLUSH_NONE -DUSE_FLUSH_LOCAL_NONE $(AM_CPPFLAGS)
+lockall_dt_SOURCES = lock_x_dt.c
+
+lockall_dt_flush_CPPFLAGS = -DSINGLE_ORIGIN -DMULTI_TARGET -DUSE_FLUSH -DUSE_FLUSH_LOCAL_NONE $(AM_CPPFLAGS)
+lockall_dt_flush_SOURCES = lock_x_dt.c
+
+lockall_dt_flushall_CPPFLAGS = -DSINGLE_ORIGIN -DMULTI_TARGET -DUSE_FLUSH_ALL -DUSE_FLUSH_LOCAL_NONE $(AM_CPPFLAGS)
+lockall_dt_flushall_SOURCES = lock_x_dt.c
+
+lockall_dt_flushlocal_CPPFLAGS = -DSINGLE_ORIGIN -DMULTI_TARGET -DUSE_FLUSH_NONE -DUSE_FLUSH_LOCAL $(AM_CPPFLAGS)
+lockall_dt_flushlocal_SOURCES = lock_x_dt.c
+
+lockall_dt_flushlocalall_CPPFLAGS = -DSINGLE_ORIGIN -DMULTI_TARGET -DUSE_FLUSH_NONE -DUSE_FLUSH_LOCAL_ALL $(AM_CPPFLAGS)
+lockall_dt_flushlocalall_SOURCES = lock_x_dt.c
+
+putpscw1_CPPFLAGS = $(AM_CPPFLAGS)
+putpscw1_SOURCES = putpscw1.c
+
+win_dynamic_acc_collattach_CPPFLAGS = -DUSE_INFO_COLL_ATTACH $(AM_CPPFLAGS)
+win_dynamic_acc_collattach_SOURCES = win_dynamic_acc.c
+
+win_dynamic_rma_flush_get_collattach_CPPFLAGS = -DUSE_INFO_COLL_ATTACH $(AM_CPPFLAGS)
+win_dynamic_rma_flush_get_collattach_SOURCES = win_dynamic_rma_flush_get.c
+
+aint_collattach_CPPFLAGS = -DUSE_INFO_COLL_ATTACH $(AM_CPPFLAGS)
+aint_collattach_SOURCES = aint.c
+
+window_attach_collattach_CPPFLAGS = -DUSE_INFO_COLL_ATTACH $(AM_CPPFLAGS)
+window_attach_collattach_SOURCES = window_attach.c

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIDPOST_H_INCLUDED
@@ -158,11 +157,17 @@ int MPIDI_CH3_Comm_connect(char * port_name, int root, MPIR_Comm * comm_ptr,
 #define MPIDI_CH3U_Request_increment_cc(req_, was_incomplete_)   \
     MPIR_cc_incr((req_)->cc_ptr, was_incomplete_)
 
+/* versions that do not require return */
+#define MPIDI_CH3U_Request_dec_cc(req_)   \
+    MPIR_cc_dec((req_)->cc_ptr)
+#define MPIDI_CH3U_Request_inc_cc(req_)   \
+    MPIR_cc_inc((req_)->cc_ptr)
 /*
  * Device level request management macros
  */
 
 #define MPID_Prequest_free_hook(req_) do {} while(0)
+#define MPID_Part_request_free_hook(req_) do {} while(0)
 
 /*
  * Device level progress engine macros
@@ -172,26 +177,27 @@ int MPIDI_CH3_Comm_connect(char * port_name, int root, MPIR_Comm * comm_ptr,
 #define MPID_Progress_end(progress_state_)   MPIDI_CH3_Progress_end(progress_state_)
 /* This is static inline instead of macro because otherwise MPID_Progress_test will
  * be a chain of macros and therefore can not be used as a callback function */
-static inline int MPID_Progress_test(void)
+static inline int MPID_Progress_test(MPID_Progress_state * state) /* state is unused */
 {
     return MPIDI_CH3_Progress_test();
 }
 #define MPID_Progress_poke()		     MPIDI_CH3_Progress_poke()
+#define MPID_Stream_progress(stream)         MPIDI_CH3_Progress_poke()
 
 /* Dynamic process support */
 int MPIDI_GPID_GetAllInComm( MPIR_Comm *comm_ptr, int local_size,
                              MPIDI_Gpid local_gpids[], int *singlePG );
 int MPIDI_GPID_Get( MPIR_Comm *comm_ptr, int rank, MPIDI_Gpid *gpid );
-int MPIDI_GPID_ToLpidArray( int size, MPIDI_Gpid gpid[], int lpid[] );
+int MPIDI_GPID_ToLpidArray( int size, MPIDI_Gpid gpid[], uint64_t lpid[] );
 int MPIDI_PG_ForwardPGInfo( MPIR_Comm *peer_ptr, MPIR_Comm *comm_ptr,
                             int nPGids, const MPIDI_Gpid gpids[],
                             int root );
 int MPID_Intercomm_exchange_map( MPIR_Comm *local_comm_ptr, int local_leader,
                                  MPIR_Comm *peer_comm_ptr, int remote_leader,
-                                 int *remote_size, int **remote_lpids,
+                                 int *remote_size, uint64_t **remote_lpids,
                                  int *is_low_group);
 int MPID_Create_intercomm_from_lpids( MPIR_Comm *newcomm_ptr,
-                                      int size, const int lpids[] );
+                                      int size, const uint64_t lpids[] );
 
 #define MPID_INTERCOMM_NO_DYNPROC(comm) (0)
 
@@ -212,30 +218,23 @@ MPL_STATIC_INLINE_PREFIX int MPID_Request_is_anysource(MPIR_Request * request_pt
 }
 
 /* communicator hooks */
-int MPIDI_CH3I_Comm_create_hook(struct MPIR_Comm *);
+int MPIDI_CH3I_Comm_commit_pre_hook(struct MPIR_Comm *);
 int MPIDI_CH3I_Comm_destroy_hook(struct MPIR_Comm *);
+int MPIDI_CH3I_Comm_commit_post_hook(struct MPIR_Comm *);
 
-int MPIDI_CH3I_Progress_register_hook(int (*progress_fn)(int*), int *id);
-int MPIDI_CH3I_Progress_deregister_hook(int id);
-int MPIDI_CH3I_Progress_activate_hook(int id);
-int MPIDI_CH3I_Progress_deactivate_hook(int id);
-
-#define MPID_Progress_register_hook(fn_, id_) MPIDI_CH3I_Progress_register_hook(fn_, id_)
-#define MPID_Progress_deregister_hook(id_) MPIDI_CH3I_Progress_deregister_hook(id_)
-#define MPID_Progress_activate_hook(id_) MPIDI_CH3I_Progress_activate_hook(id_)
-#define MPID_Progress_deactivate_hook(id_) MPIDI_CH3I_Progress_deactivate_hook(id_)
+int MPIDI_CH3I_Comm_set_hints(MPIR_Comm *, MPIR_Info *info_ptr);
 
 /*
   Device override hooks for asynchronous progress threads
 */
 MPL_STATIC_INLINE_PREFIX int MPID_Init_async_thread(void)
 {
-    return MPIR_Init_async_thread();
+    return MPIR_Start_progress_thread_impl(NULL);
 }
 
 MPL_STATIC_INLINE_PREFIX int MPID_Finalize_async_thread(void)
 {
-    return MPIR_Finalize_async_thread();
+    return MPIR_Stop_progress_thread_impl(NULL);
 }
 
 MPL_STATIC_INLINE_PREFIX int MPID_Test(MPIR_Request * request_ptr, int *flag, MPI_Status * status)

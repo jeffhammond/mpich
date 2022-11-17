@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_INFO_H_INCLUDED
@@ -42,13 +40,19 @@
   that must be handled.  In particular, multiple threads are allowed to
   update the same info value.  Thus, all of the update routines must be thread
   safe; the simple implementation used in the MPICH implementation uses locks.
-  Note that the 'MPI_Info_delete' call does not need a lock; the defintion of
+  Note that the 'MPI_Info_delete' call does not need a lock; the definition of
   thread-safety means that any order of the calls functions correctly; since
   it invalid either to delete the same 'MPI_Info' twice or to modify an
   'MPI_Info' that has been deleted, only one thread at a time can call
   'MPI_Info_free' on any particular 'MPI_Info' value.
 
   T*/
+
+struct info_entry {
+    char *key;
+    char *value;
+};
+
 /*S
   MPIR_Info - Structure of an MPIR info
 
@@ -83,23 +87,23 @@
   S*/
 struct MPIR_Info {
     MPIR_OBJECT_HEADER;         /* adds handle and ref_count fields */
-    struct MPIR_Info *next;
-    char *key;
-    char *value;
+    /* a dynamic array */
+    struct info_entry *entries;
+    int capacity;
+    int size;
 };
+
 extern MPIR_Object_alloc_t MPIR_Info_mem;
 /* Preallocated info objects */
-#define MPIR_INFO_N_BUILTIN 2
 extern MPIR_Info MPIR_Info_builtin[MPIR_INFO_N_BUILTIN];
 extern MPIR_Info MPIR_Info_direct[];
 
-int MPIR_Info_get_impl(MPIR_Info * info_ptr, const char *key, int valuelen, char *value, int *flag);
-void MPIR_Info_get_nkeys_impl(MPIR_Info * info_ptr, int *nkeys);
-int MPIR_Info_get_nthkey_impl(MPIR_Info * info, int n, char *key);
-void MPIR_Info_get_valuelen_impl(MPIR_Info * info_ptr, const char *key, int *valuelen, int *flag);
-int MPIR_Info_set_impl(MPIR_Info * info_ptr, const char *key, const char *value);
-int MPIR_Info_dup_impl(MPIR_Info * info_ptr, MPIR_Info ** new_info_ptr);
-void MPIR_Info_free(MPIR_Info * info_ptr);
 int MPIR_Info_alloc(MPIR_Info ** info_p_p);
+void MPIR_Info_setup_env(MPIR_Info * info_ptr);
+int MPIR_Info_push(MPIR_Info * info_ptr, const char *key, const char *val);
+const char *MPIR_Info_lookup(MPIR_Info * info_ptr, const char *key);
+
+/* utility to decode hex info value */
+int MPIR_Info_decode_hex(const char *str, void *buf, int len);
 
 #endif /* MPIR_INFO_H_INCLUDED */

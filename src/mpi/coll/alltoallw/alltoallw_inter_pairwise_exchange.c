@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -21,21 +19,17 @@
  * FIXME: change algorithm to match intracommunicator alltoallv
  */
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Alltoallw_inter_pairwise_exchange
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIR_Alltoallw_inter_pairwise_exchange(const void *sendbuf, const int sendcounts[],
-                                           const int sdispls[], const MPI_Datatype sendtypes[],
-                                           void *recvbuf, const int recvcounts[],
-                                           const int rdispls[], const MPI_Datatype recvtypes[],
+int MPIR_Alltoallw_inter_pairwise_exchange(const void *sendbuf, const MPI_Aint sendcounts[],
+                                           const MPI_Aint sdispls[], const MPI_Datatype sendtypes[],
+                                           void *recvbuf, const MPI_Aint recvcounts[],
+                                           const MPI_Aint rdispls[], const MPI_Datatype recvtypes[],
                                            MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
     int local_size, remote_size, max_size, i;
     int mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
     MPI_Status status;
-    int src, dst, rank, sendcount, recvcount;
+    int src, dst, rank;
     char *sendaddr, *recvaddr;
     MPI_Datatype sendtype, recvtype;
 
@@ -46,6 +40,7 @@ int MPIR_Alltoallw_inter_pairwise_exchange(const void *sendbuf, const int sendco
     /* Use pairwise exchange algorithm. */
     max_size = MPL_MAX(local_size, remote_size);
     for (i = 0; i < max_size; i++) {
+        MPI_Aint sendcount, recvcount;
         src = (rank - i + max_size) % max_size;
         dst = (rank + i) % max_size;
         if (src >= remote_size) {

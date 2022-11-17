@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -22,15 +20,11 @@
  * performs twice as fast as recursive doubling for long messages (on
  * Myrinet and IBM SP).
  */
-#undef FUNCNAME
-#define FUNCNAME MPIR_Allgather_intra_ring
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Allgather_intra_ring(const void *sendbuf,
-                              int sendcount,
+                              MPI_Aint sendcount,
                               MPI_Datatype sendtype,
                               void *recvbuf,
-                              int recvcount,
+                              MPI_Aint recvcount,
                               MPI_Datatype recvtype, MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
     int comm_size, rank;
@@ -39,9 +33,6 @@ int MPIR_Allgather_intra_ring(const void *sendbuf,
     MPI_Aint recvtype_extent;
     int j, i;
     int left, right, jnext;
-
-    if (((sendcount == 0) && (sendbuf != MPI_IN_PLACE)) || (recvcount == 0))
-        return MPI_SUCCESS;
 
     comm_size = comm_ptr->local_size;
     rank = comm_ptr->rank;
@@ -53,9 +44,7 @@ int MPIR_Allgather_intra_ring(const void *sendbuf,
         mpi_errno = MPIR_Localcopy(sendbuf, sendcount, sendtype,
                                    ((char *) recvbuf +
                                     rank * recvcount * recvtype_extent), recvcount, recvtype);
-        if (mpi_errno) {
-            MPIR_ERR_POP(mpi_errno);
-        }
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     /*

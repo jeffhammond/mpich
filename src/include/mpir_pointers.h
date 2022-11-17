@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_POINTERS_H_INCLUDED
@@ -20,7 +18,7 @@
 #define MPIR_Valid_ptr_class(kind,ptr,errclass,err) \
     do {                                                                \
         if (!(ptr)) {                                                   \
-            err = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, errclass, \
+            err = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, __func__, __LINE__, errclass, \
                                        "**nullptrtype", "**nullptrtype %s", #kind); \
             /* Explicitly tell Coverity that errclass != MPI_SUCCESS => err != MPI_SUCCESS */ \
             MPIR_Assert((errclass) == MPI_SUCCESS || ((err) != MPI_SUCCESS)); \
@@ -48,6 +46,8 @@
 #define MPIR_Errhandler_valid_ptr(ptr,err) MPIR_Valid_ptr_class(Errhandler,ptr,MPI_ERR_ARG,err)
 #define MPIR_Request_valid_ptr(ptr,err) MPIR_Valid_ptr_class(Request,ptr,MPI_ERR_REQUEST,err)
 #define MPII_Keyval_valid_ptr(ptr,err) MPIR_Valid_ptr_class(Keyval,ptr,MPI_ERR_KEYVAL,err)
+#define MPIR_Session_valid_ptr(ptr,err) MPIR_Valid_ptr_class(Session,ptr,MPI_ERR_SESSION,err)
+#define MPIR_Stream_valid_ptr(ptr,err) MPIR_Valid_ptr_class(Stream,ptr,MPIX_ERR_STREAM,err)
 
 
 /* Assigns (src_) to (dst_), checking that (src_) fits in (dst_) without

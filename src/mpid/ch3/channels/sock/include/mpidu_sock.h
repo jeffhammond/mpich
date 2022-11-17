@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIDU_SOCK_H_INCLUDED
@@ -244,7 +243,7 @@ Notes:
 This function only closes the first open socket of a sock_set and returns the
 user pointer of the sock-info structure. To close all sockets, the function must
 be called repeatedly, untiluser_ptr == NULL. The reason for this is
-that the overlying protocoll may need the user_ptr for further cleanup.
+that the overlying protocol may need the user_ptr for further cleanup.
 
 @*/
 int MPIDI_CH3I_Sock_close_open_sockets(struct MPIDI_CH3I_Sock_set *sock_set, void **user_ptr);
@@ -453,27 +452,14 @@ Utility-Sock
 int MPIDI_CH3I_Sock_post_connect(MPIDI_CH3I_Sock_set_t set, void *user_ptr, char *host_description,
                                  int port, MPIDI_CH3I_Sock_t * sock);
 
-/*S
-  MPIDI_CH3I_Sock_ifaddr_t - Structure to hold an Internet address.
-
-+ len - Length of the address.  4 for IPv4, 16 for IPv6.
-- ifaddr - Address bytes (as bytes, not characters)
-
-S*/
-typedef struct MPIDI_CH3I_Sock_ifaddr_t {
-    int len, type;
-    unsigned char ifaddr[16];
-} MPIDI_CH3I_Sock_ifaddr_t;
-
 /*@ MPIDI_CH3I_Sock_post_connect_ifaddr - Post a connection given an interface
   address (bytes, not string).
 
   This is the basic routine.  MPIDI_CH3I_Sock_post_connect converts the
   host description into the ifaddr and calls this routine.
   @*/
-int MPIDI_CH3I_Sock_post_connect_ifaddr(MPIDI_CH3I_Sock_set_t sock_set,
-                                        void *user_ptr,
-                                        MPIDI_CH3I_Sock_ifaddr_t * ifaddr, int port,
+int MPIDI_CH3I_Sock_post_connect_ifaddr(MPIDI_CH3I_Sock_set_t sock_set, void *user_ptr,
+                                        MPL_sockaddr_t * p_addr, int port,
                                         MPIDI_CH3I_Sock_t * sockp);
 
 
@@ -524,7 +510,7 @@ If any other operations are posted on the specified sock, they will be terminate
 terminated operation.  All such events will be delivered by MPIDI_CH3I_Sock_wait() prior to the delivery of the MPIDI_CH3I_SOCK_OP_CLOSE
 event.
 
-The sock object is destroyed just prior to the MPIDI_CH3I_SOCK_OP_CLOSE event being returned by MPIDI_CH3I_Sock_wait().  Any oustanding
+The sock object is destroyed just prior to the MPIDI_CH3I_SOCK_OP_CLOSE event being returned by MPIDI_CH3I_Sock_wait().  Any outstanding
 references to the sock object held by the application should be considered invalid and not used again.
 
 Thread safety:
@@ -678,7 +664,7 @@ that one thread is not attempting to post a new operation while another thread i
 Module:
 Utility-Sock
 @*/
-int MPIDI_CH3I_Sock_post_readv(MPIDI_CH3I_Sock_t sock, MPL_IOV * iov, int iov_n,
+int MPIDI_CH3I_Sock_post_readv(MPIDI_CH3I_Sock_t sock, struct iovec * iov, int iov_n,
                                MPIDI_CH3I_Sock_progress_update_func_t fn);
 
 
@@ -798,7 +784,7 @@ that one thread is not attempting to post a new operation while another thread i
 Module:
 Utility-Sock
 @*/
-int MPIDI_CH3I_Sock_post_writev(MPIDI_CH3I_Sock_t sock, MPL_IOV * iov, int iov_n,
+int MPIDI_CH3I_Sock_post_writev(MPIDI_CH3I_Sock_t sock, struct iovec * iov, int iov_n,
                                 MPIDI_CH3I_Sock_progress_update_func_t fn);
 
 
@@ -855,7 +841,7 @@ MPIDI_CH3I_Sock_wakeup() may not be called from within a progress update functio
 progress update function.
 
 The implementation should strive to only wakeup a MPIDI_CH3I_Sock_wait() that is already blocking; however, it is acceptable (although
-undesireable) for it wakeup a MPIDI_CH3I_Sock_wait() that is called in the future.
+undesirable) for it wakeup a MPIDI_CH3I_Sock_wait() that is called in the future.
 
 Module:
 Utility-Sock
@@ -959,7 +945,7 @@ not attempting to perform an immediate read while another thread is attempting t
 Module:
 Utility-Sock
 @*/
-int MPIDI_CH3I_Sock_readv(MPIDI_CH3I_Sock_t sock, MPL_IOV * iov, int iov_n, size_t * num_read);
+int MPIDI_CH3I_Sock_readv(MPIDI_CH3I_Sock_t sock, struct iovec * iov, int iov_n, size_t * num_read);
 
 
 /*@
@@ -1057,7 +1043,7 @@ not attempting to perform an immediate write while another thread is attempting 
 Module:
 Utility-Sock
 @*/
-int MPIDI_CH3I_Sock_writev(MPIDI_CH3I_Sock_t sock, MPL_IOV * iov, int iov_n, size_t * num_written);
+int MPIDI_CH3I_Sock_writev(MPIDI_CH3I_Sock_t sock, struct iovec * iov, int iov_n, size_t * num_written);
 
 
 /*@

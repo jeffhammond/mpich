@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -20,14 +18,10 @@
  * time and there will be multiple repeated malloc/free's rather than
  * maintaining a single buffer across the whole loop.  Something like
  * MADRE is probably the best solution for the MPI_IN_PLACE scenario. */
-#undef FUNCNAME
-#define FUNCNAME MPIR_Alltoallv_intra_pairwise_sendrecv_replace
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIR_Alltoallv_intra_pairwise_sendrecv_replace(const void *sendbuf, const int *sendcounts,
-                                                   const int *sdispls, MPI_Datatype sendtype,
-                                                   void *recvbuf, const int *recvcounts,
-                                                   const int *rdispls, MPI_Datatype recvtype,
+int MPIR_Alltoallv_intra_pairwise_sendrecv_replace(const void *sendbuf, const MPI_Aint * sendcounts,
+                                                   const MPI_Aint * sdispls, MPI_Datatype sendtype,
+                                                   void *recvbuf, const MPI_Aint * recvcounts,
+                                                   const MPI_Aint * rdispls, MPI_Datatype recvtype,
                                                    MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
     int comm_size, i, j;

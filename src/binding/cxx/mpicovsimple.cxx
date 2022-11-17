@@ -1,14 +1,15 @@
-//-*- Mode: C++; c-basic-offset:4 ; -*- */
-//
-//  Copyright (C) 2004 by Argonne National Laboratory.
-//      See COPYRIGHT in top-level directory.
-//
-// This is a *very* simple tool for basic coverage analysis.  
-// This is intended as a stop-gap until gcov works with the C++ files
-// used in the MPICH binding of C++ (as of 2/23/2004, gcov aborts when
-// processing the coverage files produced by g++ for the MPICH C++
-// binding).
-//
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
+/*
+ * This is a *very* simple tool for basic coverage analysis.
+ * This is intended as a stop-gap until gcov works with the C++ files
+ * used in the MPICH binding of C++ (as of 2/23/2004, gcov aborts when
+ * processing the coverage files produced by g++ for the MPICH C++
+ * binding).
+ */
 
 #include <iostream.h>
 #include <fstream.h>
@@ -145,7 +146,7 @@ int MPIX_Coverage::FileMerge( const char filename[] )
 	// If this becomes a problem, we can merge the two
 	// into a single output
 	while (infile) {
-	    fp.count = -1;  // Set a sentinal on eof in infile
+	    fp.count = -1;  // Set a sentinel on eof in infile
 	    infile >> fp.name >> fp.argcount >> fp.count >> fp.sourceFile >>
 		fp.firstLine >> fp.lastLine;
 	    if (fp.count == -1) break;

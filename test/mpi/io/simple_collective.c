@@ -1,12 +1,11 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 
 /* this deceptively simple test uncovered a bug in the way certain file systems
- * dealt with tuning parmeters.  See
+ * dealt with tuning parameters.  See
  * https://github.com/open-mpi/ompi/issues/158 and
  * http://trac.mpich.org/projects/mpich/ticket/2261
  *
@@ -19,6 +18,7 @@
  * I am surprised src/mpi/romio/test/create_excl.c did not uncover the bug
  */
 
+#include "mpitest.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,15 +31,13 @@
 #include <mpi.h>
 #include <errno.h>
 #include <getopt.h>
-#include "mpitest.h"
 
 static char *opt_file = NULL;
-static int rank = -1;
 
-static int parse_args(int argc, char **argv);
+static int parse_args(int rank, int argc, char **argv);
 static void usage(const char *prog);
 
-int test_write(char *file, int nprocs, int rank, MPI_Info info)
+static int test_write(char *file, int nprocs, int rank, MPI_Info info)
 {
     double stime, etime, wtime, w_elapsed, w_slowest, elapsed, slowest;
     MPI_File fh;
@@ -91,23 +89,23 @@ int test_write(char *file, int nprocs, int rank, MPI_Info info)
 
 int main(int argc, char **argv)
 {
+    int rank = -1;
     int nprocs;
     char file[256];
     MPI_Info info;
     int nr_errors = 0;
-
 
     MTest_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
     /* parse the command line arguments */
-    parse_args(argc, argv);
+    parse_args(rank, argc, argv);
 
     sprintf(file, "%s", opt_file);
     MPI_Info_create(&info);
     nr_errors += test_write(file, nprocs, rank, info);
-    /* acutal value does not matter.  test only writes a small amount of data */
+    /* actual value does not matter.  test only writes a small amount of data */
     MPI_Info_set(info, "striping_factor", "50");
     nr_errors += test_write(file, nprocs, rank, info);
     MPI_Info_free(&info);
@@ -116,7 +114,7 @@ int main(int argc, char **argv)
     return MTestReturnValue(nr_errors);
 }
 
-static int parse_args(int argc, char **argv)
+static int parse_args(int rank, int argc, char **argv)
 {
     int c;
 
@@ -153,7 +151,3 @@ static void usage(const char *prog)
     printf("\n<OPTIONS> is one or more of\n");
     printf(" -h       print this help\n");
 }
-
-/*
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */

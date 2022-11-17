@@ -1,161 +1,111 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
- *  Portions of this code were written by Intel Corporation.
- *  Copyright (C) 2011-2016 Intel Corporation.  Intel provides this material
- *  to Argonne National Laboratory subject to Software Grant and Corporate
- *  Contributor License Agreement dated February 8, 2012.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #ifndef CH4_IMPL_H_INCLUDED
 #define CH4_IMPL_H_INCLUDED
 
 #include "ch4_types.h"
-#include <mpidch4.h>
 #include "mpidig.h"
+#include "mpidu_shm.h"
+#include "ch4_proc.h"
+#include "ch4_self.h"
+#include "ch4_vci.h"
 
-MPL_STATIC_INLINE_PREFIX int MPIDI_Progress_test(int flags);
+int MPIDIU_Intercomm_map_bcast_intra(MPIR_Comm * local_comm, int local_leader, int *remote_size,
+                                     int *is_low_group, int pure_intracomm,
+                                     int *remote_upid_size, char *remote_upids,
+                                     uint64_t ** remote_gpids);
+int MPIDIG_get_context_index(uint64_t context_id);
+uint64_t MPIDIG_generate_win_id(MPIR_Comm * comm_ptr);
+
+/* define CH4_CALL to call netmod or shm API based on is_local */
+#ifdef MPIDI_CH4_DIRECT_NETMOD
+#define CH4_CALL(FUNC, is_local_, err_) \
+    do { \
+        err_ = MPIDI_NM_ ## FUNC; \
+    } while (0)
+#else
+#define CH4_CALL(FUNC, is_local_, err_) \
+    do { \
+        if (is_local_) { \
+            err_ = MPIDI_SHM_ ## FUNC; \
+        } else { \
+            err_ = MPIDI_NM_ ## FUNC; \
+        } \
+    } while (0)
+#endif
+
+/* Request creation with locking for LOCKLESS MT model */
+#define MPIDI_CH4_REQUEST_CREATE(req, kind, pool, ref_count)            \
+    do {                                                                \
+        if (MPIDI_CH4_MT_MODEL == MPIDI_CH4_MT_LOCKLESS)                \
+            (req) = MPIR_Request_create_from_pool_safe(kind, pool, ref_count); \
+        else                                                            \
+            (req) = MPIR_Request_create_from_pool(kind, pool, ref_count); \
+    } while (0)
+
+#define MPIDI_CH4_REQUEST_FREE(req)                                \
+    do {                                                           \
+        if (MPIDI_CH4_MT_MODEL == MPIDI_CH4_MT_LOCKLESS)           \
+            MPIR_Request_free_safe(req);                           \
+        else                                                       \
+            MPIR_Request_free_unsafe(req);                         \
+    } while (0)
 
 /* Static inlines */
-static inline int MPIDIG_get_context_index(uint64_t context_id)
-{
-    int raw_prefix, idx, bitpos, gen_id;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_GET_CONTEXT_INDEX);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_GET_CONTEXT_INDEX);
-
-    raw_prefix = MPIR_CONTEXT_READ_FIELD(PREFIX, context_id);
-    idx = raw_prefix / MPIR_CONTEXT_INT_BITS;
-    bitpos = raw_prefix % MPIR_CONTEXT_INT_BITS;
-    gen_id = (idx * MPIR_CONTEXT_INT_BITS) + (31 - bitpos);
-
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_GET_CONTEXT_INDEX);
-    return gen_id;
-}
-
-static inline int MPIDIG_request_get_context_offset(MPIR_Request * req)
+/* Reconstruct context offset associated with a persistent request.
+ * Input must be a persistent request. */
+MPL_STATIC_INLINE_PREFIX int MPIDI_prequest_get_context_offset(MPIR_Request * preq)
 {
     int context_offset;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_REQUEST_GET_CONTEXT_OFFSET);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_REQUEST_GET_CONTEXT_OFFSET);
+    MPIR_FUNC_ENTER;
 
-    context_offset = MPIDIG_REQUEST(req, context_id) - req->comm->context_id;
+    MPIR_Assert(preq->kind == MPIR_REQUEST_KIND__PREQUEST_SEND ||
+                preq->kind == MPIR_REQUEST_KIND__PREQUEST_RECV);
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_REQUEST_GET_CONTEXT_OFFSET);
+    context_offset = MPIDI_PREQUEST(preq, context_id) - preq->comm->context_id;
+
+    MPIR_FUNC_EXIT;
 
     return context_offset;
 }
 
-static inline MPIR_Comm *MPIDIG_context_id_to_comm(uint64_t context_id)
-{
-    int comm_idx = MPIDIG_get_context_index(context_id);
-    int subcomm_type = MPIR_CONTEXT_READ_FIELD(SUBCOMM, context_id);
-    int is_localcomm = MPIR_CONTEXT_READ_FIELD(IS_LOCALCOMM, context_id);
-    MPIR_Comm *ret;
-
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_CONTEXT_ID_TO_COMM);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_CONTEXT_ID_TO_COMM);
-
-    MPIR_Assert(subcomm_type <= 3);
-    MPIR_Assert(is_localcomm <= 2);
-    ret = MPIDI_global.comm_req_lists[comm_idx].comm[is_localcomm][subcomm_type];
-
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_CONTEXT_ID_TO_COMM);
-    return ret;
-}
-
-static inline MPIDIG_rreq_t **MPIDIG_context_id_to_uelist(uint64_t context_id)
-{
-    int comm_idx = MPIDIG_get_context_index(context_id);
-    int subcomm_type = MPIR_CONTEXT_READ_FIELD(SUBCOMM, context_id);
-    int is_localcomm = MPIR_CONTEXT_READ_FIELD(IS_LOCALCOMM, context_id);
-    MPIDIG_rreq_t **ret;
-
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_CONTEXT_ID_TO_UELIST);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_CONTEXT_ID_TO_UELIST);
-
-    MPIR_Assert(subcomm_type <= 3);
-    MPIR_Assert(is_localcomm <= 2);
-
-    ret = &MPIDI_global.comm_req_lists[comm_idx].uelist[is_localcomm][subcomm_type];
-
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_CONTEXT_ID_TO_UELIST);
-    return ret;
-}
-
-static inline uint64_t MPIDIG_generate_win_id(MPIR_Comm * comm_ptr)
-{
-    uint64_t ret;
-
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_GENERATE_WIN_ID);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_GENERATE_WIN_ID);
-
-    /* context id lower bits, window instance upper bits */
-    ret = 1 + (((uint64_t) comm_ptr->context_id) |
-               ((uint64_t) ((MPIDIG_COMM(comm_ptr, window_instance))++) << 32));
-
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_GENERATE_WIN_ID);
-    return ret;
-}
-
-static inline MPIR_Context_id_t MPIDIG_win_id_to_context(uint64_t win_id)
+MPL_STATIC_INLINE_PREFIX MPIR_Context_id_t MPIDIG_win_id_to_context(uint64_t win_id)
 {
     MPIR_Context_id_t ret;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_WIN_ID_TO_CONTEXT);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_WIN_ID_TO_CONTEXT);
+    MPIR_FUNC_ENTER;
 
     /* pick the lower 32-bit to extract context id */
     ret = (win_id - 1) & 0xffffffff;
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_WIN_ID_TO_CONTEXT);
+    MPIR_FUNC_EXIT;
     return ret;
 }
 
-static inline MPIR_Context_id_t MPIDIG_win_to_context(const MPIR_Win * win)
+MPL_STATIC_INLINE_PREFIX MPIR_Context_id_t MPIDIG_win_to_context(const MPIR_Win * win)
 {
     MPIR_Context_id_t ret;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_WIN_TO_CONTEXT);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_WIN_TO_CONTEXT);
+    MPIR_FUNC_ENTER;
 
     ret = MPIDIG_win_id_to_context(MPIDIG_WIN(win, win_id));
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_WIN_TO_CONTEXT);
+    MPIR_FUNC_EXIT;
     return ret;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_request_complete
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-MPL_STATIC_INLINE_PREFIX void MPIDIU_request_complete(MPIR_Request * req)
-{
-    int incomplete;
-
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIU_REQUEST_COMPLETE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIU_REQUEST_COMPLETE);
-
-    MPIR_cc_decr(req->cc_ptr, &incomplete);
-    if (!incomplete)
-        MPIR_Request_free(req);
-
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIU_REQUEST_COMPLETE);
-}
-
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_target_add
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX MPIDIG_win_target_t *MPIDIG_win_target_add(MPIR_Win * win, int rank)
 {
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_WIN_TARGET_ADD);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_WIN_TARGET_ADD);
+    MPIR_FUNC_ENTER;
 
     MPIDIG_win_target_t *target_ptr = NULL;
     target_ptr = (MPIDIG_win_target_t *) MPL_malloc(sizeof(MPIDIG_win_target_t), MPL_MEM_RMA);
+    MPIR_Assert(target_ptr);
     target_ptr->rank = rank;
     MPIR_cc_set(&target_ptr->local_cmpl_cnts, 0);
     MPIR_cc_set(&target_ptr->remote_cmpl_cnts, 0);
@@ -166,30 +116,21 @@ MPL_STATIC_INLINE_PREFIX MPIDIG_win_target_t *MPIDIG_win_target_add(MPIR_Win * w
 
     HASH_ADD(hash_handle, MPIDIG_WIN(win, targets), rank, sizeof(int), target_ptr, MPL_MEM_RMA);
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_WIN_TARGET_ADD);
+    MPIR_FUNC_EXIT;
     return target_ptr;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_target_find
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX MPIDIG_win_target_t *MPIDIG_win_target_find(MPIR_Win * win, int rank)
 {
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_WIN_TARGET_FIND);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_WIN_TARGET_FIND);
+    MPIR_FUNC_ENTER;
 
     MPIDIG_win_target_t *target_ptr = NULL;
     HASH_FIND(hash_handle, MPIDIG_WIN(win, targets), &rank, sizeof(int), target_ptr);
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_WIN_TARGET_FIND);
+    MPIR_FUNC_EXIT;
     return target_ptr;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_target_get
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX MPIDIG_win_target_t *MPIDIG_win_target_get(MPIR_Win * win, int rank)
 {
     MPIDIG_win_target_t *target_ptr = MPIDIG_win_target_find(win, rank);
@@ -198,30 +139,20 @@ MPL_STATIC_INLINE_PREFIX MPIDIG_win_target_t *MPIDIG_win_target_get(MPIR_Win * w
     return target_ptr;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_target_delete
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX void MPIDIG_win_target_delete(MPIR_Win * win,
                                                        MPIDIG_win_target_t * target_ptr)
 {
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_WIN_TARGET_DELETE);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_WIN_TARGET_DELETE);
+    MPIR_FUNC_ENTER;
 
     HASH_DELETE(hash_handle, MPIDIG_WIN(win, targets), target_ptr);
     MPL_free(target_ptr);
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_WIN_TARGET_DELETE);
+    MPIR_FUNC_EXIT;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_target_cleanall
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX void MPIDIG_win_target_cleanall(MPIR_Win * win)
 {
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_WIN_TARGET_CLEANALL);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_WIN_TARGET_CLEANALL);
+    MPIR_FUNC_ENTER;
 
     MPIDIG_win_target_t *target_ptr, *tmp;
     HASH_ITER(hash_handle, MPIDIG_WIN(win, targets), target_ptr, tmp) {
@@ -229,241 +160,285 @@ MPL_STATIC_INLINE_PREFIX void MPIDIG_win_target_cleanall(MPIR_Win * win)
         MPL_free(target_ptr);
     }
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_WIN_TARGET_CLEANALL);
+    MPIR_FUNC_EXIT;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_hash_clear
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX void MPIDIG_win_hash_clear(MPIR_Win * win)
 {
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_WIN_HASH_CLEAR);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_WIN_HASH_CLEAR);
+    MPIR_FUNC_ENTER;
 
     HASH_CLEAR(hash_handle, MPIDIG_WIN(win, targets));
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_WIN_HASH_CLEAR);
+    MPIR_FUNC_EXIT;
 }
 
-#define MPIDI_Datatype_get_info(_count, _datatype,              \
-                                _dt_contig_out, _data_sz_out,   \
-                                _dt_ptr, _dt_true_lb)           \
+#define MPIDI_Datatype_get_info(count_, datatype_,              \
+                                dt_contig_out_, data_sz_out_,   \
+                                dt_ptr_, dt_true_lb_)           \
     do {                                                        \
-        if (IS_BUILTIN(_datatype))                              \
-        {                                                       \
-            (_dt_ptr)        = NULL;                            \
-            (_dt_contig_out) = TRUE;                            \
-            (_dt_true_lb)    = 0;                               \
-            (_data_sz_out)   = (size_t)(_count) *               \
-                MPIR_Datatype_get_basic_size(_datatype);        \
-        }                                                       \
-        else                                                    \
-        {                                                       \
-            MPIR_Datatype_get_ptr((_datatype), (_dt_ptr));      \
-            if (_dt_ptr)                                        \
+        if (IS_BUILTIN(datatype_)) {                            \
+            (dt_ptr_)        = NULL;                            \
+            (dt_contig_out_) = TRUE;                            \
+            (dt_true_lb_)    = 0;                               \
+            (data_sz_out_)   = (size_t)(count_) *               \
+                MPIR_Datatype_get_basic_size(datatype_);        \
+        } else {                                                \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));      \
+            if (dt_ptr_)                                        \
             {                                                   \
-                (_dt_contig_out) = (_dt_ptr)->is_contig;        \
-                (_dt_true_lb)    = (_dt_ptr)->true_lb;          \
-                (_data_sz_out)   = (size_t)(_count) *           \
-                    (_dt_ptr)->size;                            \
+                (dt_contig_out_) = (dt_ptr_)->is_contig;        \
+                (dt_true_lb_)    = (dt_ptr_)->true_lb;          \
+                (data_sz_out_)   = (size_t)(count_) *           \
+                    (dt_ptr_)->size;                            \
             }                                                   \
             else                                                \
             {                                                   \
-                (_dt_contig_out) = 1;                           \
-                (_dt_true_lb)    = 0;                           \
-                (_data_sz_out)   = 0;                           \
+                (dt_contig_out_) = 1;                           \
+                (dt_true_lb_)    = 0;                           \
+                (data_sz_out_)   = 0;                           \
             }                                                   \
         }                                                       \
     } while (0)
 
-#define MPIDI_Datatype_get_size_dt_ptr(_count, _datatype,       \
-                                       _data_sz_out, _dt_ptr)   \
+#define MPIDI_Datatype_get_size_dt_ptr(count_, datatype_,       \
+                                       data_sz_out_, dt_ptr_)   \
     do {                                                        \
-        if (IS_BUILTIN(_datatype))                              \
-        {                                                       \
-            (_dt_ptr)        = NULL;                            \
-            (_data_sz_out)   = (size_t)(_count) *               \
-                MPIR_Datatype_get_basic_size(_datatype);        \
-        }                                                       \
-        else                                                    \
-        {                                                       \
-            MPIR_Datatype_get_ptr((_datatype), (_dt_ptr));      \
-            (_data_sz_out)   = (_dt_ptr) ? (size_t)(_count) *   \
-                (_dt_ptr)->size : 0;                            \
+        if (IS_BUILTIN(datatype_)) {                            \
+            (dt_ptr_)        = NULL;                            \
+            (data_sz_out_)   = (size_t)(count_) *               \
+                MPIR_Datatype_get_basic_size(datatype_);        \
+        } else {                                                \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));      \
+            (data_sz_out_)   = (dt_ptr_) ? (size_t)(count_) *   \
+                (dt_ptr_)->size : 0;                            \
         }                                                       \
     } while (0)
 
-#define MPIDI_Datatype_check_contig(_datatype,_dt_contig_out)           \
+#define MPIDI_Datatype_check_contig(datatype_,dt_contig_out_)           \
     do {                                                                \
-        if (IS_BUILTIN(_datatype))                                      \
-        {                                                               \
-            (_dt_contig_out) = TRUE;                                    \
-        }                                                               \
-        else                                                            \
-        {                                                               \
-            MPIR_Datatype *_dt_ptr;                                     \
-            MPIR_Datatype_get_ptr((_datatype), (_dt_ptr));              \
-            (_dt_contig_out) = (_dt_ptr) ? (_dt_ptr)->is_contig : 1;    \
-        }                                                               \
-    } while (0)
-
-#define MPIDI_Datatype_check_contig_size(_datatype,_count,      \
-                                         _dt_contig_out,        \
-                                         _data_sz_out)          \
-    do {                                                        \
-        if (IS_BUILTIN(_datatype))                              \
-        {                                                       \
-            (_dt_contig_out) = TRUE;                            \
-            (_data_sz_out)   = (size_t)(_count) *               \
-                MPIR_Datatype_get_basic_size(_datatype);        \
-        }                                                       \
-        else                                                    \
-        {                                                       \
-            MPIR_Datatype *_dt_ptr;                             \
-            MPIR_Datatype_get_ptr((_datatype), (_dt_ptr));      \
-            if (_dt_ptr)                                        \
-            {                                                   \
-                (_dt_contig_out) = (_dt_ptr)->is_contig;        \
-                (_data_sz_out)   = (size_t)(_count) *           \
-                    (_dt_ptr)->size;                            \
-            }                                                   \
-            else                                                \
-            {                                                   \
-                (_dt_contig_out) = 1;                           \
-                (_data_sz_out)   = 0;                           \
-            }                                                   \
-        }                                                       \
-    } while (0)
-
-#define MPIDI_Datatype_check_size(_datatype,_count,_data_sz_out)        \
-    do {                                                                \
-        if (IS_BUILTIN(_datatype))                                      \
-        {                                                               \
-            (_data_sz_out)   = (size_t)(_count) *                       \
-                MPIR_Datatype_get_basic_size(_datatype);                \
-        }                                                               \
-        else                                                            \
-        {                                                               \
-            MPIR_Datatype *_dt_ptr;                                     \
-            MPIR_Datatype_get_ptr((_datatype), (_dt_ptr));              \
-            (_data_sz_out)   = (_dt_ptr) ? (size_t)(_count) *           \
-                (_dt_ptr)->size : 0;                                    \
-        }                                                               \
-    } while (0)
-
-#define MPIDI_Datatype_check_size_lb(_datatype,_count,_data_sz_out,     \
-                                     _dt_true_lb)                       \
-    do {                                                                \
-        if (IS_BUILTIN(_datatype)) {                                    \
-            (_data_sz_out)   = (size_t)(_count) *                       \
-                MPIR_Datatype_get_basic_size(_datatype);                \
-            (_dt_true_lb)    = 0;                                       \
+        if (IS_BUILTIN(datatype_)) {                                    \
+            (dt_contig_out_) = TRUE;                                    \
         } else {                                                        \
-            MPIR_Datatype *_dt_ptr;                                     \
-            MPIR_Datatype_get_ptr((_datatype), (_dt_ptr));              \
-            (_data_sz_out)   = (_dt_ptr) ? (size_t)(_count) *           \
-                (_dt_ptr)->size : 0;                                    \
-            (_dt_true_lb)    = (_dt_ptr) ? (_dt_ptr)->true_lb : 0;      \
+            MPIR_Datatype *dt_ptr_;                                     \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));              \
+            (dt_contig_out_) = (dt_ptr_) ? (dt_ptr_)->is_contig : 1;    \
         }                                                               \
     } while (0)
 
-#define MPIDI_Datatype_check_contig_size_lb(_datatype,_count,   \
-                                            _dt_contig_out,     \
-                                            _data_sz_out,       \
-                                            _dt_true_lb)        \
+#define MPIDI_Datatype_check_contig_size(datatype_,count_,      \
+                                         dt_contig_out_,        \
+                                         data_sz_out_)          \
     do {                                                        \
-        if (IS_BUILTIN(_datatype))                              \
-        {                                                       \
-            (_dt_contig_out) = TRUE;                            \
-            (_data_sz_out)   = (size_t)(_count) *               \
-                MPIR_Datatype_get_basic_size(_datatype);        \
-            (_dt_true_lb)    = 0;                               \
-        }                                                       \
-        else                                                    \
-        {                                                       \
-            MPIR_Datatype *_dt_ptr;                             \
-            MPIR_Datatype_get_ptr((_datatype), (_dt_ptr));      \
-            if (_dt_ptr)                                        \
-            {                                                   \
-                (_dt_contig_out) = (_dt_ptr)->is_contig;        \
-                (_data_sz_out)   = (size_t)(_count) *           \
-                    (_dt_ptr)->size;                            \
-                (_dt_true_lb)    = (_dt_ptr)->true_lb;          \
-            }                                                   \
-            else                                                \
-            {                                                   \
-                (_dt_contig_out) = 1;                           \
-                (_data_sz_out)   = 0;                           \
-                (_dt_true_lb)    = 0;                           \
+        if (IS_BUILTIN(datatype_)) {                            \
+            (dt_contig_out_) = TRUE;                            \
+            (data_sz_out_)   = (size_t)(count_) *               \
+                MPIR_Datatype_get_basic_size(datatype_);        \
+        } else {                                                \
+            MPIR_Datatype *dt_ptr_;                             \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));      \
+            if (dt_ptr_) {                                      \
+                (dt_contig_out_) = (dt_ptr_)->is_contig;        \
+                (data_sz_out_)   = (size_t)(count_) *           \
+                    (dt_ptr_)->size;                            \
+            } else {                                            \
+                (dt_contig_out_) = 1;                           \
+                (data_sz_out_)   = 0;                           \
             }                                                   \
         }                                                       \
     } while (0)
 
-#define MPIDI_Request_create_null_rreq(rreq_, mpi_errno_, FAIL_)        \
+#define MPIDI_Datatype_check_size(datatype_,count_,data_sz_out_)        \
     do {                                                                \
-        (rreq_) = MPIR_Request_create(MPIR_REQUEST_KIND__RECV);         \
-        if ((rreq_) != NULL) {                                          \
-            MPIR_cc_set(&(rreq_)->cc, 0);                               \
-            MPIR_Status_set_procnull(&(rreq_)->status);                 \
+        if (IS_BUILTIN(datatype_)) {                                    \
+            (data_sz_out_)   = (size_t)(count_) *                       \
+                MPIR_Datatype_get_basic_size(datatype_);                \
+        } else {                                                        \
+            MPIR_Datatype *dt_ptr_;                                     \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));              \
+            (data_sz_out_)   = (dt_ptr_) ? (size_t)(count_) *           \
+                (dt_ptr_)->size : 0;                                    \
         }                                                               \
-        else {                                                          \
-            MPIR_ERR_SETANDJUMP(mpi_errno_,MPIX_ERR_NOREQ,"**nomemreq"); \
+    } while (0)
+
+#define MPIDI_Datatype_check_size_lb(datatype_,count_,data_sz_out_,     \
+                                     dt_true_lb_)                       \
+    do {                                                                \
+        if (IS_BUILTIN(datatype_)) {                                    \
+            (data_sz_out_)   = (size_t)(count_) *                       \
+                MPIR_Datatype_get_basic_size(datatype_);                \
+            (dt_true_lb_)    = 0;                                       \
+        } else {                                                        \
+            MPIR_Datatype *dt_ptr_;                                     \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));              \
+            (data_sz_out_)   = (dt_ptr_) ? (size_t)(count_) *           \
+                (dt_ptr_)->size : 0;                                    \
+            (dt_true_lb_)    = (dt_ptr_) ? (dt_ptr_)->true_lb : 0;      \
         }                                                               \
+    } while (0)
+
+#define MPIDI_Datatype_check_contig_size_lb(datatype_,count_,   \
+                                            dt_contig_out_,     \
+                                            data_sz_out_,       \
+                                            dt_true_lb_)        \
+    do {                                                        \
+        if (IS_BUILTIN(datatype_)) {                            \
+            (dt_contig_out_) = TRUE;                            \
+            (data_sz_out_)   = (size_t)(count_) *               \
+                MPIR_Datatype_get_basic_size(datatype_);        \
+            (dt_true_lb_)    = 0;                               \
+        } else {                                                \
+            MPIR_Datatype *dt_ptr_;                             \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));      \
+            if (dt_ptr_) {                                      \
+                (dt_contig_out_) = (dt_ptr_)->is_contig;        \
+                (data_sz_out_)   = (size_t)(count_) *           \
+                    (dt_ptr_)->size;                            \
+                (dt_true_lb_)    = (dt_ptr_)->true_lb;          \
+            } else {                                            \
+                (dt_contig_out_) = 1;                           \
+                (data_sz_out_)   = 0;                           \
+                (dt_true_lb_)    = 0;                           \
+            }                                                   \
+        }                                                       \
+    } while (0)
+
+#define MPIDI_Datatype_check_contig_lb(datatype_, dt_contig_out_, dt_true_lb_) \
+    do {                                                                       \
+        if (IS_BUILTIN(datatype_)) {                                           \
+            (dt_contig_out_) = TRUE;                                           \
+            (dt_true_lb_)    = 0;                                              \
+        } else {                                                               \
+            MPIR_Datatype *dt_ptr_;                                            \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));                     \
+            if (dt_ptr_) {                                                     \
+                (dt_contig_out_) = (dt_ptr_)->is_contig;                       \
+                (dt_true_lb_)    = (dt_ptr_)->true_lb;                         \
+            } else {                                                           \
+                (dt_contig_out_) = 1;                                          \
+                (dt_true_lb_)    = 0;                                          \
+            }                                                                  \
+        }                                                                      \
+    } while (0)
+
+#define MPIDI_Datatype_check_lb(datatype_, dt_true_lb_)    \
+    do {                                                   \
+        if (IS_BUILTIN(datatype_)) {                       \
+            (dt_true_lb_)    = 0;                          \
+        } else {                                           \
+            MPIR_Datatype *dt_ptr_;                        \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_)); \
+            if (dt_ptr_) {                                 \
+                (dt_true_lb_)    = (dt_ptr_)->true_lb;     \
+            } else {                                       \
+                (dt_true_lb_)    = 0;                      \
+            }                                              \
+        }                                                  \
+    } while (0)
+
+#define MPIDI_Datatype_check_contig_size_extent_lb(datatype_,count_,   \
+                                                   dt_contig_out_,     \
+                                                   data_sz_out_,       \
+                                                   dt_extent_out_,     \
+                                                   dt_true_lb_)        \
+    do {                                                        \
+        if (IS_BUILTIN(datatype_)) {                            \
+            (dt_contig_out_) = TRUE;                            \
+            (data_sz_out_) = (size_t)(count_) * MPIR_Datatype_get_basic_size(datatype_);  \
+            (dt_extent_out_) = (data_sz_out_);                  \
+            (dt_true_lb_) = 0;                                  \
+        } else {                                                \
+            MPIR_Datatype *dt_ptr_;                             \
+            MPIR_Datatype_get_ptr((datatype_), (dt_ptr_));      \
+            MPIR_Assert(dt_ptr_);                               \
+            (dt_contig_out_) = (dt_ptr_)->is_contig;            \
+            (data_sz_out_) = (size_t)(count_) * (dt_ptr_)->size;    \
+            (dt_extent_out_) = (size_t)(count_) * (dt_ptr_)->extent;\
+            (dt_true_lb_) = (dt_ptr_)->true_lb;                 \
+        }                                                       \
+    } while (0)
+
+/* Check both origin|target buffers' size. */
+#define MPIDI_Datatype_check_origin_target_size(o_datatype_, t_datatype_,         \
+                                                o_count_, t_count_,               \
+                                                o_data_sz_out_, t_data_sz_out_)   \
+    do {                                                                          \
+        MPIDI_Datatype_check_size(o_datatype_, o_count_, o_data_sz_out_);         \
+        if (t_datatype_ == o_datatype_ && t_count_ == o_count_) {                 \
+            t_data_sz_out_ = o_data_sz_out_;                                      \
+        } else {                                                                  \
+            MPIDI_Datatype_check_size(t_datatype_, t_count_, t_data_sz_out_);     \
+        }                                                                         \
+    } while (0)
+
+/* Check both origin|target buffers' size, contig and lb. */
+#define MPIDI_Datatype_check_origin_target_contig_size_lb(o_datatype_, t_datatype_,             \
+                                                          o_count_, t_count_,                   \
+                                                          o_dt_contig_out_, t_dt_contig_out_,   \
+                                                          o_data_sz_out_, t_data_sz_out_,       \
+                                                          o_dt_true_lb_, t_dt_true_lb_)         \
+    do {                                                                                        \
+        MPIDI_Datatype_check_contig_size_lb(o_datatype_, o_count_, o_dt_contig_out_,            \
+                                            o_data_sz_out_, o_dt_true_lb_);                     \
+        if (t_datatype_ == o_datatype_ && t_count_ == o_count_) {                               \
+            t_dt_contig_out_ = o_dt_contig_out_;                                                \
+            t_data_sz_out_ = o_data_sz_out_;                                                    \
+            t_dt_true_lb_ = o_dt_true_lb_;                                                      \
+        }                                                                                       \
+        else {                                                                                  \
+            MPIDI_Datatype_check_contig_size_lb(t_datatype_, t_count_, t_dt_contig_out_,        \
+                                                t_data_sz_out_, t_dt_true_lb_);                 \
+        }                                                                                       \
     } while (0)
 
 #define IS_BUILTIN(_datatype)                           \
-    (HANDLE_GET_KIND(_datatype) == HANDLE_KIND_BUILTIN)
+    (HANDLE_IS_BUILTIN(_datatype))
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_valid_group_rank
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline int MPIDIU_valid_group_rank(MPIR_Comm * comm, int rank, MPIR_Group * grp)
+/* We assume this routine is never called with rank=MPI_PROC_NULL. */
+MPL_STATIC_INLINE_PREFIX int MPIDIU_valid_group_rank(MPIR_Comm * comm, int rank, MPIR_Group * grp)
 {
-    int lpid;
+    uint64_t gpid;
     int size = grp->size;
     int z;
     int ret;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIU_VALID_GROUP_RANK);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIU_VALID_GROUP_RANK);
+    MPIR_FUNC_ENTER;
 
-    if (unlikely(rank == MPI_PROC_NULL)) {
-        /* Treat PROC_NULL as always valid */
-        ret = 1;
-        goto fn_exit;
-    }
+    MPIDI_NM_comm_get_gpid(comm, rank, &gpid, FALSE);
 
-    MPIDI_NM_comm_get_lpid(comm, rank, &lpid, FALSE);
-
-    for (z = 0; z < size && lpid != grp->lrank_to_lpid[z].lpid; ++z) {
+    for (z = 0; z < size && gpid != grp->lrank_to_lpid[z].lpid; ++z) {
     }
 
     ret = (z < size);
 
-  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIU_VALID_GROUP_RANK);
+    MPIR_FUNC_EXIT;
     return ret;
 }
 
-/* TODO: Several unbounded loops call this macro. One way to avoid holding the
- * ALLFUNC_MUTEX lock forever is to insert YIELD in each loop. We choose to
- * insert it here for simplicity, but this might not be the best place. One
- * needs to investigate the appropriate place to yield the lock. */
+/* Following progress macros are currently used by window synchronization calls.
+ *
+ * CAUTION: the macro uses MPIR_ERR_CHECK, be careful of it escaping the
+ * critical section.
+ *
+ * NOTE: when used in a loop, we insert a yield of global lock to prevent
+ * blocking other progress (under global granularity).
+ */
 
-#define MPIDIU_PROGRESS()                                   \
-    do {                                                        \
-        mpi_errno = MPID_Progress_test();                       \
-        if (mpi_errno != MPI_SUCCESS) MPIR_ERR_POP(mpi_errno);  \
+/* declare to avoid header order dance */
+MPL_STATIC_INLINE_PREFIX int MPIDI_progress_test_vci(int vci);
+
+#define MPIDIU_PROGRESS_WHILE(cond, vci)         \
+    while (cond) {                          \
+        mpi_errno = MPIDI_progress_test_vci(vci);   \
+        MPIR_ERR_CHECK(mpi_errno); \
         MPID_THREAD_CS_YIELD(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX); \
-    } while (0)
+    }
 
-#define MPIDIU_PROGRESS_WHILE(cond)         \
-    do {                                        \
-        while (cond)                            \
-            MPIDIU_PROGRESS();              \
-    } while (0)
+#define MPIDIU_PROGRESS_DO_WHILE(cond, vci) \
+    do { \
+        mpi_errno = MPIDI_progress_test_vci(vci); \
+        MPIR_ERR_CHECK(mpi_errno); \
+        MPID_THREAD_CS_YIELD(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX); \
+    } while (cond)
 
 #ifdef HAVE_ERROR_CHECKING
 #define MPIDIG_EPOCH_CHECK_SYNC(win, mpi_errno, stmt)               \
@@ -582,18 +557,15 @@ static inline int MPIDIU_valid_group_rank(MPIR_Comm * comm, int rank, MPIR_Group
         MPID_END_ERROR_CHECKS;                                          \
     } while (0)
 
-#else /* HAVE_ERROR_CHECKING */
-#define MPIDIG_EPOCH_CHECK_SYNC(win, mpi_errno, stmt)               if (0) goto fn_fail;
-#define MPIDIG_EPOCH_CHECK_TARGET_SYNC(win, target_rank, mpi_errno, stmt)              if (0) goto fn_fail;
-#define MPIDIG_EPOCH_CHECK_PASSIVE(win, mpi_errno, stmt)            if (0) goto fn_fail;
-#define MPIDIG_EPOCH_CHECK_TARGET_LOCK(target_ptr, mpi_errno, stmt)  if (0) goto fn_fail;
-#define MPIDIG_ACCESS_EPOCH_CHECK_NONE(win, mpi_errno, stmt)        if (0) goto fn_fail;
-#define MPIDIG_EXPOSURE_EPOCH_CHECK_NONE(win, mpi_errno, stmt)           if (0) goto fn_fail;
-#define MPIDIG_LOCK_EPOCH_CHECK_NONE(win,rank,mpi_errno,stmt)       if (0) goto fn_fail;
-#define MPIDIG_FENCE_EPOCH_CHECK(win, mpi_errno, stmt)              if (0) goto fn_fail;
-#define MPIDIG_ACCESS_EPOCH_CHECK(win, epoch_type, mpi_errno, stmt) if (0) goto fn_fail;
-#define MPIDIG_EXPOSURE_EPOCH_CHECK(win, epoch_type, mpi_errno, stmt)    if (0) goto fn_fail;
-#endif /* HAVE_ERROR_CHECKING */
+#define MPIDIG_EPOCH_OP_REFENCE(win)                                \
+    do {                                                                \
+        if (MPIDIG_WIN(win, sync).access_epoch_type == MPIDIG_EPOTYPE_REFENCE && \
+            MPIDIG_WIN(win, sync).exposure_epoch_type == MPIDIG_EPOTYPE_REFENCE) \
+        {                                                               \
+            MPIDIG_WIN(win, sync).access_epoch_type = MPIDIG_EPOTYPE_FENCE; \
+            MPIDIG_WIN(win, sync).exposure_epoch_type = MPIDIG_EPOTYPE_FENCE; \
+        }                                                               \
+    } while (0)
 
 #define MPIDIG_EPOCH_FENCE_EVENT(win, massert)                      \
     do {                                                                \
@@ -609,37 +581,44 @@ static inline int MPIDIU_valid_group_rank(MPIR_Comm * comm, int rank, MPIR_Group
         }                                                               \
     } while (0)
 
-#define MPIDIG_EPOCH_OP_REFENCE(win)                                \
-    do {                                                                \
-        if (MPIDIG_WIN(win, sync).access_epoch_type == MPIDIG_EPOTYPE_REFENCE && \
-            MPIDIG_WIN(win, sync).exposure_epoch_type == MPIDIG_EPOTYPE_REFENCE) \
-        {                                                               \
-            MPIDIG_WIN(win, sync).access_epoch_type = MPIDIG_EPOTYPE_FENCE; \
-            MPIDIG_WIN(win, sync).exposure_epoch_type = MPIDIG_EPOTYPE_FENCE; \
-        }                                                               \
-    } while (0)
-
-/* Generic routine for checking synchronization at every RMA operation.*/
+/* Generic routine for checking synchronization at every RMA operation.
+ * Assuming no RMA operation with target_rank=PROC_NULL will call it. */
 #define MPIDIG_RMA_OP_CHECK_SYNC(target_rank, win)                                 \
     do {                                                                               \
         MPIDIG_EPOCH_CHECK_SYNC(win, mpi_errno, goto fn_fail);                     \
         MPIDIG_EPOCH_OP_REFENCE(win);                                              \
-        /* Check target sync status for any target_rank except PROC_NULL. */           \
-        if (target_rank != MPI_PROC_NULL)                                              \
-            MPIDIG_EPOCH_CHECK_TARGET_SYNC(win, target_rank, mpi_errno, goto fn_fail);  \
+        /* Check target sync status for target_rank. */       \
+        MPIDIG_EPOCH_CHECK_TARGET_SYNC(win, target_rank, mpi_errno, goto fn_fail); \
     } while (0);
+
+#else /* HAVE_ERROR_CHECKING */
+#define MPIDIG_EPOCH_CHECK_SYNC(win, mpi_errno, stmt)               if (0) goto fn_fail;
+#define MPIDIG_EPOCH_CHECK_TARGET_SYNC(win, target_rank, mpi_errno, stmt)              if (0) goto fn_fail;
+#define MPIDIG_EPOCH_CHECK_PASSIVE(win, mpi_errno, stmt)            if (0) goto fn_fail;
+#define MPIDIG_EPOCH_CHECK_TARGET_LOCK(target_ptr, mpi_errno, stmt)  if (0) goto fn_fail;
+#define MPIDIG_ACCESS_EPOCH_CHECK_NONE(win, mpi_errno, stmt)        if (0) goto fn_fail;
+#define MPIDIG_EXPOSURE_EPOCH_CHECK_NONE(win, mpi_errno, stmt)           if (0) goto fn_fail;
+#define MPIDIG_LOCK_EPOCH_CHECK_NONE(win,rank,mpi_errno,stmt)       if (0) goto fn_fail;
+#define MPIDIG_FENCE_EPOCH_CHECK(win, mpi_errno, stmt)              if (0) goto fn_fail;
+#define MPIDIG_ACCESS_EPOCH_CHECK(win, epoch_type, mpi_errno, stmt) if (0) goto fn_fail;
+#define MPIDIG_EXPOSURE_EPOCH_CHECK(win, epoch_type, mpi_errno, stmt)    if (0) goto fn_fail;
+#define MPIDIG_RMA_OP_CHECK_SYNC(target_rank, win) if (0) goto fn_fail;
+#define MPIDIG_EPOCH_FENCE_EVENT(win, massert) do {} while (0)
+#endif /* HAVE_ERROR_CHECKING */
+
+#define MPIDI_WIN_TARGET_VCI(win, rank) \
+    (MPIDI_WIN(win, vci_table) ? MPIDI_WIN(win, vci_table)[rank] : MPIDI_WIN(win, am_vci))
 
 /*
   Calculate base address of the target window at the origin side
   Return zero to let the target side calculate the actual address
   (only offset from window base is given to the target in this case)
 */
-static inline uintptr_t MPIDIG_win_base_at_origin(const MPIR_Win * win, int target_rank)
+MPL_STATIC_INLINE_PREFIX uintptr_t MPIDIG_win_base_at_origin(const MPIR_Win * win, int target_rank)
 {
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_WIN_BASE_AT_ORIGIN);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_WIN_BASE_AT_ORIGIN);
+    MPIR_FUNC_ENTER;
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_WIN_BASE_AT_ORIGIN);
+    MPIR_FUNC_EXIT;
 
     /* TODO: In future we may want to calculate the full virtual address
      * in the target at the origin side. It can be done by looking at
@@ -652,28 +631,21 @@ static inline uintptr_t MPIDIG_win_base_at_origin(const MPIR_Win * win, int targ
   If MPIDIG_win_base_at_origin calculates the full virtual address
   this function must return zero
 */
-static inline uintptr_t MPIDIG_win_base_at_target(const MPIR_Win * win)
+MPL_STATIC_INLINE_PREFIX uintptr_t MPIDIG_win_base_at_target(const MPIR_Win * win)
 {
     uintptr_t ret;
 
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_WIN_BASE_AT_TARGET);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_WIN_BASE_AT_TARGET);
+    MPIR_FUNC_ENTER;
 
     ret = (uintptr_t) win->base;
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_WIN_BASE_AT_TARGET);
+    MPIR_FUNC_EXIT;
     return ret;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_cmpl_cnts_incr
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline void MPIDIG_win_cmpl_cnts_incr(MPIR_Win * win, int target_rank,
-                                             MPIR_cc_t ** local_cmpl_cnts_ptr)
+MPL_STATIC_INLINE_PREFIX void MPIDIG_win_cmpl_cnts_incr(MPIR_Win * win, int target_rank,
+                                                        MPIR_cc_t ** local_cmpl_cnts_ptr)
 {
-    int c = 0;
-
     /* Increase per-window counters for fence, and per-target counters for
      * all other synchronization. */
     switch (MPIDIG_WIN(win, sync).access_epoch_type) {
@@ -686,15 +658,15 @@ static inline void MPIDIG_win_cmpl_cnts_incr(MPIR_Win * win, int target_rank,
             {
                 MPIDIG_win_target_t *target_ptr = MPIDIG_win_target_get(win, target_rank);
 
-                MPIR_cc_incr(&target_ptr->local_cmpl_cnts, &c);
-                MPIR_cc_incr(&target_ptr->remote_cmpl_cnts, &c);
+                MPIR_cc_inc(&target_ptr->local_cmpl_cnts);
+                MPIR_cc_inc(&target_ptr->remote_cmpl_cnts);
 
                 *local_cmpl_cnts_ptr = &target_ptr->local_cmpl_cnts;
                 break;
             }
         default:
-            MPIR_cc_incr(&MPIDIG_WIN(win, local_cmpl_cnts), &c);
-            MPIR_cc_incr(&MPIDIG_WIN(win, remote_cmpl_cnts), &c);
+            MPIR_cc_inc(&MPIDIG_WIN(win, local_cmpl_cnts));
+            MPIR_cc_inc(&MPIDIG_WIN(win, remote_cmpl_cnts));
 
             *local_cmpl_cnts_ptr = &MPIDIG_WIN(win, local_cmpl_cnts);
             break;
@@ -702,36 +674,26 @@ static inline void MPIDIG_win_cmpl_cnts_incr(MPIR_Win * win, int target_rank,
 }
 
 /* Increase counter for active message acc ops. */
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_remote_acc_cmpl_cnt_incr
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX void MPIDIG_win_remote_acc_cmpl_cnt_incr(MPIR_Win * win, int target_rank)
 {
-    int c = 0;
     switch (MPIDIG_WIN(win, sync).access_epoch_type) {
         case MPIDIG_EPOTYPE_LOCK:
         case MPIDIG_EPOTYPE_LOCK_ALL:
         case MPIDIG_EPOTYPE_START:
             {
                 MPIDIG_win_target_t *target_ptr = MPIDIG_win_target_get(win, target_rank);
-                MPIR_cc_incr(&target_ptr->remote_acc_cmpl_cnts, &c);
+                MPIR_cc_inc(&target_ptr->remote_acc_cmpl_cnts);
                 break;
             }
         default:
-            MPIR_cc_incr(&MPIDIG_WIN(win, remote_acc_cmpl_cnts), &c);
+            MPIR_cc_inc(&MPIDIG_WIN(win, remote_acc_cmpl_cnts));
             break;
     }
 }
 
 /* Decrease counter for active message acc ops. */
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_remote_acc_cmpl_cnt_decr
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX void MPIDIG_win_remote_acc_cmpl_cnt_decr(MPIR_Win * win, int target_rank)
 {
-    int c = 0;
     switch (MPIDIG_WIN(win, sync).access_epoch_type) {
         case MPIDIG_EPOTYPE_LOCK:
         case MPIDIG_EPOTYPE_LOCK_ALL:
@@ -739,24 +701,18 @@ MPL_STATIC_INLINE_PREFIX void MPIDIG_win_remote_acc_cmpl_cnt_decr(MPIR_Win * win
             {
                 MPIDIG_win_target_t *target_ptr = MPIDIG_win_target_find(win, target_rank);
                 MPIR_Assert(target_ptr);
-                MPIR_cc_decr(&target_ptr->remote_acc_cmpl_cnts, &c);
+                MPIR_cc_dec(&target_ptr->remote_acc_cmpl_cnts);
                 break;
             }
         default:
-            MPIR_cc_decr(&MPIDIG_WIN(win, remote_acc_cmpl_cnts), &c);
+            MPIR_cc_dec(&MPIDIG_WIN(win, remote_acc_cmpl_cnts));
             break;
     }
 
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_remote_cmpl_cnt_decr
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline void MPIDIG_win_remote_cmpl_cnt_decr(MPIR_Win * win, int target_rank)
+MPL_STATIC_INLINE_PREFIX void MPIDIG_win_remote_cmpl_cnt_decr(MPIR_Win * win, int target_rank)
 {
-    int c = 0;
-
     /* Decrease per-window counter for fence, and per-target counters for
      * all other synchronization. */
     switch (MPIDIG_WIN(win, sync).access_epoch_type) {
@@ -766,68 +722,68 @@ static inline void MPIDIG_win_remote_cmpl_cnt_decr(MPIR_Win * win, int target_ra
             {
                 MPIDIG_win_target_t *target_ptr = MPIDIG_win_target_find(win, target_rank);
                 MPIR_Assert(target_ptr);
-                MPIR_cc_decr(&target_ptr->remote_cmpl_cnts, &c);
+                MPIR_cc_dec(&target_ptr->remote_cmpl_cnts);
                 break;
             }
         default:
-            MPIR_cc_decr(&MPIDIG_WIN(win, remote_cmpl_cnts), &c);
+            MPIR_cc_dec(&MPIDIG_WIN(win, remote_cmpl_cnts));
             break;
     }
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_check_all_targets_remote_completed
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline void MPIDIG_win_check_all_targets_remote_completed(MPIR_Win * win, int *allcompleted)
+MPL_STATIC_INLINE_PREFIX bool MPIDIG_win_check_all_targets_remote_completed(MPIR_Win * win)
 {
     int rank = 0;
 
-    *allcompleted = 1;
+    if (!MPIDIG_WIN(win, targets))
+        return true;
+
+    bool allcompleted = true;
     MPIDIG_win_target_t *target_ptr = NULL;
     for (rank = 0; rank < win->comm_ptr->local_size; rank++) {
         target_ptr = MPIDIG_win_target_find(win, rank);
         if (!target_ptr)
             continue;
-        if (MPIR_cc_get(target_ptr->remote_cmpl_cnts) != 0) {
-            *allcompleted = 0;
+        if (MPIR_cc_get(target_ptr->remote_cmpl_cnts) != 0 ||
+            MPIR_cc_get(target_ptr->remote_acc_cmpl_cnts) != 0) {
+            allcompleted = false;
             break;
         }
     }
+    return allcompleted;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_check_all_targets_local_completed
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline void MPIDIG_win_check_all_targets_local_completed(MPIR_Win * win, int *allcompleted)
+MPL_STATIC_INLINE_PREFIX bool MPIDIG_win_check_all_targets_local_completed(MPIR_Win * win)
 {
     int rank = 0;
 
-    *allcompleted = 1;
+    if (!MPIDIG_WIN(win, targets))
+        return true;
+
+    bool allcompleted = true;
     MPIDIG_win_target_t *target_ptr = NULL;
     for (rank = 0; rank < win->comm_ptr->local_size; rank++) {
         target_ptr = MPIDIG_win_target_find(win, rank);
         if (!target_ptr)
             continue;
         if (MPIR_cc_get(target_ptr->local_cmpl_cnts) != 0) {
-            *allcompleted = 0;
+            allcompleted = false;
             break;
         }
     }
+    return allcompleted;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_win_check_group_local_completed
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline void MPIDIG_win_check_group_local_completed(MPIR_Win * win,
-                                                          int *ranks_in_win_grp,
-                                                          int grp_siz, int *allcompleted)
+MPL_STATIC_INLINE_PREFIX bool MPIDIG_win_check_group_local_completed(MPIR_Win * win,
+                                                                     int *ranks_in_win_grp,
+                                                                     int grp_siz)
 {
     int i = 0;
 
-    *allcompleted = 1;
+    if (!MPIDIG_WIN(win, targets))
+        return true;
+
+    bool allcompleted = true;
     MPIDIG_win_target_t *target_ptr = NULL;
     for (i = 0; i < grp_siz; i++) {
         int rank = ranks_in_win_grp[i];
@@ -835,17 +791,14 @@ static inline void MPIDIG_win_check_group_local_completed(MPIR_Win * win,
         if (!target_ptr)
             continue;
         if (MPIR_cc_get(target_ptr->local_cmpl_cnts) != 0) {
-            *allcompleted = 0;
+            allcompleted = false;
             break;
         }
     }
+    return allcompleted;
 }
 
 /* Map function interfaces in CH4 level */
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_map_create
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX void MPIDIU_map_create(void **out_map, MPL_memory_class class)
 {
     MPIDIU_map_t *map;
@@ -855,26 +808,26 @@ MPL_STATIC_INLINE_PREFIX void MPIDIU_map_create(void **out_map, MPL_memory_class
     *out_map = map;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_map_destroy
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX void MPIDIU_map_destroy(void *in_map)
 {
     MPIDIU_map_t *map = in_map;
+    MPIDIU_map_entry_t *e, *etmp;
+    HASH_ITER(hh, map->head, e, etmp) {
+        /* Free all remaining entries in the hash */
+        HASH_DELETE(hh, map->head, e);
+        MPL_free(e);
+    }
     HASH_CLEAR(hh, map->head);
     MPL_free(map);
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_map_set
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-MPL_STATIC_INLINE_PREFIX void MPIDIU_map_set(void *in_map, uint64_t id, void *val,
-                                             MPL_memory_class class)
+MPL_STATIC_INLINE_PREFIX void MPIDIU_map_set_unsafe(void *in_map, uint64_t id, void *val,
+                                                    MPL_memory_class class)
 {
     MPIDIU_map_t *map;
     MPIDIU_map_entry_t *map_entry;
+    /* MPIDIU_MAP_NOT_FOUND may be used as a special value to indicate an error. */
+    MPIR_Assert(val != MPIDIU_MAP_NOT_FOUND);
     map = (MPIDIU_map_t *) in_map;
     map_entry = MPL_malloc(sizeof(MPIDIU_map_entry_t), class);
     MPIR_Assert(map_entry != NULL);
@@ -883,10 +836,15 @@ MPL_STATIC_INLINE_PREFIX void MPIDIU_map_set(void *in_map, uint64_t id, void *va
     HASH_ADD(hh, map->head, key, sizeof(uint64_t), map_entry, class);
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_map_erase
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
+/* Sets a (id -> val) pair into the map, assuming there's no entry with `id`. */
+MPL_STATIC_INLINE_PREFIX void MPIDIU_map_set(void *in_map, uint64_t id, void *val,
+                                             MPL_memory_class class)
+{
+    MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_UTIL_MUTEX);
+    MPIDIU_map_set_unsafe(in_map, id, val, class);
+    MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_UTIL_MUTEX);
+}
+
 MPL_STATIC_INLINE_PREFIX void MPIDIU_map_erase(void *in_map, uint64_t id)
 {
     MPIDIU_map_t *map;
@@ -898,10 +856,6 @@ MPL_STATIC_INLINE_PREFIX void MPIDIU_map_erase(void *in_map, uint64_t id)
     MPL_free(map_entry);
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_map_lookup
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 MPL_STATIC_INLINE_PREFIX void *MPIDIU_map_lookup(void *in_map, uint64_t id)
 {
     void *rc;
@@ -917,171 +871,88 @@ MPL_STATIC_INLINE_PREFIX void *MPIDIU_map_lookup(void *in_map, uint64_t id)
     return rc;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_map_lookup
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
+/* Updates a value in the map which has `id` as a key.
+   If `id` does not exist in the map, it will be added. Returns the old value. */
+MPL_STATIC_INLINE_PREFIX void *MPIDIU_map_update(void *in_map, uint64_t id, void *new_val,
+                                                 MPL_memory_class class)
+{
+    void *rc;
+    MPIDIU_map_t *map;
+    MPIDIU_map_entry_t *map_entry;
+
+    MPID_THREAD_CS_ENTER(VCI, MPIDIU_THREAD_UTIL_MUTEX);
+    map = (MPIDIU_map_t *) in_map;
+    HASH_FIND(hh, map->head, &id, sizeof(uint64_t), map_entry);
+    if (map_entry == NULL) {
+        rc = MPIDIU_MAP_NOT_FOUND;
+        MPIDIU_map_set_unsafe(in_map, id, new_val, class);
+    } else {
+        rc = map_entry->value;
+        map_entry->value = new_val;
+    }
+    MPID_THREAD_CS_EXIT(VCI, MPIDIU_THREAD_UTIL_MUTEX);
+    return rc;
+}
+
+/* Return the associated av for a RMA target.
+ * This is an optimized path for direct intra comm (comm_world or dup from comm_world) by
+ * eliminating pointer dereferences into dynamic allocated objects (i.e., win->comm_ptr).*/
+MPL_STATIC_INLINE_PREFIX MPIDI_av_entry_t *MPIDIU_win_rank_to_av(MPIR_Win * win, int rank,
+                                                                 MPIDI_winattr_t winattr)
+{
+    MPIDI_av_entry_t *av = NULL;
+
+    if (winattr & MPIDI_WINATTR_DIRECT_INTRA_COMM) {
+        av = &MPIDI_global.avt_mgr.av_table0->table[rank];
+    } else
+        av = MPIDIU_comm_rank_to_av(win->comm_ptr, rank);
+    return av;
+}
+
+/* Return the local process's rank in the window.
+ * This is an optimized path for direct intra comm (comm_world or dup from comm_world) by
+ * eliminating pointer dereferences into dynamic allocated objects (i.e., win->comm_ptr).*/
+MPL_STATIC_INLINE_PREFIX int MPIDIU_win_comm_rank(MPIR_Win * win, MPIDI_winattr_t winattr)
+{
+    if (winattr & MPIDI_WINATTR_DIRECT_INTRA_COMM)
+        return MPIR_Process.rank;
+    else
+        return win->comm_ptr->rank;
+}
+
+/* Return the corresponding rank in intranode for a RMA target.
+ * This is an optimized path for direct intra comm (comm_world or dup from comm_world) by
+ * eliminating pointer dereferences into dynamic allocated objects (i.e., win->comm_ptr).*/
+MPL_STATIC_INLINE_PREFIX int MPIDIU_win_rank_to_intra_rank(MPIR_Win * win, int rank,
+                                                           MPIDI_winattr_t winattr)
+{
+    if (winattr & MPIDI_WINATTR_DIRECT_INTRA_COMM)
+        return MPIR_Process.comm_world->intranode_table[rank];
+    else
+        return win->comm_ptr->intranode_table[rank];
+}
+
 /* Wait until active message acc ops are done. */
-MPL_STATIC_INLINE_PREFIX int MPIDIG_wait_am_acc(MPIR_Win * win, int target_rank, int order_needed)
+/* NOTE: this function is currently only called from ofi_rma.h, it is being called
+ * outside per-vci critical section */
+MPL_STATIC_INLINE_PREFIX int MPIDIG_wait_am_acc(MPIR_Win * win, int target_rank)
 {
     int mpi_errno = MPI_SUCCESS;
-    if (MPIDIG_WIN(win, info_args).accumulate_ordering & order_needed) {
-        MPIDIG_win_target_t *target_ptr = MPIDIG_win_target_find(win, target_rank);
-        while ((target_ptr && MPIR_cc_get(target_ptr->remote_acc_cmpl_cnts) != 0) ||
-               MPIR_cc_get(MPIDIG_WIN(win, remote_acc_cmpl_cnts)) != 0) {
-            MPIDIU_PROGRESS();
-        }
+    MPIDIG_win_target_t *target_ptr = MPIDIG_win_target_find(win, target_rank);
+    MPID_Progress_state state;
+    state.vci_count = 1;
+    state.vci[0] = 0;   /* MPIDIG only uses vci 0 for now */
+    state.flag = MPIDI_PROGRESS_ALL;
+    /* skip other state fields for MPID_Progress_test */
+    while ((target_ptr && MPIR_cc_get(target_ptr->remote_acc_cmpl_cnts) != 0) ||
+           MPIR_cc_get(MPIDIG_WIN(win, remote_acc_cmpl_cnts)) != 0) {
+        mpi_errno = MPID_Progress_test(&state);
+        MPIR_ERR_CHECK(mpi_errno);
+        MPID_THREAD_CS_YIELD(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
     }
   fn_exit:
     return mpi_errno;
 
-  fn_fail:
-    goto fn_exit;
-}
-
-/* Collectively allocate shared memory region.
- * MPL_shm routines and MPI collectives are internally used.
- * The parameter *mapfail_flag_ptr is set to true and MPI_SUCCESS is returned
- * if mapping fails (e.g., no memory resource, or opened too many files), thus the
- * caller can choose fallback if exists. If communication fails it returns an MPI error.*/
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_allocate_shm_segment
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline int MPIDIU_allocate_shm_segment(MPIR_Comm * shm_comm_ptr,
-                                              MPI_Aint shm_segment_len,
-                                              MPL_shm_hnd_t * shm_segment_hdl_ptr,
-                                              void **base_ptr, bool * mapfail_flag_ptr)
-{
-    MPIR_Errflag_t errflag = MPIR_ERR_NONE;
-    int mpi_errno = MPI_SUCCESS, mpl_err = 0;
-    bool any_shm_fail_flag = false, shm_fail_flag = false, mapped_flag = false;
-
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIU_ALLOCATE_SHM_SEGMENT);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIU_ALLOCATE_SHM_SEGMENT);
-
-    mpl_err = MPL_shm_hnd_init(shm_segment_hdl_ptr);
-    MPIR_ERR_CHKANDJUMP(mpl_err, mpi_errno, MPI_ERR_OTHER, "**alloc_shar_mem");
-
-    *mapfail_flag_ptr = false;
-    *base_ptr = NULL;
-    if (shm_comm_ptr->rank == 0) {
-        char *serialized_hnd_ptr = NULL;
-        char mpl_err_hnd[MPL_SHM_GHND_SZ] = { 0 };
-
-        /* create shared memory region for all processes in win and map */
-        mpl_err = MPL_shm_seg_create_and_attach(*shm_segment_hdl_ptr, shm_segment_len, base_ptr, 0);
-        if (mpl_err != MPL_SHM_SUCCESS) {
-            shm_fail_flag = true;
-            goto hnd_sync;
-        } else
-            mapped_flag = true;
-
-        /* serialize handle and broadcast it to the other processes in win */
-        mpl_err = MPL_shm_hnd_get_serialized_by_ref(*shm_segment_hdl_ptr, &serialized_hnd_ptr);
-        if (mpl_err != MPL_SHM_SUCCESS)
-            shm_fail_flag = true;
-
-      hnd_sync:
-        /* bcast empty hnd as error reporting */
-        if (shm_fail_flag)
-            serialized_hnd_ptr = &mpl_err_hnd[0];
-        mpi_errno = MPIR_Bcast(serialized_hnd_ptr, MPL_SHM_GHND_SZ, MPI_CHAR, 0,
-                               shm_comm_ptr, &errflag);
-        MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
-
-        if (shm_fail_flag)
-            goto map_fail;
-
-        /* ensure all other processes have mapped successfully */
-        mpi_errno = MPIR_Allreduce(&shm_fail_flag, &any_shm_fail_flag, 1, MPI_C_BOOL,
-                                   MPI_LOR, shm_comm_ptr, &errflag);
-        MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
-
-        /* unlink shared memory region so it gets deleted when all processes exit */
-        mpl_err = MPL_shm_seg_remove(*shm_segment_hdl_ptr);
-        MPIR_ERR_CHKANDJUMP(mpl_err, mpi_errno, MPI_ERR_OTHER, "**remove_shar_mem");
-
-        if (any_shm_fail_flag)
-            goto map_fail;
-
-    } else {
-        char serialized_hnd[MPL_SHM_GHND_SZ] = { 0 };
-
-        /* get serialized handle from rank 0 and deserialize it */
-        mpi_errno = MPIR_Bcast(serialized_hnd, MPL_SHM_GHND_SZ, MPI_CHAR, 0,
-                               shm_comm_ptr, &errflag);
-        MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
-
-        /* empty handler means root fails */
-        if (strlen(serialized_hnd) == 0)
-            goto map_fail;
-
-        mpl_err = MPL_shm_hnd_deserialize(*shm_segment_hdl_ptr, serialized_hnd,
-                                          strlen(serialized_hnd));
-        if (mpl_err != MPL_SHM_SUCCESS) {
-            shm_fail_flag = true;
-            goto result_sync;
-        }
-
-        /* attach to shared memory region created by rank 0 */
-        mpl_err = MPL_shm_seg_attach(*shm_segment_hdl_ptr, shm_segment_len, base_ptr, 0);
-        if (mpl_err != MPL_SHM_SUCCESS) {
-            shm_fail_flag = true;
-            goto result_sync;
-        } else
-            mapped_flag = true;
-
-      result_sync:
-        mpi_errno = MPIR_Allreduce(&shm_fail_flag, &any_shm_fail_flag, 1, MPI_C_BOOL,
-                                   MPI_LOR, shm_comm_ptr, &errflag);
-        MPIR_ERR_CHKANDJUMP(errflag, mpi_errno, MPI_ERR_OTHER, "**coll_fail");
-
-        if (any_shm_fail_flag)
-            goto map_fail;
-    }
-
-  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIU_ALLOCATE_SHM_SEGMENT);
-    return mpi_errno;
-  map_fail:
-    /* clean up shm mapping resource */
-    if (mapped_flag) {
-        mpl_err = MPL_shm_seg_detach(*shm_segment_hdl_ptr, base_ptr, shm_segment_len);
-        MPIR_ERR_CHKANDJUMP(mpl_err, mpi_errno, MPI_ERR_OTHER, "**detach_shar_mem");
-        *base_ptr = NULL;
-    }
-    mpl_err = MPL_shm_hnd_finalize(shm_segment_hdl_ptr);
-    MPIR_ERR_CHKANDJUMP(mpl_err, mpi_errno, MPI_ERR_OTHER, "**remove_shar_mem");
-    *mapfail_flag_ptr = true;
-    goto fn_exit;
-  fn_fail:
-    goto fn_exit;
-}
-
-/* Destroy shared memory region on the local process.
- * MPL_shm routines are internally used. */
-#undef FUNCNAME
-#define FUNCNAME MPIDIU_destroy_shm_segment
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline int MPIDIU_destroy_shm_segment(MPI_Aint shm_segment_len,
-                                             MPL_shm_hnd_t * shm_segment_hdl_ptr, void **base_ptr)
-{
-    int mpi_errno = MPI_SUCCESS, mpl_err = 0;
-
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_DESTROY_SHM_SEGMENT);
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_DESTROY_SHM_SEGMENT);
-
-    mpl_err = MPL_shm_seg_detach(*shm_segment_hdl_ptr, base_ptr, shm_segment_len);
-    MPIR_ERR_CHKANDJUMP(mpl_err, mpi_errno, MPI_ERR_OTHER, "**detach_shar_mem");
-
-    mpl_err = MPL_shm_hnd_finalize(shm_segment_hdl_ptr);
-    MPIR_ERR_CHKANDJUMP(mpl_err, mpi_errno, MPI_ERR_OTHER, "**remove_shar_mem");
-
-  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_DESTROY_SHM_SEGMENT);
-    return mpi_errno;
   fn_fail:
     goto fn_exit;
 }
@@ -1090,143 +961,124 @@ static inline int MPIDIU_destroy_shm_segment(MPI_Aint shm_segment_len,
  * The source datatype can be only predefined; the target datatype can be
  * predefined or derived. If the source buffer has been packed by the caller,
  * src_kind must be set to MPIDIG_ACC_SRCBUF_PACKED.*/
-#undef FUNCNAME
-#define FUNCNAME MPIDIG_compute_acc_op
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-MPL_STATIC_INLINE_PREFIX int MPIDIG_compute_acc_op(void *source_buf, int source_count,
+MPL_STATIC_INLINE_PREFIX int MPIDIG_compute_acc_op(void *source_buf, MPI_Aint source_count,
                                                    MPI_Datatype source_dtp, void *target_buf,
-                                                   int target_count, MPI_Datatype target_dtp,
+                                                   MPI_Aint target_count, MPI_Datatype target_dtp,
                                                    MPI_Op acc_op, int src_kind)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPI_User_function *uop = NULL;
-    MPI_Aint source_dtp_size = 0, source_dtp_extent = 0;
-    int is_empty_source = FALSE;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDIG_COMPUTE_ACC_OP);
-
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDIG_COMPUTE_ACC_OP);
-
-    /* first Judge if source buffer is empty */
-    if (acc_op == MPI_NO_OP)
-        is_empty_source = TRUE;
-
-    if (is_empty_source == FALSE) {
-        MPIR_Assert(MPIR_DATATYPE_IS_PREDEFINED(source_dtp));
-        MPIR_Datatype_get_size_macro(source_dtp, source_dtp_size);
-        MPIR_Datatype_get_extent_macro(source_dtp, source_dtp_extent);
-    }
-
-    if (HANDLE_GET_KIND(acc_op) == HANDLE_KIND_BUILTIN) {
-        /* get the function by indexing into the op table */
-        uop = MPIR_OP_HDL_TO_FN(acc_op);
-    } else {
-        /* --BEGIN ERROR HANDLING-- */
-        mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
-                                         FCNAME, __LINE__, MPI_ERR_OP,
-                                         "**opnotpredefined", "**opnotpredefined %d", acc_op);
-        return mpi_errno;
-        /* --END ERROR HANDLING-- */
-    }
 
 
-    if (is_empty_source == TRUE || MPIR_DATATYPE_IS_PREDEFINED(target_dtp)) {
-        /* directly apply op if target dtp is predefined dtp OR source buffer is empty */
-        (*uop) (source_buf, target_buf, &source_count, &source_dtp);
-    } else {
-        /* derived datatype */
-        MPIR_Segment *segp;
-        MPL_IOV *dloop_vec;
-        MPI_Aint first, last;
-        int vec_len, i, count;
-        MPI_Aint type_extent, type_size, src_type_stride;
-        MPI_Datatype type;
-        MPIR_Datatype *dtp;
-        MPI_Aint curr_len;
-        void *curr_loc;
-        int accumulated_count;
+    MPIR_FUNC_ENTER;
 
-        segp = MPIR_Segment_alloc(NULL, target_count, target_dtp);
-        /* --BEGIN ERROR HANDLING-- */
-        if (!segp) {
-            mpi_errno =
-                MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__,
-                                     MPI_ERR_OTHER, "**nomem", 0);
-            goto fn_exit;
-        }
-        /* --END ERROR HANDLING-- */
-        first = 0;
-        last = first + source_count * source_dtp_size;
+    mpi_errno = MPIR_Typerep_op(source_buf, source_count, source_dtp,
+                                target_buf, target_count, target_dtp,
+                                acc_op, src_kind == MPIDIG_ACC_SRCBUF_PACKED, -1);
 
-        MPIR_Datatype_get_ptr(target_dtp, dtp);
-        MPIR_Assert(dtp != NULL);
-        vec_len = dtp->max_contig_blocks * target_count + 1;
-        /* +1 needed because Rob says so */
-        dloop_vec = (MPL_IOV *)
-            MPL_malloc(vec_len * sizeof(MPL_IOV), MPL_MEM_RMA);
-        /* --BEGIN ERROR HANDLING-- */
-        if (!dloop_vec) {
-            mpi_errno =
-                MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__,
-                                     MPI_ERR_OTHER, "**nomem", 0);
-            goto fn_exit;
-        }
-        /* --END ERROR HANDLING-- */
-
-        MPIR_Segment_to_iov(segp, first, &last, dloop_vec, &vec_len);
-
-        type = dtp->basic_type;
-        MPIR_Assert(type != MPI_DATATYPE_NULL);
-
-        MPIR_Assert(type == source_dtp);
-        type_size = source_dtp_size;
-        type_extent = source_dtp_extent;
-        /* If the source buffer has been packed by the caller, the distance between
-         * two elements can be smaller than extent. E.g., predefined pairtype may
-         * have larger extent than size.*/
-        if (src_kind == MPIDIG_ACC_SRCBUF_PACKED)
-            src_type_stride = source_dtp_size;
-        else
-            src_type_stride = source_dtp_extent;
-
-        i = 0;
-        curr_loc = dloop_vec[0].MPL_IOV_BUF;
-        curr_len = dloop_vec[0].MPL_IOV_LEN;
-        accumulated_count = 0;
-        while (i != vec_len) {
-            if (curr_len < type_size) {
-                MPIR_Assert(i != vec_len);
-                i++;
-                curr_len += dloop_vec[i].MPL_IOV_LEN;
-                continue;
-            }
-
-            MPIR_Assign_trunc(count, curr_len / type_size, int);
-
-            (*uop) ((char *) source_buf + src_type_stride * accumulated_count,
-                    (char *) target_buf + MPIR_Ptr_to_aint(curr_loc), &count, &type);
-
-            if (curr_len % type_size == 0) {
-                i++;
-                if (i != vec_len) {
-                    curr_loc = dloop_vec[i].MPL_IOV_BUF;
-                    curr_len = dloop_vec[i].MPL_IOV_LEN;
-                }
-            } else {
-                curr_loc = (void *) ((char *) curr_loc + type_extent * count);
-                curr_len -= type_size * count;
-            }
-
-            accumulated_count += count;
-        }
-
-        MPIR_Segment_free(segp);
-        MPL_free(dloop_vec);
-    }
-
-  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDIG_COMPUTE_ACC_OP);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
+}
+
+/* NOTE: the slot for MPI_OP_NULL refers to RMA cswap */
+MPL_STATIC_INLINE_PREFIX int MPIDIU_win_acc_op_get_index(MPI_Op op)
+{
+    return MPIR_Op_builtin_get_index(op);
+}
+
+MPL_STATIC_INLINE_PREFIX MPI_Op MPIDIU_win_acc_get_op(int index)
+{
+    return MPIR_Op_builtin_get_op(index);
+}
+
+/* Determine whether need poll progress for RMA target-side active message.
+ * The polling interval is set globally as we don't distinguish target-side
+ * AM handling per-window.  */
+MPL_STATIC_INLINE_PREFIX bool MPIDIG_rma_need_poll_am(void)
+{
+    bool poll_flag = false;
+
+    if (MPIR_CVAR_CH4_RMA_ENABLE_DYNAMIC_AM_PROGRESS) {
+        int interval;
+        MPIR_cc_incr(&MPIDIG_global.rma_am_poll_cntr, &interval);
+
+        /* Always poll if any RMA target-side AM has arrived because
+         * we expect more incoming AM now. */
+        if (MPL_atomic_load_int(&MPIDIG_global.rma_am_flag)) {
+            poll_flag = true;
+        } else {
+            /* Otherwise poll with low frequency to reduce latency */
+            poll_flag = ((interval + 1) % MPIR_CVAR_CH4_RMA_AM_PROGRESS_LOW_FREQ_INTERVAL
+                         == 0) ? true : false;
+        }
+    } else if (MPIR_CVAR_CH4_RMA_AM_PROGRESS_INTERVAL > 1) {
+        int interval;
+        MPIR_cc_incr(&MPIDIG_global.rma_am_poll_cntr, &interval);
+
+        /* User explicitly controls the polling frequency */
+        poll_flag = ((interval + 1) % MPIR_CVAR_CH4_RMA_AM_PROGRESS_INTERVAL == 0) ? true : false;
+    } else if (MPIR_CVAR_CH4_RMA_AM_PROGRESS_INTERVAL == 1) {
+        /* Skip cntr update when interval == 1, as we always poll (default)  */
+        poll_flag = true;
+    } else {
+        /* User explicitly disables polling */
+        poll_flag = false;
+    }
+
+    return poll_flag;
+}
+
+/* Set flag to indicate a target-side AM has arrived. */
+MPL_STATIC_INLINE_PREFIX void MPIDIG_rma_set_am_flag(void)
+{
+    MPL_atomic_store_int(&MPIDIG_global.rma_am_flag, 1);
+}
+
+MPL_STATIC_INLINE_PREFIX void update_sender_vci(MPIR_Comm * comm, int value)
+{
+    comm->hints[MPIR_COMM_HINT_SENDER_VCI] = value % MPIDI_global.n_vcis;
+}
+
+MPL_STATIC_INLINE_PREFIX void update_receiver_vci(MPIR_Comm * comm, int value)
+{
+    comm->hints[MPIR_COMM_HINT_RECEIVER_VCI] = value % MPIDI_global.n_vcis;
+}
+
+MPL_STATIC_INLINE_PREFIX void update_comm_vci(MPIR_Comm * comm, int value)
+{
+    /* update the comm hints vci, sender_vci, and receiver_vci */
+    comm->hints[MPIR_COMM_HINT_VCI] = value % MPIDI_global.n_vcis;
+    update_sender_vci(comm, value);
+    update_receiver_vci(comm, value);
+}
+
+MPL_STATIC_INLINE_PREFIX int MPIDI_set_comm_hint_sender_vci(MPIR_Comm * comm, int type, int value)
+{
+    /* if the generic hint "vci" is set, update all of "vci", "sender_vci", and "receiver_vci"
+     * for consistency */
+    if (comm->hints[MPIR_COMM_HINT_VCI] != MPIDI_VCI_INVALID) {
+        update_comm_vci(comm, value);
+    } else {
+        update_sender_vci(comm, value);
+    }
+    return MPI_SUCCESS;
+}
+
+MPL_STATIC_INLINE_PREFIX int MPIDI_set_comm_hint_receiver_vci(MPIR_Comm * comm, int type, int value)
+{
+    /* if the generic hint "vci" is set, update all of "vci", "sender_vci", and "receiver_vci"
+     * for consistency */
+    if (comm->hints[MPIR_COMM_HINT_VCI] != MPIDI_VCI_INVALID) {
+        update_comm_vci(comm, value);
+    } else {
+        update_receiver_vci(comm, value);
+    }
+    return MPI_SUCCESS;
+}
+
+MPL_STATIC_INLINE_PREFIX int MPIDI_set_comm_hint_vci(MPIR_Comm * comm, int type, int value)
+{
+    update_comm_vci(comm, value);
+    return MPI_SUCCESS;
 }
 
 #endif /* CH4_IMPL_H_INCLUDED */

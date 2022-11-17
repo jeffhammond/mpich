@@ -1,36 +1,17 @@
-dnl PAC_CXX_SEARCH_LIST - expands to a whitespace separated list of C++
-dnl compilers for use with AC_PROG_CXX that is more suitable for HPC software
-dnl packages
-AC_DEFUN([PAC_CXX_SEARCH_LIST],[$CCC icpc pgCC xlC pathCC g++ clang++ c++ cc++ cxx CC cl])
-dnl PAC_PROG_CXX - reprioritize the C++ compiler search order
-dnl NOTE: this macro suffers from a basically intractable "expanded before it
-dnl was required" problem when libtool is also used
-AC_DEFUN([PAC_PROG_CXX],[
-	PAC_PUSH_FLAG([CXXFLAGS])
-        # This test uses the list from a recent PROG_CXX, but with the
-        # addition of the Portland group, IBM, and Intel C++ compilers
-        # (While the Intel icc compiler will compile C++ programs, it will
-        # not *link* C++ object files unless there is at least one C++ source
-        # file present on the command that performs the linking.  icpc is the
-        # Intel C++ compiler that both compiles and links C++ programs)
-	AC_PROG_CXX([PAC_CXX_SEARCH_LIST])
-	PAC_POP_FLAG([CXXFLAGS])
-])
-
 dnl This is from crypt.to/autoconf-archive, slightly modified.
-dnl It defines bool as int if it is not availalbe
+dnl It defines bool as int if it is not available
 dnl
 AC_DEFUN([AX_CXX_BOOL],
 [AC_CACHE_CHECK(whether the compiler recognizes bool as a built-in type,
 ac_cv_cxx_bool,
 [AC_LANG_SAVE
- AC_LANG_CPLUSPLUS
- AC_TRY_COMPILE([
-int f(int  x){return 1;}
-int f(char x){return 1;}
-int f(bool x){return 1;}
-],[bool b = true; return f(b);],
- ac_cv_cxx_bool=yes, ac_cv_cxx_bool=no)
+ AC_LANG([C++])
+ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    int f(int  x){return 1;}
+    int f(char x){return 1;}
+    int f(bool x){return 1;}
+    ]],[[bool b = true; return f(b);]])],
+    ac_cv_cxx_bool=yes, ac_cv_cxx_bool=no)
  AC_LANG_RESTORE
 ])
 if test "$ac_cv_cxx_bool" != yes; then
@@ -44,9 +25,9 @@ AC_DEFUN([AX_CXX_EXCEPTIONS],
 [AC_CACHE_CHECK(whether the compiler supports exceptions,
 ac_cv_cxx_exceptions,
 [AC_LANG_SAVE
- AC_LANG_CPLUSPLUS
- AC_TRY_COMPILE(,[try { throw  1; } catch (int i) { return i; }],
- ac_cv_cxx_exceptions=yes, ac_cv_cxx_exceptions=no)
+ AC_LANG([C++])
+ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[[try { throw  1; } catch (int i) { return i; }]])],
+    ac_cv_cxx_exceptions=yes, ac_cv_cxx_exceptions=no)
  AC_LANG_RESTORE
 ])
 if test "$ac_cv_cxx_exceptions" = yes; then
@@ -60,10 +41,13 @@ AC_DEFUN([AX_CXX_NAMESPACES],
 [AC_CACHE_CHECK(whether the compiler implements namespaces,
 ac_cv_cxx_namespaces,
 [AC_LANG_SAVE
- AC_LANG_CPLUSPLUS
- AC_TRY_COMPILE([namespace Outer { namespace Inner { int i = 0; }}],
-                [using namespace Outer::Inner; return i;],
- ac_cv_cxx_namespaces=yes, ac_cv_cxx_namespaces=no)
+ AC_LANG([C++])
+ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+    namespace Outer { namespace Inner { int i = 0; }}
+    ]],[[
+    using namespace Outer::Inner; return i;
+    ]])],
+    ac_cv_cxx_namespaces=yes, ac_cv_cxx_namespaces=no)
  AC_LANG_RESTORE
 ])
 if test "$ac_cv_cxx_namespaces" = yes; then
@@ -80,12 +64,14 @@ ac_cv_cxx_namespace_std,
 [ac_cv_cxx_namespace_std=no
 if test "$ac_cv_cxx_namespaces" = yes ; then 
    AC_LANG_SAVE
-   AC_LANG_CPLUSPLUS
-   AC_TRY_COMPILE([
-#include <iostream>
-using namespace std;],
-                [cout << "message\n";],
- ac_cv_cxx_namespace_std=yes, ac_cv_cxx_namespace_std=no)
+   AC_LANG([C++])
+   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+        #include <iostream>
+        using namespace std;
+        ]],[[
+        cout << "message\n";
+        ]])],
+        ac_cv_cxx_namespace_std=yes, ac_cv_cxx_namespace_std=no)
    AC_LANG_RESTORE
 fi
 ])

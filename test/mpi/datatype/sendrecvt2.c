@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include "mpitest.h"
 #include <stdio.h>
@@ -20,8 +20,8 @@ int main(int argc, char **argv)
     void **inbufs, **outbufs;
     int *counts, *bytesize, ntype;
     MPI_Comm comm;
-    int ncomm = 20, rank, np, partner, tag, count;
-    int i, j, k, err, toterr, world_rank, errloc;
+    int rank, np, partner, tag, count;
+    int i, j, k, err, world_rank, errloc;
     MPI_Status status;
     char *obuf;
     char myname[MPI_MAX_OBJECT_NAME];

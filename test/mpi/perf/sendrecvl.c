@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This program provides a simple test of send-receive performance between
@@ -89,8 +88,6 @@ int main(int argc, char *argv[])
         if (wrank == 0) {
             t1 = t1 / reps;
             if (t1 > 0) {
-                double rate;
-                rate = (len / t1) / 1.e6;
                 t1 = t1 * 1.e6;
                 if (verbose)
                     printf("%d\t%g\t%g\n", len, t1, len / t1);
@@ -134,8 +131,6 @@ int main(int argc, char *argv[])
         if (wrank == 0) {
             t1 = t1 / reps;
             if (t1 > 0) {
-                double rate;
-                rate = (len / t1) / 1.e6;
                 t1 = t1 * 1.e6;
                 if (verbose)
                     printf("%d\t%g\t%g\n", len, t1, len / t1);
@@ -184,8 +179,6 @@ int main(int argc, char *argv[])
         if (wrank == 0) {
             t1 = t1 / reps;
             if (t1 > 0) {
-                double rate;
-                rate = (len / t1) / 1.e6;
                 t1 = t1 * 1.e6;
                 if (verbose)
                     printf("%d\t%g\t%g\n", len, t1, len / t1);

@@ -1,173 +1,153 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
+#include "mpitest.h"
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "mpitest.h"
 #include "dtpools.h"
+#include "mtest_dtp.h"
+#include <assert.h>
 
 /*
 static char MTEST_Descrip[] = "Send-Recv";
 */
 
+int world_rank, world_size;
 
-int main(int argc, char *argv[])
+static int sendrecv1(int seed, int testsize, int sendcnt, int recvcnt, const char *basic_type,
+                     mtest_mem_type_e sendmem, mtest_mem_type_e recvmem, int source)
 {
-    int errs = 0, err;
-    int rank, size, source, dest;
-    int minsize = 2, count[2];
-    int i, j, len;
+    int errs = 0;
+    int err;
+    int rank, size;
     MPI_Aint sendcount, recvcount;
     MPI_Comm comm;
     MPI_Datatype sendtype, recvtype;
-    DTP_t send_dtp, recv_dtp;
-    void *sendbuf, *recvbuf;
-    char send_name[MPI_MAX_OBJECT_NAME] = { 0 };
-    char recv_name[MPI_MAX_OBJECT_NAME] = { 0 };
+    DTP_pool_s dtp;
+    struct mtest_obj send, recv;
 
-    MTest_Init(&argc, &argv);
-
-#ifndef USE_DTP_POOL_TYPE__STRUCT       /* set in 'test/mpi/structtypetest.txt' to split tests */
-    MPI_Datatype basic_type;
-    char type_name[MPI_MAX_OBJECT_NAME] = { 0 };
-
-    err = MTestInitBasicPt2ptSignature(argc, argv, count, &basic_type);
-    if (err)
-        return MTestReturnValue(1);
-
-    err = DTP_pool_create(basic_type, count[0], &send_dtp);
-    if (err != DTP_SUCCESS) {
-        MPI_Type_get_name(basic_type, type_name, &len);
-        fprintf(stdout, "Error while creating send pool (%s,%d)\n", type_name, count[0]);
-        fflush(stdout);
+    static char test_desc[200];
+    snprintf(test_desc, 200,
+             "./sendrecv1 -seed=%d -testsize=%d -type=%s -sendcnt=%d -recvcnt=%d -sendmem=%s -recvmem=%s",
+             seed, testsize, basic_type, sendcnt, recvcnt, MTest_memtype_name(sendmem),
+             MTest_memtype_name(recvmem));
+    if (world_rank == 0) {
+        MTestPrintfMsg(1, " %s\n", test_desc);
     }
 
-    err = DTP_pool_create(basic_type, count[1], &recv_dtp);
+    err = DTP_pool_create(basic_type, sendcnt, seed, &dtp);
     if (err != DTP_SUCCESS) {
-        MPI_Type_get_name(basic_type, type_name, &len);
-        fprintf(stdout, "Error while creating recv pool (%s,%d)\n", type_name, count[1]);
-        fflush(stdout);
-    }
-#else
-    MPI_Datatype *basic_types = NULL;
-    int *basic_type_counts = NULL;
-    int basic_type_num;
-
-    err = MTestInitStructSignature(argc, argv, &basic_type_num, &basic_type_counts, &basic_types);
-    if (err)
-        return MTestReturnValue(1);
-
-    err = DTP_pool_create_struct(basic_type_num, basic_types, basic_type_counts, &send_dtp);
-    if (err != DTP_SUCCESS) {
-        fprintf(stdout, "Error while creating struct pool\n");
-        fflush(stdout);
+        fprintf(stderr, "Error while creating dtp pool (%s,%d)\n", basic_type, sendcnt);
+        fflush(stderr);
     }
 
-    err = DTP_pool_create_struct(basic_type_num, basic_types, basic_type_counts, &recv_dtp);
-    if (err != DTP_SUCCESS) {
-        fprintf(stdout, "Error while creating struct pool\n");
-        fflush(stdout);
-    }
-
-    /* these are ignored */
-    count[0] = 0;
-    count[1] = 0;
-#endif
+    MTest_dtp_obj_start(&send, "send", dtp, sendmem, 0, false);
+    MTest_dtp_obj_start(&recv, "recv", dtp, recvmem, 0, false);
 
     /* The following illustrates the use of the routines to
      * run through a selection of communicators and datatypes.
      * Use subsets of these for tests that do not involve combinations
      * of communicators, datatypes, and counts of datatypes */
-    while (MTestGetIntracommGeneral(&comm, minsize, 1)) {
-        if (comm == MPI_COMM_NULL)
+    while (MTestGetIntracommGeneral(&comm, 2, 1)) {
+        if (comm == MPI_COMM_NULL) {
+            /* for NULL comms, make sure these processes create the
+             * same number of objects, so the target knows what
+             * datatype layout to check for */
+            errs += MTEST_CREATE_AND_FREE_DTP_OBJS(dtp, testsize);
+            errs += MTEST_CREATE_AND_FREE_DTP_OBJS(dtp, testsize);
             continue;
+        }
 
         /* Determine the sender and receiver */
         MPI_Comm_rank(comm, &rank);
         MPI_Comm_size(comm, &size);
-        source = 0;
-        dest = size - 1;
+
+        int dest = (source + size - 1) % size;
 
         /* To improve reporting of problems about operations, we
          * change the error handler to errors return */
         MPI_Comm_set_errhandler(comm, MPI_ERRORS_RETURN);
 
-        for (i = 0; i < send_dtp->DTP_num_objs; i++) {
-            err = DTP_obj_create(send_dtp, i, 0, 1, count[0]);
-            if (err != DTP_SUCCESS) {
-                errs++;
-                break;
-            }
+        for (int i = 0; i < testsize; i++) {
+            DTP_pool_update_count(dtp, (rank == source) ? sendcnt : recvcnt);
+            errs += MTest_dtp_create(&send, rank == source);
+            errs += MTest_dtp_create(&recv, rank == dest);
 
-            sendcount = send_dtp->DTP_obj_array[i].DTP_obj_count;
-            sendtype = send_dtp->DTP_obj_array[i].DTP_obj_type;
-            sendbuf = send_dtp->DTP_obj_array[i].DTP_obj_buf;
+            if (rank == source) {
+                MTest_dtp_init(&send, 0, 1, sendcnt);
 
-            for (j = 0; j < recv_dtp->DTP_num_objs; j++) {
-                err = DTP_obj_create(recv_dtp, j, 0, 0, 0);
-                if (err != DTP_SUCCESS) {
+                sendcount = send.dtp_obj.DTP_type_count;
+                sendtype = send.dtp_obj.DTP_datatype;
+
+                err = MPI_Send((const char *) send.buf + send.dtp_obj.DTP_buf_offset,
+                               sendcount, sendtype, dest, 0, comm);
+                if (err) {
                     errs++;
-                    break;
-                }
-
-                recvcount = recv_dtp->DTP_obj_array[j].DTP_obj_count;
-                recvtype = recv_dtp->DTP_obj_array[j].DTP_obj_type;
-                recvbuf = recv_dtp->DTP_obj_array[j].DTP_obj_buf;
-
-                if (rank == source) {
-                    err = MPI_Send(sendbuf, sendcount, sendtype, dest, 0, comm);
-                    if (err) {
-                        errs++;
-                        if (errs < 10) {
-                            MTestPrintError(err);
-                        }
-                    }
-                } else if (rank == dest) {
-                    err =
-                        MPI_Recv(recvbuf, recvcount, recvtype, source, 0, comm, MPI_STATUS_IGNORE);
-                    if (err) {
-                        errs++;
-                        if (errs < 10) {
-                            MTestPrintError(err);
-                        }
-                    }
-
-                    err = DTP_obj_buf_check(recv_dtp, j, 0, 1, count[0]);
-                    if (err != DTP_SUCCESS) {
-                        if (errs < 10) {
-                            MPI_Type_get_name(sendtype, send_name, &len);
-                            MPI_Type_get_name(recvtype, recv_name, &len);
-                            fprintf(stdout,
-                                    "Data in target buffer did not match for destination datatype %s and source datatype %s, count = %d\n",
-                                    recv_name, send_name, count[0]);
-                        }
-                        errs++;
+                    if (errs < 10) {
+                        MTestPrintError(err);
                     }
                 }
-                DTP_obj_free(recv_dtp, j);
+            } else if (rank == dest) {
+                MTest_dtp_init(&recv, -1, -1, recvcnt);
+
+                recvcount = recv.dtp_obj.DTP_type_count;
+                recvtype = recv.dtp_obj.DTP_datatype;
+
+                MPI_Status status;
+                err = MPI_Recv((char *) recv.buf + recv.dtp_obj.DTP_buf_offset,
+                               recvcount, recvtype, source, 0, comm, &status);
+                if (err) {
+                    errs++;
+                    if (errs < 10) {
+                        MTestPrintError(err);
+                    }
+                }
+
+                /* only up to sendcnt should be updated */
+                errs += MTestCheckStatus(&status, dtp.DTP_base_type, sendcnt, source, 0, errs < 10);
+                errs += MTest_dtp_check(&recv, 0, 1, sendcnt, &send, errs < 10);
             }
-            DTP_obj_free(send_dtp, i);
+            MTest_dtp_destroy(&send);
+            MTest_dtp_destroy(&recv);
         }
         MTestFreeComm(&comm);
     }
 
-    DTP_pool_free(send_dtp);
-    DTP_pool_free(recv_dtp);
+    MTest_dtp_obj_finish(&send);
+    MTest_dtp_obj_finish(&recv);
+    DTP_pool_free(dtp);
+    return errs;
+}
 
-#ifdef USE_DTP_POOL_TYPE__STRUCT
-    /* cleanup array if any */
-    if (basic_types) {
-        free(basic_types);
+int main(int argc, char *argv[])
+{
+    int errs = 0;
+    MTest_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    if (world_size < 2) {
+        printf("This test requires 2 processes\n");
+        errs++;
+        goto fn_exit;
     }
-    if (basic_type_counts) {
-        free(basic_type_counts);
-    }
-#endif
 
+    struct dtp_args dtp_args;
+    dtp_args_init(&dtp_args, MTEST_DTP_PT2PT, argc, argv);
+    while (dtp_args_get_next(&dtp_args)) {
+        for (int source_rank = 0; source_rank < 2; source_rank++) {
+            MTestPrintfMsg(1, "Test with source rank = %d\n", source_rank);
+            errs += sendrecv1(dtp_args.seed, dtp_args.testsize,
+                              dtp_args.count, dtp_args.u.pt2pt.recvcnt,
+                              dtp_args.basic_type, dtp_args.u.pt2pt.sendmem,
+                              dtp_args.u.pt2pt.recvmem, source_rank);
+        }
+    }
+    dtp_args_finalize(&dtp_args);
+
+  fn_exit:
     MTest_Finalize(errs);
     return MTestReturnValue(errs);
 }

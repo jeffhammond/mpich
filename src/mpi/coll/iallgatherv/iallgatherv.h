@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2017 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef IALLGATHERV_H_INCLUDED
@@ -9,6 +8,7 @@
 
 #include "mpiimpl.h"
 
-int MPII_Iallgatherv_is_displs_ordered(int size, const int recvcounts[], const int displs[]);
+int MPII_Iallgatherv_is_displs_ordered(int size, const MPI_Aint recvcounts[],
+                                       const MPI_Aint displs[]);
 
 #endif /* IALLGATHERV_H_INCLUDED */

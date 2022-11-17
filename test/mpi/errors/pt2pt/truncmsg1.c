@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "mpi.h"
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     int *buf = 0;
 
     MTest_Init(&argc, &argv);
-    MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -83,7 +83,17 @@ int main(int argc, char *argv[])
             err = MPI_Recv(buf, LongLen - 1, MPI_INT, source, 0, MPI_COMM_WORLD, &status);
             errs += checkTruncError(err, "long");
         }
+        /* Test when the receive buffer is much shorter */
+        if (rank == source) {
+            err = MPI_Send(buf, LongLen, MPI_INT, dest, 0, MPI_COMM_WORLD);
+            errs += checkOk(err, "long");
+        } else if (rank == dest) {
+            err = MPI_Recv(buf, ShortLen, MPI_INT, source, 0, MPI_COMM_WORLD, &status);
+            errs += checkTruncError(err, "long-receive-short");
+        }
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     free(buf);
     MTest_Finalize(errs);

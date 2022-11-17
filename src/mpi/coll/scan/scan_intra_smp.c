@@ -1,18 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
 
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Scan_intra_smp
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIR_Scan_intra_smp(const void *sendbuf, void *recvbuf, int count,
+int MPIR_Scan_intra_smp(const void *sendbuf, void *recvbuf, MPI_Aint count,
                         MPI_Datatype datatype, MPI_Op op, MPIR_Comm * comm_ptr,
                         MPIR_Errflag_t * errflag)
 {
@@ -61,8 +55,7 @@ int MPIR_Scan_intra_smp(const void *sendbuf, void *recvbuf, int count,
         }
     } else if (sendbuf != MPI_IN_PLACE) {
         mpi_errno = MPIR_Localcopy(sendbuf, count, datatype, recvbuf, count, datatype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     /* get result from local node's last processor which
@@ -100,8 +93,8 @@ int MPIR_Scan_intra_smp(const void *sendbuf, void *recvbuf, int count,
 
     /* do scan on localfulldata to prefulldata. for example,
      * prefulldata on rank 4 contains reduce result of ranks
-     * 1,2,3,4,5,6. it will be sent to rank 7 which is master
-     * process of node 3. */
+     * 1,2,3,4,5,6. it will be sent to rank 7 which is the
+     * main process of node 3. */
     if (comm_ptr->node_roots_comm != NULL) {
         mpi_errno = MPIR_Scan(localfulldata, prefulldata, count, datatype,
                               op, comm_ptr->node_roots_comm, errflag);
@@ -147,7 +140,7 @@ int MPIR_Scan_intra_smp(const void *sendbuf, void *recvbuf, int count,
      * scan result. for example, to node 3, it will have reduce result
      * of rank 1,2,3,4,5,6 in tempbuf.
      * then we should broadcast this result in the local node, and
-     * reduce it with recvbuf to get final result if nessesary. */
+     * reduce it with recvbuf to get final result if necessary. */
 
     if (comm_ptr->node_comm != NULL) {
         mpi_errno = MPIR_Bcast(&noneed, 1, MPI_INT, 0, comm_ptr->node_comm, errflag);

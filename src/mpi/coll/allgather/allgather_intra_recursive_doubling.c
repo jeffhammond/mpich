@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -19,15 +17,11 @@
  * property of recursive doubling (see Benson et al paper in Euro
  * PVM/MPI 2003).
  */
-#undef FUNCNAME
-#define FUNCNAME MPIR_Allgather_intra_recursive_doubling
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Allgather_intra_recursive_doubling(const void *sendbuf,
-                                            int sendcount,
+                                            MPI_Aint sendcount,
                                             MPI_Datatype sendtype,
                                             void *recvbuf,
-                                            int recvcount,
+                                            MPI_Aint recvcount,
                                             MPI_Datatype recvtype,
                                             MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
@@ -39,11 +33,7 @@ int MPIR_Allgather_intra_recursive_doubling(const void *sendbuf,
     MPI_Aint curr_cnt, last_recv_cnt = 0;
     int dst;
     MPI_Status status;
-    int mask, dst_tree_root, my_tree_root,
-        send_offset, recv_offset, nprocs_completed, k, offset, tmp_mask, tree_root;
-
-    if (((sendcount == 0) && (sendbuf != MPI_IN_PLACE)) || (recvcount == 0))
-        return MPI_SUCCESS;
+    int mask, dst_tree_root, my_tree_root, nprocs_completed, k, tmp_mask, tree_root;
 
     comm_size = comm_ptr->local_size;
     rank = comm_ptr->rank;
@@ -60,9 +50,7 @@ int MPIR_Allgather_intra_recursive_doubling(const void *sendbuf,
         mpi_errno = MPIR_Localcopy(sendbuf, sendcount, sendtype,
                                    ((char *) recvbuf +
                                     rank * recvcount * recvtype_extent), recvcount, recvtype);
-        if (mpi_errno) {
-            MPIR_ERR_POP(mpi_errno);
-        }
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     curr_cnt = recvcount;
@@ -83,7 +71,7 @@ int MPIR_Allgather_intra_recursive_doubling(const void *sendbuf,
         my_tree_root = rank >> i;
         my_tree_root <<= i;
 
-        /* FIXME: saving an MPI_Aint into an int */
+        MPI_Aint send_offset, recv_offset;
         send_offset = my_tree_root * recvcount * recvtype_extent;
         recv_offset = dst_tree_root * recvcount * recvtype_extent;
 
@@ -140,7 +128,7 @@ int MPIR_Allgather_intra_recursive_doubling(const void *sendbuf,
             }
             k--;
 
-            /* FIXME: saving an MPI_Aint into an int */
+            MPI_Aint offset;
             offset = recvcount * (my_tree_root + mask) * recvtype_extent;
             tmp_mask = mask >> 1;
 

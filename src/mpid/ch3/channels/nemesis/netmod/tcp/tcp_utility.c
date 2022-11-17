@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "tcp_impl.h"
@@ -11,10 +10,6 @@
    the remote process associated with this VC.  [NOTE: I'm not sure
    yet, if the pg_id parameters will be char* or char**.  I'd like to
    avoid a copy on this.] */
-#undef FUNCNAME
-#define FUNCNAME MPID_nem_tcp_get_conninfo
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_tcp_get_conninfo(struct MPIDI_VC *vc, struct sockaddr_in *addr, char **pg_id,
                               int *pg_rank)
 {
@@ -30,24 +25,18 @@ int MPID_nem_tcp_get_conninfo(struct MPIDI_VC *vc, struct sockaddr_in *addr, cha
 
 /* MPID_nem_tcp_get_vc_from_conninfo -- This function takes
    the pg_id and pg_rank and returns the corresponding VC. */
-#undef FUNCNAME
-#define FUNCNAME MPID_nem_tcp_get_vc_from_conninfo
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_tcp_get_vc_from_conninfo(char *pg_id, int pg_rank, struct MPIDI_VC **vc)
 {
     int mpi_errno = MPI_SUCCESS;
     MPIDI_PG_t *pg;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_TCP_GET_VC_FROM_CONNINFO);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_TCP_GET_VC_FROM_CONNINFO);
+    MPIR_FUNC_ENTER;
 
     MPL_DBG_MSG_FMT(MPIDI_NEM_TCP_DBG_DET, VERBOSE,
                     (MPL_DBG_FDEST, "pg_id=%s pg_rank=%d", pg_id, pg_rank));
 
     mpi_errno = MPIDI_PG_Find(pg_id, &pg);
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
     MPIR_ERR_CHKINTERNAL(pg == NULL, mpi_errno, "invalid PG");
     MPIR_ERR_CHKINTERNAL(pg_rank < 0 ||
@@ -56,51 +45,50 @@ int MPID_nem_tcp_get_vc_from_conninfo(char *pg_id, int pg_rank, struct MPIDI_VC 
     MPIDI_PG_Get_vc_set_active(pg, pg_rank, vc);
 
   fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_TCP_GET_VC_FROM_CONNINFO);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
   fn_fail:
     goto fn_exit;
 }
 
-#undef FUNCNAME
-#define FUNCNAME set_sockopts
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_tcp_set_sockopts(int fd)
 {
     int mpi_errno = MPI_SUCCESS;
     int option, flags;
     int ret;
     socklen_t len;
+#ifdef HAVE_ERROR_CHECKING
+    char strerrbuf[MPIR_STRERROR_BUF_SIZE];
+#endif
 
-/*     fprintf(stdout, FCNAME " Enter\n"); fflush(stdout); */
+/*     fprintf(stdout, __func__ " Enter\n"); fflush(stdout); */
     /* I heard you have to read the options after setting them in some implementations */
 
     option = 1;
     len = sizeof(int);
     ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &option, len);
     MPIR_ERR_CHKANDJUMP2(ret == -1, mpi_errno, MPI_ERR_OTHER, "**fail", "**fail %s %d",
-                         MPIR_Strerror(errno), errno);
+                         MPIR_Strerror(errno, strerrbuf, MPIR_STRERROR_BUF_SIZE), errno);
     ret = getsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &option, &len);
     MPIR_ERR_CHKANDJUMP2(ret == -1, mpi_errno, MPI_ERR_OTHER, "**fail", "**fail %s %d",
-                         MPIR_Strerror(errno), errno);
+                         MPIR_Strerror(errno, strerrbuf, MPIR_STRERROR_BUF_SIZE), errno);
 
     flags = fcntl(fd, F_GETFL, 0);
     MPIR_ERR_CHKANDJUMP2(flags == -1, mpi_errno, MPI_ERR_OTHER, "**fail", "**fail %s %d",
-                         MPIR_Strerror(errno), errno);
+                         MPIR_Strerror(errno, strerrbuf, MPIR_STRERROR_BUF_SIZE), errno);
     ret = fcntl(fd, F_SETFL, flags | SO_REUSEADDR);
     MPIR_ERR_CHKANDJUMP2(ret == -1, mpi_errno, MPI_ERR_OTHER, "**fail", "**fail %s %d",
-                         MPIR_Strerror(errno), errno);
+                         MPIR_Strerror(errno, strerrbuf, MPIR_STRERROR_BUF_SIZE), errno);
 
     flags = fcntl(fd, F_GETFL, 0);
     MPIR_ERR_CHKANDJUMP2(flags == -1, mpi_errno, MPI_ERR_OTHER, "**fail", "**fail %s %d",
-                         MPIR_Strerror(errno), errno);
+                         MPIR_Strerror(errno, strerrbuf, MPIR_STRERROR_BUF_SIZE), errno);
     ret = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     MPIR_ERR_CHKANDJUMP2(ret == -1, mpi_errno, MPI_ERR_OTHER, "**fail", "**fail %s %d",
-                         MPIR_Strerror(errno), errno);
+                         MPIR_Strerror(errno, strerrbuf, MPIR_STRERROR_BUF_SIZE), errno);
 
   fn_exit:
-/*     fprintf(stdout, FCNAME " Exit\n"); fflush(stdout); */
+/*     fprintf(stdout, __func__ " Exit\n"); fflush(stdout); */
     return mpi_errno;
   fn_fail:
 /*     fprintf(stdout, "failure. mpi_errno = %d\n", mpi_errno); */
@@ -123,7 +111,7 @@ there is an error in the socket or whether the peer has closed it (i.e we have r
 EOF and hence recv returns 0). Either way, we deccide the socket fd is not usable any
 more. So, same return code is used.
 A design decision is not to write also, if the peer has closed the socket. Please note that
-write will still be succesful, even if the peer has sent us FIN. Only the subsequent
+write will still be successful, even if the peer has sent us FIN. Only the subsequent
 write will fail. So, this function is made tight enough and this should be called
 before doing any read/write at least in the connection establishment state machine code.
 
@@ -135,13 +123,12 @@ FIXME : Above comments are inconsistent now with the changes. No check for EOF i
 actually done now in this function.
 */
 
-#undef FUNCNAME
-#define FUNCNAME MPID_nem_tcp_check_sock_status
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-MPID_NEM_TCP_SOCK_STATUS_t MPID_nem_tcp_check_sock_status(const struct pollfd *const plfd)
+int MPID_nem_tcp_check_sock_status(const struct pollfd *const plfd)
 {
     int rc = MPID_NEM_TCP_SOCK_NOEVENT;
+#ifdef MPL_USE_DBG_LOGGING
+    char strerrbuf[MPIR_STRERROR_BUF_SIZE];
+#endif
 
     if (plfd->revents & POLLERR) {
         rc = MPID_NEM_TCP_SOCK_ERROR_EOF;
@@ -157,7 +144,7 @@ MPID_NEM_TCP_SOCK_STATUS_t MPID_nem_tcp_check_sock_status(const struct pollfd *c
             rc = MPID_NEM_TCP_SOCK_ERROR_EOF;   /*  (N1) */
             MPL_DBG_MSG_FMT(MPIDI_NEM_TCP_DBG_DET, VERBOSE,
                             (MPL_DBG_FDEST, "getsockopt failure. error=%d:%s", error,
-                             MPIR_Strerror(error)));
+                             MPIR_Strerror(error, strerrbuf, MPIR_STRERROR_BUF_SIZE)));
             goto fn_exit;
         }
         rc = MPID_NEM_TCP_SOCK_CONNECTED;
@@ -168,10 +155,6 @@ MPID_NEM_TCP_SOCK_STATUS_t MPID_nem_tcp_check_sock_status(const struct pollfd *c
 
 /*
  */
-#undef FUNCNAME
-#define FUNCNAME MPID_nem_tcp_is_sock_connected
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_tcp_is_sock_connected(int fd)
 {
     int rc = FALSE;
@@ -179,12 +162,15 @@ int MPID_nem_tcp_is_sock_connected(int fd)
     int buf_len = sizeof(buf) / sizeof(buf[0]), error = 0;
     size_t ret_recv;
     socklen_t n = sizeof(error);
+#ifdef MPL_USE_DBG_LOGGING
+    char strerrbuf[MPIR_STRERROR_BUF_SIZE];
+#endif
 
     n = sizeof(error);
     if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &n) < 0 || error != 0) {
         MPL_DBG_MSG_FMT(MPIDI_NEM_TCP_DBG_DET, VERBOSE,
                         (MPL_DBG_FDEST, "getsockopt failure. error=%d:%s", error,
-                         MPIR_Strerror(error)));
+                         MPIR_Strerror(error, strerrbuf, MPIR_STRERROR_BUF_SIZE)));
         rc = FALSE;     /*  error */
         goto fn_exit;
     }
@@ -200,10 +186,6 @@ int MPID_nem_tcp_is_sock_connected(int fd)
 
 
 /* --BEGIN ERROR HANDLING-- */
-#undef FUNCNAME
-#define FUNCNAME MPID_nem_dbg_print_all_sendq
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 void MPID_nem_tcp_vc_dbg_print_sendq(FILE * stream, MPIDI_VC_t * vc)
 {
     int i;
@@ -222,7 +204,7 @@ void MPID_nem_tcp_vc_dbg_print_sendq(FILE * stream, MPIDI_VC_t * vc)
                 sreq->dev.match.parts.context_id,
                 sreq->dev.match.parts.rank, sreq->dev.match.parts.tag);
         ++i;
-        sreq = sreq->dev.next;
+        sreq = sreq->next;
     }
 }
 

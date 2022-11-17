@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPIR_HANDLEMEM_H_INCLUDED
@@ -32,7 +30,7 @@ int MPIR_check_handles_on_finalize(void *objmem_ptr);
    define MPID_<OBJ>_PREALLOC 256
    MPIR_Object_alloc_t MPID_<obj>_mem = { 0, 0, 0, 0, MPID_<obj>,
                                           sizeof(MPID_<obj>), MPID_<obj>_direct,
-                                          MPID_<OBJ>_PREALLOC, };
+                                          MPID_<OBJ>_PREALLOC, NULL};
 
    // Preallocated objects
    MPID_<obj> MPID_<obj>_direct[MPID_<OBJ>_PREALLOC];
@@ -55,21 +53,51 @@ int MPIR_check_handles_on_finalize(void *objmem_ptr);
 
    None of these routines is thread-safe.  Any routine that uses them
    must ensure that only one thread at a time may call them.
+
+   As of MPI-4, MPI_Info handles can be created and freed before MPI_Init() and
+   after MPI_Finalize(), so some internal functions below may be called before
+   MPI_Init() and after MPI_Finalize().
 */
 
 /* This routine is called by finalize when MPI exits */
-static inline int MPIR_Handle_free(void *((*indirect)[]), int indirect_size)
+static inline void MPIR_Handle_free(MPIR_Object_alloc_t * objmem)
 {
     int i;
 
-    /* Remove any allocated storage */
-    for (i = 0; i < indirect_size; i++) {
-        MPL_free((*indirect)[i]);
+    /* Clean up all registered blocks. */
+    if (MPL_VG_RUNNING_ON_VALGRIND()) {
+        MPIR_Handle_common *ptr = objmem->avail;
+        while (ptr) {
+            MPL_VG_DISCARD(ptr);
+            ptr = ptr->next;
+        }
     }
-    MPL_free(indirect);
-    /* This does *not* remove any objects that the user created
-     * and then did not destroy */
-    return 0;
+
+    /* Remove any allocated storage */
+    if (objmem->kind != MPIR_INFO) {
+        for (i = 0; i < objmem->indirect_size; i++) {
+            MPL_free((objmem->indirect)[i]);
+        }
+        MPL_free(objmem->indirect);
+    } else {
+        /* MPI_Info objects are allocated by MPL_direct_malloc(), so they need to be
+         * freed by MPL_direct_free(), not MPL_free(). */
+        for (i = 0; i < objmem->indirect_size; i++) {
+            MPL_direct_free((objmem->indirect)[i]);
+        }
+        MPL_direct_free(objmem->indirect);
+    }
+
+    /* Clean up variables so that it can be reinitialized. */
+    objmem->avail = NULL;
+    objmem->initialized = 0;
+    objmem->indirect = NULL;
+    objmem->indirect_size = 0;
+    objmem->num_allocated = 0;
+    objmem->num_avail = 0;
+
+    /* at this point we are done with the memory pool, inform valgrind */
+    MPL_VG_DESTROY_MEMPOOL(objmem);
 }
 
 #if defined(MPL_VG_AVAILABLE)
@@ -91,63 +119,74 @@ static inline int MPIR_Handle_free(void *((*indirect)[]), int indirect_size)
 #define HANDLE_VG_LABEL(objptr_, objsize_, handle_type_, is_direct_) do {} while (0)
 #endif
 
-static inline void *MPIR_Handle_direct_init(void *direct,
-                                            int direct_size, int obj_size, int handle_type)
+static inline void *MPIR_Handle_direct_init(MPIR_Object_alloc_t * objmem)
 {
     int i;
     MPIR_Handle_common *hptr = 0;
-    char *ptr = (char *) direct;
+    char *ptr = (char *) objmem->direct;
 
-    for (i = 0; i < direct_size; i++) {
-        /* printf("Adding %p in %d\n", ptr, handle_type); */
+    for (i = 0; i < objmem->direct_size; i++) {
+        /* printf("Adding %p in %d\n", ptr, objmem->kind); */
         /* First cast to (void*) to avoid false warnings about alignment
          * (consider that a requirement of the input parameters) */
         hptr = (MPIR_Handle_common *) (void *) ptr;
-        ptr = ptr + obj_size;
+        ptr = ptr + objmem->size;
         hptr->next = ptr;
         hptr->handle = ((unsigned) HANDLE_KIND_DIRECT << HANDLE_KIND_SHIFT) |
-            (handle_type << HANDLE_MPI_KIND_SHIFT) | i;
+            (objmem->kind << HANDLE_MPI_KIND_SHIFT) | i;
 
-        HANDLE_VG_LABEL(hptr, obj_size, handle_type, 1);
+        HANDLE_VG_LABEL(hptr, objmem->size, objmem->kind, 1);
     }
+    objmem->num_allocated += objmem->direct_size;
+    objmem->num_avail += objmem->direct_size;
 
     if (hptr)
         hptr->next = 0;
-    return direct;
+    return objmem->direct;
 }
 
-/* indirect is really a pointer to a pointer to an array of pointers */
-static inline void *MPIR_Handle_indirect_init(void *(**indirect)[],
-                                              int *indirect_size,
-                                              int indirect_num_blocks,
-                                              int indirect_num_indices,
-                                              int obj_size, int handle_type)
+/* indirect is a pointer to a pointer table of block_ptrs
+ * and a block_ptr points to a block of objects */
+static inline void *MPIR_Handle_indirect_init(MPIR_Object_alloc_t * objmem,
+                                              int indirect_num_blocks, int indirect_num_indices)
 {
     void *block_ptr;
     MPIR_Handle_common *hptr = 0;
     char *ptr;
     int i;
 
+    MPIR_Assert(indirect_num_blocks > 0);
+    MPIR_Assert(indirect_num_indices > 0);
+
     /* Must create new storage for dynamically allocated objects */
     /* Create the table */
-    if (!*indirect) {
+    if (!objmem->indirect) {
         /* printf("Creating indirect table with %d pointers to blocks in it\n", indirect_num_blocks); */
-        *indirect = (void *) MPL_calloc(indirect_num_blocks, sizeof(void *), MPL_MEM_OBJECT);
-        if (!*indirect) {
+        if (objmem->kind != MPIR_INFO) {
+            objmem->indirect =
+                (void **) MPL_calloc(indirect_num_blocks, sizeof(void *), MPL_MEM_OBJECT);
+        } else {
+            objmem->indirect = (void **) MPL_direct_calloc(indirect_num_blocks, sizeof(void *));
+        }
+        if (!objmem->indirect) {
             return 0;
         }
-        *indirect_size = 0;
+        objmem->indirect_size = 0;
     }
 
     /* See if we can allocate another block */
-    if (*indirect_size >= indirect_num_blocks) {
+    if (objmem->indirect_size >= indirect_num_blocks) {
         /* printf("Out of space in indirect table\n"); */
         return 0;
     }
 
     /* Create the next block */
-    /* printf("Creating indirect block number %d with %d objects in it\n", *indirect_size, indirect_num_indices); */
-    block_ptr = (void *) MPL_calloc(indirect_num_indices, obj_size, MPL_MEM_OBJECT);
+    /* printf("Creating indirect block number %d with %d objects in it\n", objmem->indirect_size, indirect_num_indices); */
+    if (objmem->kind != MPIR_INFO) {
+        block_ptr = (void *) MPL_calloc(indirect_num_indices, objmem->size, MPL_MEM_OBJECT);
+    } else {
+        block_ptr = (void *) MPL_direct_calloc(indirect_num_indices, objmem->size);
+    }
     if (!block_ptr) {
         return 0;
     }
@@ -155,20 +194,23 @@ static inline void *MPIR_Handle_indirect_init(void *(**indirect)[],
     for (i = 0; i < indirect_num_indices; i++) {
         /* Cast to (void*) to avoid false warning about alignment */
         hptr = (MPIR_Handle_common *) (void *) ptr;
-        ptr = ptr + obj_size;
+        ptr = ptr + objmem->size;
         hptr->next = ptr;
         hptr->handle = ((unsigned) HANDLE_KIND_INDIRECT << HANDLE_KIND_SHIFT) |
-            (handle_type << HANDLE_MPI_KIND_SHIFT) | (*indirect_size << HANDLE_INDIRECT_SHIFT) | i;
-        /* printf("handle=%#x handle_type=%x *indirect_size=%d i=%d\n", hptr->handle, handle_type, *indirect_size, i); */
+            (objmem->
+             kind << HANDLE_MPI_KIND_SHIFT) | (objmem->indirect_size << HANDLE_INDIRECT_SHIFT) | i;
+        /* printf("handle=%#x handle_type=%x indirect_size=%d i=%d\n", hptr->handle, objmem->kind, objmem->indirect_size, i); */
 
-        HANDLE_VG_LABEL(hptr, obj_size, handle_type, 0);
+        HANDLE_VG_LABEL(hptr, objmem->size, objmem->kind, 0);
     }
     hptr->next = 0;
     /* We're here because avail is null, so there is no need to set
      * the last block ptr to avail */
-    /* printf("loc of update is %x\n", &(**indirect)[*indirect_size]);  */
-    (**indirect)[*indirect_size] = block_ptr;
-    *indirect_size = *indirect_size + 1;
+    /* printf("loc of update is %x\n", &(objmem->indirect)[objmem->indirect_size]);  */
+    objmem->indirect[objmem->indirect_size] = block_ptr;
+    objmem->indirect_size = objmem->indirect_size + 1;
+    objmem->num_allocated += indirect_num_indices;
+    objmem->num_avail += indirect_num_indices;
     return block_ptr;
 }
 
@@ -176,13 +218,9 @@ static inline int MPIR_Handle_finalize(void *objmem_ptr)
 {
     MPIR_Object_alloc_t *objmem = (MPIR_Object_alloc_t *) objmem_ptr;
 
-    (void) MPIR_Handle_free(objmem->indirect, objmem->indirect_size);
+    MPIR_Handle_free(objmem);
     /* This does *not* remove any Info objects that the user created
      * and then did not destroy */
-
-    /* at this point we are done with the memory pool, inform valgrind */
-    MPL_VG_DESTROY_MEMPOOL(objmem_ptr);
-
     return 0;
 }
 
@@ -206,32 +244,36 @@ Input Parameters:
   MPI_Requests) and should not call any other routines in the common
   case.
 
-  Threading: The 'MPID_THREAD_CS_ENTER/EXIT(POBJ/VCI, MPIR_THREAD_POBJ_HANDLE_MUTEX)' enables both
-  finer-grain
-  locking with a single global mutex and with a mutex specific for handles.
+  Threading: this function is protected by handle-granular lock under
+  POBJ/VCI thread model.
 
   +*/
-#undef FUNCNAME
-#define FUNCNAME MPIR_Handle_obj_alloc
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 static inline void *MPIR_Handle_obj_alloc(MPIR_Object_alloc_t * objmem)
 {
+    /* MPI_Info must call MPIR_Info_handle_obj_alloc(). */
+    MPIR_Assert(objmem->kind != MPIR_INFO);
+
     void *ret;
     MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_HANDLE_MUTEX);
-    MPID_THREAD_CS_ENTER(VCI, MPIR_THREAD_POBJ_HANDLE_MUTEX);
-    ret = MPIR_Handle_obj_alloc_unsafe(objmem);
-    MPID_THREAD_CS_EXIT(VCI, MPIR_THREAD_POBJ_HANDLE_MUTEX);
+    MPID_THREAD_CS_ENTER(VCI, MPIR_THREAD_VCI_HANDLE_MUTEX);
+    ret = MPIR_Handle_obj_alloc_unsafe(objmem, HANDLE_NUM_BLOCKS, HANDLE_NUM_INDICES);
     MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_HANDLE_MUTEX);
+    MPID_THREAD_CS_EXIT(VCI, MPIR_THREAD_VCI_HANDLE_MUTEX);
     return ret;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Handle_obj_alloc_unsafe
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static inline void *MPIR_Handle_obj_alloc_unsafe(MPIR_Object_alloc_t * objmem)
+/* Beyond direct objects (a single static block), indirect objects are allocated by blocks,
+ * each block initialized with an array of objects up to max_indices. `max_blocks` depends
+ * on the bit size in the object handle. Request objects need extra bits to support multiple
+ * request pools, so it will have lower `max_blocks` than default (HANDLE_NUM_BLOCKS).
+ * While `max_indices` is also limited by handle bits, we also need balance the runtime cost.
+ * Having too large `max_indices` will take more delay to initialize all the objects each
+ * time we allocate a new block.
+ */
+static inline void *MPIR_Handle_obj_alloc_unsafe(MPIR_Object_alloc_t * objmem,
+                                                 int max_blocks, int max_indices)
 {
+    /* ptr points to object to allocate */
     MPIR_Handle_common *ptr;
 
     if (objmem->avail) {
@@ -240,13 +282,9 @@ static inline void *MPIR_Handle_obj_alloc_unsafe(MPIR_Object_alloc_t * objmem)
         /* We do not clear ptr->next as we set it to an invalid pattern
          * when doing memory debugging and we don't need to set it
          * for the production/default case */
-        /* ptr points to object to allocate */
     } else {
-        int objsize, objkind;
-
-        objsize = objmem->size;
-        objkind = objmem->kind;
-
+        /* slow path */
+        ptr = NULL;
         if (!objmem->initialized) {
             MPL_VG_CREATE_MEMPOOL(objmem, 0 /*rzB */ , 0 /*is_zeroed */);
 
@@ -254,31 +292,33 @@ static inline void *MPIR_Handle_obj_alloc_unsafe(MPIR_Object_alloc_t * objmem)
              * jobs do not need to include any of the Info code if no
              * Info-using routines are used */
             objmem->initialized = 1;
-            ptr = MPIR_Handle_direct_init(objmem->direct, objmem->direct_size, objsize, objkind);
+            ptr = MPIR_Handle_direct_init(objmem);
             if (ptr) {
                 objmem->avail = ptr->next;
             }
+            /* MPI_Info allocation/deallocation must be always available
+             * regardless of MPI initialization and finalization phases from
+             * MPI-4.  Since there is no guarantee that all MPI_Info objects are
+             * freed before MPI_Finalize(), we may not call MPIR_Handle_finalize
+             * for MPI_Info in MPI_Finalize(). */
+            if (objmem->kind != MPIR_INFO) {
 #ifdef MPICH_DEBUG_HANDLEALLOC
-            /* The priority of these callbacks must be greater than
-             * the priority of the callback that frees the objmem direct and
-             * indirect storage. */
-            MPIR_Add_finalize(MPIR_check_handles_on_finalize, objmem,
-                              MPIR_FINALIZE_CALLBACK_HANDLE_CHECK_PRIO);
+                /* The priority of these callbacks must be greater than
+                 * the priority of the callback that frees the objmem direct and
+                 * indirect storage. */
+                MPIR_Add_finalize(MPIR_check_handles_on_finalize, objmem,
+                                  MPIR_FINALIZE_CALLBACK_HANDLE_CHECK_PRIO);
 #endif
-            MPIR_Add_finalize(MPIR_Handle_finalize, objmem, 0);
-            /* ptr points to object to allocate */
-        } else {
-            /* no space left in direct block; setup the indirect block. */
+                MPIR_Add_finalize(MPIR_Handle_finalize, objmem, 0);
+            }
+        }
 
-            ptr = MPIR_Handle_indirect_init(&objmem->indirect,
-                                            &objmem->indirect_size,
-                                            HANDLE_NUM_BLOCKS,
-                                            HANDLE_NUM_INDICES, objsize, objkind);
+        if (!ptr) {
+            /* setup a new indirect block (index at objmem->indirect_size). */
+            ptr = MPIR_Handle_indirect_init(objmem, max_blocks, max_indices);
             if (ptr) {
                 objmem->avail = ptr->next;
             }
-
-            /* ptr points to object to allocate */
         }
     }
 
@@ -317,6 +357,7 @@ static inline void *MPIR_Handle_obj_alloc_unsafe(MPIR_Object_alloc_t * objmem)
                                                    ptr, ptr->handle));
     }
 
+    objmem->num_avail--;
     return ptr;
 }
 
@@ -333,10 +374,20 @@ Input Parameters:
   +*/
 static inline void MPIR_Handle_obj_free(MPIR_Object_alloc_t * objmem, void *object)
 {
-    MPIR_Handle_common *obj = (MPIR_Handle_common *) object;
+    /* MPI_Info must call MPIR_Info_handle_obj_free(). */
+    MPIR_Assert(objmem->kind != MPIR_INFO);
 
     MPID_THREAD_CS_ENTER(POBJ, MPIR_THREAD_POBJ_HANDLE_MUTEX);
-    MPID_THREAD_CS_ENTER(VCI, MPIR_THREAD_POBJ_HANDLE_MUTEX);
+    MPID_THREAD_CS_ENTER(VCI, MPIR_THREAD_VCI_HANDLE_MUTEX);
+    MPIR_Handle_obj_free_unsafe(objmem, object, /* not info */ FALSE);
+    MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_HANDLE_MUTEX);
+    MPID_THREAD_CS_EXIT(VCI, MPIR_THREAD_VCI_HANDLE_MUTEX);
+}
+
+static inline void MPIR_Handle_obj_free_unsafe(MPIR_Object_alloc_t * objmem, void *object,
+                                               bool is_info)
+{
+    MPIR_Handle_common *obj = (MPIR_Handle_common *) object;
 
     MPL_DBG_MSG_FMT(MPIR_DBG_HANDLE, TYPICAL, (MPL_DBG_FDEST,
                                                "Freeing object ptr %p (0x%08x kind=%s) refcount=%d",
@@ -380,8 +431,18 @@ static inline void MPIR_Handle_obj_free(MPIR_Object_alloc_t * objmem, void *obje
 
     obj->next = objmem->avail;
     objmem->avail = obj;
-    MPID_THREAD_CS_EXIT(VCI, MPIR_THREAD_POBJ_HANDLE_MUTEX);
-    MPID_THREAD_CS_EXIT(POBJ, MPIR_THREAD_POBJ_HANDLE_MUTEX);
+    objmem->num_avail++;
+
+    if (is_info) {
+        /* This option slows down this routine.  This active garbage collection
+         * is for MPI_Info, which cannot be freed on finalization. */
+        if (objmem->num_avail == objmem->num_allocated) {
+            /* All memory has been released.  Free and initialize objmem. */
+            MPIR_Handle_free(objmem);
+        }
+    }
+    /* Currently is_info must be enabled for MPI_Info. */
+    MPIR_Assert(is_info || objmem->kind != MPIR_INFO);
 }
 
 /*
@@ -414,7 +475,7 @@ static inline void *MPIR_Handle_get_ptr_indirect(int handle, MPIR_Object_alloc_t
     {
         char *block_ptr;
         /* Get the pointer to the block */
-        block_ptr = (char *) (*(objmem->indirect))[block_num];
+        block_ptr = (char *) objmem->indirect[block_num];
         /* Get the item */
         block_ptr += index_num * objmem->size;
         return block_ptr;

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidi_ch3_impl.h"
@@ -17,28 +16,21 @@ char MPIDI_CH3_ABIVersion[] = "1.1";
  *                    (sock + shm) channel.
  */
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_Init
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3_Init(int has_parent, MPIDI_PG_t * pg_p, int pg_rank)
 {
     int mpi_errno = MPI_SUCCESS;
     char *publish_bc_orig = NULL;
     char *bc_val = NULL;
     int val_max_remaining;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_CH3_INIT);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_CH3_INIT);
+    MPIR_FUNC_ENTER;
 
     mpi_errno = MPIDI_CH3I_Progress_init();
-    if (mpi_errno != MPI_SUCCESS)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* Initialize the business card */
     mpi_errno = MPIDI_CH3I_BCInit(&bc_val, &val_max_remaining);
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
     publish_bc_orig = bc_val;
 
     /* initialize aspects specific to sockets  */
@@ -52,11 +44,10 @@ int MPIDI_CH3_Init(int has_parent, MPIDI_PG_t * pg_p, int pg_rank)
      * (note that publish_bc_orig is the head of bc_val) */
     MPIDI_CH3I_BCFree(publish_bc_orig);
 
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
   fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_CH3_INIT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
   fn_fail:
     MPL_free(publish_bc_orig);
@@ -84,14 +75,12 @@ int MPIDI_CH3_VC_Init(MPIDI_VC_t * vc)
     return 0;
 }
 
+#ifdef MPL_USE_DBG_LOGGING
 const char *MPIDI_CH3_VC_GetStateString(struct MPIDI_VC *vc)
 {
-#ifdef MPL_USE_DBG_LOGGING
     return MPIDI_CH3_VC_SockGetStateString(vc);
-#else
-    return "unknown";
-#endif
 }
+#endif
 
 /* Select the routine that uses sockets to connect two communicators
    using a socket */

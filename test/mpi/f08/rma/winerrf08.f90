@@ -1,9 +1,10 @@
+!
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
+!
+
 ! This file created from test/mpi/f77/rma/winerrf.f with f77tof90
-! -*- Mode: Fortran; -*-
-!
-!  (C) 2003 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
-!
+
        program main
        use mpi_f08
        integer errs, ierr, code(2), newerrclass, eclass
@@ -115,8 +116,9 @@
        end
 !
        subroutine myerrhanfunc( win, errcode )
-       use mpi
-       integer win, errcode
+       use mpi_f08
+       type(MPI_Win) win
+       integer errcode
        integer rlen, ierr
        integer callcount, codesSeen(3)
        character*(MPI_MAX_ERROR_STRING) errstring

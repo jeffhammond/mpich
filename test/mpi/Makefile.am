@@ -1,17 +1,16 @@
-# -*- Mode: Makefile; -*-
-# vim: set ft=automake :
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
 # mix in the "make testing" rule and other boilerplate
-include $(top_srcdir)/Makefile.mtest
+include $(top_srcdir)/Makefile_single.mtest
 
 ACLOCAL_AMFLAGS = -I confdb
 
 static_subdirs = util attr basic datatype coll comm errhan group info init \
-                 pt2pt rma topo errors manual perf mpi_t impls ckpoint ft dtpools
+                 pt2pt rma topo errors manual perf mpi_t impls ckpoint ft dtpools \
+                 part
 all_lang_subdirs = f77 cxx f90 f08
 
 # DIST_SUBDIRS must be a superset of SUBDIRS, and automake must be able to
@@ -21,12 +20,12 @@ all_lang_subdirs = f77 cxx f90 f08
 DIST_SUBDIRS = $(static_subdirs) io $(all_lang_subdirs) threads spawn .
 SUBDIRS      = $(static_subdirs) $(iodir) $(otherlangs) $(threadsdir) $(spawndir) $(ckpointdir) $(ftdir) .
 
-EXTRA_DIST = maint/common.defn maint/f77tof90 maint/testmerge.in maint/updatefiles testlist.in
+EXTRA_DIST = maint/common.defn maint/f77tof90 maint/testmerge.in maint/updatefiles maint/gentests_dtp.sh maint/test_coll_algos.sh maint/dtp-test-config.txt testlist.in
 
 DISTCLEANFILES = config.system
 
 ## here are automakefile entries for the test/mpi/include dir
-noinst_HEADERS = include/mpitest.h include/mpitestcxx.h include/mpithreadtest.h include/dtypes.h rma/squelch.h errors/rma/win_sync.h
+noinst_HEADERS = include/mpitest.h include/mpicolltest.h include/mpitestcxx.h include/mpithreadtest.h include/dtypes.h rma/squelch.h errors/rma/win_sync.h
 nodist_noinst_HEADERS = include/mpitestconf.h
 
 # Need to patch some things up:

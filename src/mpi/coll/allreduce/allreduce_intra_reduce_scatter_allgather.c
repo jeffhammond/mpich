@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -39,13 +38,9 @@
  * Cost = (2.floor(lgp)+2).alpha + (2.((p-1)/p) + 2).n.beta + n.(1+(p-1)/p).gamma
  */
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Allreduce_intra_reduce_scatter_allgather
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Allreduce_intra_reduce_scatter_allgather(const void *sendbuf,
                                                   void *recvbuf,
-                                                  int count,
+                                                  MPI_Aint count,
                                                   MPI_Datatype datatype,
                                                   MPI_Op op,
                                                   MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
@@ -54,8 +49,7 @@ int MPIR_Allreduce_intra_reduce_scatter_allgather(const void *sendbuf,
     int comm_size, rank;
     int mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
-    int mask, dst, pof2, newrank, rem, newdst, i,
-        send_idx, recv_idx, last_idx, send_cnt, recv_cnt, *cnts, *disps;
+    int mask, dst, pof2, newrank, rem, newdst, i, send_idx, recv_idx, last_idx;
     MPI_Aint true_extent, true_lb, extent;
     void *tmp_buf;
 
@@ -75,12 +69,11 @@ int MPIR_Allreduce_intra_reduce_scatter_allgather(const void *sendbuf,
     /* copy local data into recvbuf */
     if (sendbuf != MPI_IN_PLACE) {
         mpi_errno = MPIR_Localcopy(sendbuf, count, datatype, recvbuf, count, datatype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     /* get nearest power-of-two less than or equal to comm_size */
-    pof2 = comm_ptr->pof2;
+    pof2 = comm_ptr->coll.pof2;
 
     rem = comm_size - pof2;
 
@@ -124,8 +117,7 @@ int MPIR_Allreduce_intra_reduce_scatter_allgather(const void *sendbuf,
              * ordering is right, it doesn't matter whether
              * the operation is commutative or not. */
             mpi_errno = MPIR_Reduce_local(tmp_buf, recvbuf, count, datatype, op);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
 
             /* change the rank */
             newrank = rank / 2;
@@ -143,13 +135,15 @@ int MPIR_Allreduce_intra_reduce_scatter_allgather(const void *sendbuf,
      * using recursive doubling in that case.) */
 
 #ifdef HAVE_ERROR_CHECKING
-    MPIR_Assert(HANDLE_GET_KIND(op) == HANDLE_KIND_BUILTIN);
+    MPIR_Assert(HANDLE_IS_BUILTIN(op));
     MPIR_Assert(count >= pof2);
 #endif /* HAVE_ERROR_CHECKING */
 
     if (newrank != -1) {
-        MPIR_CHKLMEM_MALLOC(cnts, int *, pof2 * sizeof(int), mpi_errno, "counts", MPL_MEM_BUFFER);
-        MPIR_CHKLMEM_MALLOC(disps, int *, pof2 * sizeof(int), mpi_errno, "displacements",
+        MPI_Aint *cnts, *disps;
+        MPIR_CHKLMEM_MALLOC(cnts, MPI_Aint *, pof2 * sizeof(MPI_Aint), mpi_errno, "counts",
+                            MPL_MEM_BUFFER);
+        MPIR_CHKLMEM_MALLOC(disps, MPI_Aint *, pof2 * sizeof(MPI_Aint), mpi_errno, "displacements",
                             MPL_MEM_BUFFER);
 
         for (i = 0; i < pof2; i++)
@@ -172,6 +166,7 @@ int MPIR_Allreduce_intra_reduce_scatter_allgather(const void *sendbuf,
             /* find real rank of dest */
             dst = (newdst < rem) ? newdst * 2 + 1 : newdst + rem;
 
+            MPI_Aint send_cnt, recv_cnt;
             send_cnt = recv_cnt = 0;
             if (newrank < newdst) {
                 send_idx = recv_idx + pof2 / (mask * 2);
@@ -213,8 +208,7 @@ int MPIR_Allreduce_intra_reduce_scatter_allgather(const void *sendbuf,
             mpi_errno = MPIR_Reduce_local(((char *) tmp_buf + disps[recv_idx] * extent),
                                           ((char *) recvbuf + disps[recv_idx] * extent),
                                           recv_cnt, datatype, op);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
 
             /* update send_idx for next iteration */
             send_idx = recv_idx;
@@ -235,6 +229,7 @@ int MPIR_Allreduce_intra_reduce_scatter_allgather(const void *sendbuf,
             /* find real rank of dest */
             dst = (newdst < rem) ? newdst * 2 + 1 : newdst + rem;
 
+            MPI_Aint send_cnt, recv_cnt;
             send_cnt = recv_cnt = 0;
             if (newrank < newdst) {
                 /* update last_idx except on first iteration */

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -11,7 +10,8 @@
 #include "mpitest.h"
 
 #define DATA_NELTS  1000
-#define NUM_WIN     1000
+/* NOTE: with sysv, there is a limit on shared memory IDs */
+#define NUM_WIN     500
 #define DATA_SZ     (DATA_NELTS*sizeof(int))
 
 int main(int argc, char **argv)

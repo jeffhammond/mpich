@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2005 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +17,7 @@
 
 */
 
-int StatusEmpty(MPI_Status * s);
-int StatusEmpty(MPI_Status * s)
+static int StatusEmpty(MPI_Status * s)
 {
     int errs = 0;
     int count = 10;
@@ -40,11 +39,69 @@ int StatusEmpty(MPI_Status * s)
     return errs ? 0 : 1;
 }
 
-int main(int argc, char *argv[])
+static int test_recv_init(int src_rank, const char *test_name)
 {
     MPI_Request r;
     MPI_Status s;
     int errs = 0;
+    int flag;
+    int buf[10];
+    int tag = 27;
+
+    MPI_Recv_init(buf, 10, MPI_INT, src_rank, tag, MPI_COMM_WORLD, &r);
+
+    flag = 0;
+    s.MPI_TAG = 10;
+    s.MPI_SOURCE = 10;
+    MPI_Test(&r, &flag, &s);
+    if (!flag) {
+        errs++;
+        printf("Flag not true after MPI_Test (%s)\n", test_name);
+        printf("Aborting further tests to avoid hanging in MPI_Wait\n");
+        return errs;
+    }
+    if (!StatusEmpty(&s)) {
+        errs++;
+        printf("Status not empty after MPI_Test (%s)\n", test_name);
+    }
+
+    s.MPI_TAG = 10;
+    s.MPI_SOURCE = 10;
+    MPI_Wait(&r, &s);
+    if (!StatusEmpty(&s)) {
+        errs++;
+        printf("Status not empty after MPI_Wait (%s)\n", test_name);
+    }
+
+    MPI_Request_free(&r);
+
+    return errs;
+}
+
+static void test_proc_null(void)
+{
+    MPI_Request r;
+    MPI_Status s;
+    int buf[10];
+    int tag = 27;
+
+    MPI_Recv_init(buf, 10, MPI_INT, MPI_PROC_NULL, tag, MPI_COMM_WORLD, &r);
+    MPI_Start(&r);
+    MPI_Wait(&r, &s);
+    MPI_Request_free(&r);
+
+    MPI_Send_init(buf, 10, MPI_INT, MPI_PROC_NULL, tag, MPI_COMM_WORLD, &r);
+    MPI_Start(&r);
+    MPI_Wait(&r, &s);
+
+    MPI_Request_free(&r);
+}
+
+int main(int argc, char *argv[])
+{
+    MPI_Request r;
+    MPI_Status s;
+    int errs = 0, e;
     int flag;
     int buf[10];
     int rbuf[10];
@@ -57,7 +114,9 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    /* Create a persistent send request */
+    if (rank == 0)
+        MTestPrintfMsg(1, "Create a persistent send request\n");
+
     MPI_Send_init(buf, 10, MPI_INT, dest, tag, MPI_COMM_WORLD, &r);
 
     flag = 0;
@@ -124,39 +183,23 @@ int main(int argc, char *argv[])
         printf("Status not empty after MPI_Wait (send)\n");
     }
 
-
-
     MPI_Request_free(&r);
 
-    /* Create a persistent receive request */
-    MPI_Recv_init(buf, 10, MPI_INT, dest, tag, MPI_COMM_WORLD, &r);
+    if (rank == 0)
+        MTestPrintfMsg(1, "Create a persistent receive request\n");
 
-    flag = 0;
-    s.MPI_TAG = 10;
-    s.MPI_SOURCE = 10;
-    MPI_Test(&r, &flag, &s);
-    if (!flag) {
-        errs++;
-        printf("Flag not true after MPI_Test (recv)\n");
-        printf("Aborting further tests to avoid hanging in MPI_Wait\n");
-        MTest_Finalize(errs);
-        return MTestReturnValue(errs);
-    }
-    if (!StatusEmpty(&s)) {
-        errs++;
-        printf("Status not empty after MPI_Test (recv)\n");
-    }
+    e = test_recv_init(dest, "recv");
+    errs += e;
+    if (e)
+        goto fn_exit;
 
-    s.MPI_TAG = 10;
-    s.MPI_SOURCE = 10;
-    MPI_Wait(&r, &s);
-    if (!StatusEmpty(&s)) {
-        errs++;
-        printf("Status not empty after MPI_Wait (recv)\n");
-    }
+    if (rank == 0)
+        MTestPrintfMsg(1, "Create a persistent receive (ANY_SOURCE) request\n");
 
-    MPI_Request_free(&r);
+    errs += test_recv_init(MPI_ANY_SOURCE, "recv-anysource");
+    test_proc_null();
 
+  fn_exit:
     MTest_Finalize(errs);
     return MTestReturnValue(errs);
 }

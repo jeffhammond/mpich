@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef PROCESS_H_INCLUDED
@@ -10,7 +9,7 @@
 #include <sys/types.h>
 
 /*
-Data structures and routines for managing processs
+Data structures and routines for managing processes
 
 The data structures for managing processes following the hierarchy implied
 by MPI-2 design, particularly the ":" syntax of mpiexec and the
@@ -96,7 +95,7 @@ typedef struct ProcessApp {
     const char *arch;           /* Architecture type */
     const char *path;           /* Search path for executables */
     const char *wdir;           /* Working directory */
-    const char *hostname;       /* Default host (can be overridded
+    const char *hostname;       /* Default host (can be overridden
                                  * by each process in an App) */
     const char **args;          /* Pointer into the array of args */
     int nArgs;                  /* Number of args (list is *not* null

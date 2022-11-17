@@ -1,15 +1,11 @@
-/* ---------------------------------------------------------------- */
-/* (C)Copyright IBM Corp.  2007, 2008                               */
-/* ---------------------------------------------------------------- */
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 /**
  * \file ad_tuning.c
  * \brief Defines common performance tuning env var options
- */
-
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
-/*
- *   Copyright (C) 2008 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
  */
 
 /*---------------------------------------------------------------------
@@ -43,9 +39,9 @@ int romio_tunegather;
  *   libraries like PNETCDF which may count on read-modify-write functionality for certain
  *   features (like fill values).  Possible values:
  *   - 0 - Normal two-phase collective IO is used.
- *   - 1 - A separate one-sided MPI_Put or MPI_Get is used for each contigous chunk of data
+ *   - 1 - A separate one-sided MPI_Put or MPI_Get is used for each contiguous chunk of data
  *         for a compute to write to or read from the collective buffer on the aggregator.
- *   - 2 - An MPI derived datatype is created using all the contigous chunks and just one
+ *   - 2 - An MPI derived datatype is created using all the contiguous chunks and just one
  *         call to MPI_Put or MPI_Get is done with the derived datatype.  On Blue Gene /Q
  *         optimal performance for this is achieved when paired with PAMID_TYPED_ONESIDED=1.
  *   - Default is 0
@@ -80,7 +76,7 @@ int romio_tunegather;
  *
  */
 
-void ad_get_env_vars()
+void ad_get_env_vars(void)
 {
     char *x;
 

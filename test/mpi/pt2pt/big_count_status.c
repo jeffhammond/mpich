@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2013 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <mpi.h>
@@ -10,7 +8,7 @@
 #include <stdio.h>
 #include "mpitest.h"
 
-int test_count(MPI_Count count)
+static int test_count(MPI_Count count)
 {
     MPI_Status stat;
     int cancelled, cancelled2;

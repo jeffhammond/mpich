@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_nfs.h"
@@ -11,7 +9,7 @@
 #include <unistd.h>
 #endif
 
-void ADIOI_NFS_WriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_NFS_WriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                            MPI_Datatype datatype, int file_ptr_type,
                            ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {
@@ -21,6 +19,11 @@ void ADIOI_NFS_WriteContig(ADIO_File fd, const void *buf, int count,
     size_t wr_count;
     static char myname[] = "ADIOI_NFS_WRITECONTIG";
     char *p;
+
+    if (count == 0) {
+        err = 0;
+        goto fn_exit;
+    }
 
     MPI_Type_size_x(datatype, &datatype_size);
     len = datatype_size * (ADIO_Offset) count;
@@ -63,8 +66,11 @@ void ADIOI_NFS_WriteContig(ADIO_File fd, const void *buf, int count,
     if (file_ptr_type == ADIO_INDIVIDUAL) {
         fd->fp_ind += bytes_xfered;
     }
+
+  fn_exit:
 #ifdef HAVE_STATUS_SET_BYTES
-    MPIR_Status_set_bytes(status, datatype, bytes_xfered);
+    if (status && err != -1)
+        MPIR_Status_set_bytes(status, datatype, bytes_xfered);
 #endif
 
     *error_code = MPI_SUCCESS;
@@ -252,7 +258,7 @@ void ADIOI_NFS_WriteContig(ADIO_File fd, const void *buf, int count,
 #endif
 
 
-void ADIOI_NFS_WriteStrided(ADIO_File fd, const void *buf, int count,
+void ADIOI_NFS_WriteStrided(ADIO_File fd, const void *buf, MPI_Aint count,
                             MPI_Datatype datatype, int file_ptr_type,
                             ADIO_Offset offset, ADIO_Status * status, int
                             *error_code)
@@ -268,7 +274,7 @@ void ADIOI_NFS_WriteStrided(ADIO_File fd, const void *buf, int count,
     ADIO_Offset abs_off_in_filetype = 0;
     int req_len;
     MPI_Count filetype_size, etype_size, buftype_size;
-    MPI_Aint filetype_extent, buftype_extent;
+    MPI_Aint lb, filetype_extent, buftype_extent;
     int buf_count, buftype_is_contig, filetype_is_contig;
     ADIO_Offset userbuf_off;
     ADIO_Offset off, req_off, disp, end_offset = 0, writebuf_off, start_off;
@@ -290,9 +296,9 @@ void ADIOI_NFS_WriteStrided(ADIO_File fd, const void *buf, int count,
         return;
     }
 
-    MPI_Type_extent(fd->filetype, &filetype_extent);
+    MPI_Type_get_extent(fd->filetype, &lb, &filetype_extent);
     MPI_Type_size_x(datatype, &buftype_size);
-    MPI_Type_extent(datatype, &buftype_extent);
+    MPI_Type_get_extent(datatype, &lb, &buftype_extent);
     etype_size = fd->etype_size;
 
     bufsize = buftype_size * count;
@@ -327,7 +333,8 @@ void ADIOI_NFS_WriteStrided(ADIO_File fd, const void *buf, int count,
                 userbuf_off = j * buftype_extent + flat_buf->indices[i];
                 req_off = off;
                 req_len = flat_buf->blocklens[i];
-                ADIOI_BUFFERED_WRITE_WITHOUT_READ off += flat_buf->blocklens[i];
+                ADIOI_BUFFERED_WRITE_WITHOUT_READ;
+                off += flat_buf->blocklens[i];
             }
 
         /* write the buffer out finally */
@@ -536,7 +543,8 @@ void ADIOI_NFS_WriteStrided(ADIO_File fd, const void *buf, int count,
                     req_off = off;
                     req_len = fwr_size;
                     userbuf_off = i_offset;
-                ADIOI_BUFFERED_WRITE}
+                    ADIOI_BUFFERED_WRITE;
+                }
                 i_offset += fwr_size;
 
                 if (off + fwr_size < disp + flat_file->indices[j] +
@@ -578,7 +586,8 @@ void ADIOI_NFS_WriteStrided(ADIO_File fd, const void *buf, int count,
                     req_off = off;
                     req_len = size;
                     userbuf_off = i_offset;
-                ADIOI_BUFFERED_WRITE}
+                    ADIOI_BUFFERED_WRITE;
+                }
 
                 new_fwr_size = fwr_size;
                 new_bwr_size = bwr_size;

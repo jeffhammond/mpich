@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2004 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 
     MPI_Op_create(matmult, 0, &op);
 
-    /* A single rotation matrix (3x3, stored as 9 consequetive elements) */
+    /* A single rotation matrix (3x3, stored as 9 consecutive elements) */
     MPI_Type_contiguous(9, MPI_INT, &mattype);
     MPI_Type_commit(&mattype);
 

@@ -1,22 +1,16 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2017 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 
 /* This implementation of MPI_Reduce_scatter_block was obtained by taking
    the implementation of MPI_Reduce_scatter from reduce_scatter.c and replacing
-   recvcnts[i] with recvcount everywhere. */
+   recvcounts[i] with recvcount everywhere. */
 
 
 #include "mpiimpl.h"
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Reduce_scatter_block_intra_pairwise
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 
 /* Algorithm: Pairwise Exchange
  *
@@ -28,14 +22,13 @@
  */
 int MPIR_Reduce_scatter_block_intra_pairwise(const void *sendbuf,
                                              void *recvbuf,
-                                             int recvcount,
+                                             MPI_Aint recvcount,
                                              MPI_Datatype datatype,
                                              MPI_Op op,
                                              MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
     int rank, comm_size, i;
     MPI_Aint extent, true_extent, true_lb;
-    int *disps;
     void *tmp_recvbuf;
     int mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
@@ -45,21 +38,6 @@ int MPIR_Reduce_scatter_block_intra_pairwise(const void *sendbuf,
     comm_size = comm_ptr->local_size;
     rank = comm_ptr->rank;
 
-    /* set op_errno to 0. stored in perthread structure */
-    {
-        MPIR_Per_thread_t *per_thread = NULL;
-        int err = 0;
-
-        MPID_THREADPRIV_KEY_GET_ADDR(MPIR_ThreadInfo.isThreaded, MPIR_Per_thread_key,
-                                     MPIR_Per_thread, per_thread, &err);
-        MPIR_Assert(err == 0);
-        per_thread->op_errno = 0;
-    }
-
-    if (recvcount == 0) {
-        goto fn_exit;
-    }
-
     MPIR_Datatype_get_extent_macro(datatype, extent);
     MPIR_Type_get_true_extent_impl(datatype, &true_lb, &true_extent);
 
@@ -67,11 +45,13 @@ int MPIR_Reduce_scatter_block_intra_pairwise(const void *sendbuf,
     {
         int is_commutative;
         is_commutative = MPIR_Op_is_commutative(op);
-        MPIR_Assert(is_commutative);
+        MPIR_Assertp(is_commutative);
     }
 #endif /* HAVE_ERROR_CHECKING */
 
-    MPIR_CHKLMEM_MALLOC(disps, int *, comm_size * sizeof(int), mpi_errno, "disps", MPL_MEM_BUFFER);
+    MPI_Aint *disps;
+    MPIR_CHKLMEM_MALLOC(disps, MPI_Aint *, comm_size * sizeof(MPI_Aint), mpi_errno, "disps",
+                        MPL_MEM_BUFFER);
 
     for (i = 0; i < comm_size; i++) {
         disps[i] = i * recvcount;
@@ -84,8 +64,7 @@ int MPIR_Reduce_scatter_block_intra_pairwise(const void *sendbuf,
         /* copy local data into recvbuf */
         mpi_errno = MPIR_Localcopy(((char *) sendbuf + disps[rank] * extent),
                                    recvcount, datatype, recvbuf, recvcount, datatype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     /* allocate temporary buffer to store incoming data */
@@ -135,6 +114,7 @@ int MPIR_Reduce_scatter_block_intra_pairwise(const void *sendbuf,
              * end, we will copy back the result to the
              * beginning of recvbuf. */
         }
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     /* if MPI_IN_PLACE, move output data to the beginning of
@@ -143,23 +123,11 @@ int MPIR_Reduce_scatter_block_intra_pairwise(const void *sendbuf,
         mpi_errno = MPIR_Localcopy(((char *) recvbuf +
                                     disps[rank] * extent),
                                    recvcount, datatype, recvbuf, recvcount, datatype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
   fn_exit:
     MPIR_CHKLMEM_FREEALL();
-
-    {
-        MPIR_Per_thread_t *per_thread = NULL;
-        int err = 0;
-
-        MPID_THREADPRIV_KEY_GET_ADDR(MPIR_ThreadInfo.isThreaded, MPIR_Per_thread_key,
-                                     MPIR_Per_thread, per_thread, &err);
-        MPIR_Assert(err == 0);
-        if (per_thread->op_errno)
-            mpi_errno = per_thread->op_errno;
-    }
 
     /* --BEGIN ERROR HANDLING-- */
     if (mpi_errno_ret)

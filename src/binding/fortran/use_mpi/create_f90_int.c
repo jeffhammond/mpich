@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2004 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "create_f90_util.h"
@@ -39,10 +38,6 @@ typedef struct intModel {
     int range, kind, bytes;
 } intModel;
 
-#undef FUNCNAME
-#define FUNCNAME MPI_Type_create_f90_integer
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 /*@
    MPI_Type_create_f90_integer - Return a predefined type that matches
    the specified range
@@ -71,12 +66,11 @@ int MPI_Type_create_f90_integer(int range, MPI_Datatype * newtype)
     MPI_Datatype basetype = MPI_DATATYPE_NULL;
     static intModel f90_integer_map[] = { MPIR_F90_INTEGER_MODEL_MAP {0, 0, 0}
     };
-    MPIR_FUNC_TERSE_STATE_DECL(MPID_STATE_MPI_TYPE_CREATE_F90_INTEGER);
 
     MPIR_ERRTEST_INITIALIZED_ORDIE();
 
     MPID_THREAD_CS_ENTER(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
-    MPIR_FUNC_TERSE_ENTER(MPID_STATE_MPI_TYPE_CREATE_F90_INTEGER);
+    MPIR_FUNC_TERSE_ENTER;
 
     /* ... body of routine ...  */
     for (i = 0; f90_integer_map[i].range > 0; i++) {
@@ -117,7 +111,7 @@ int MPI_Type_create_f90_integer(int range, MPI_Datatype * newtype)
 
     /* ... end of body of routine ... */
   fn_exit:
-    MPIR_FUNC_TERSE_EXIT(MPID_STATE_MPI_TYPE_CREATE_F90_INTEGER);
+    MPIR_FUNC_TERSE_EXIT;
     MPID_THREAD_CS_EXIT(GLOBAL, MPIR_THREAD_GLOBAL_ALLFUNC_MUTEX);
     return mpi_errno;
   fn_fail:
@@ -125,12 +119,12 @@ int MPI_Type_create_f90_integer(int range, MPI_Datatype * newtype)
 #ifdef HAVE_ERROR_CHECKING
     {
         mpi_errno =
-            MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
+            MPIR_Err_create_code(mpi_errno, MPIR_ERR_RECOVERABLE, __func__, __LINE__, MPI_ERR_OTHER,
                                  "**mpi_type_create_f90_int", "**mpi_type_create_f90_int %d",
                                  range);
     }
 #endif
-    mpi_errno = MPIR_Err_return_comm(0, FCNAME, mpi_errno);
+    mpi_errno = MPIR_Err_return_comm(0, __func__, mpi_errno);
     goto fn_exit;
     /* --END ERROR HANDLING-- */
 }

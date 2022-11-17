@@ -1,15 +1,14 @@
-# -*- Mode: Makefile; -*-
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
-ACLOCAL_AMFLAGS = -I confdb -I src/hwloc/config
+ACLOCAL_AMFLAGS = -I confdb
 
 # automake requires that we initialize variables to something, even just empty,
 # before appending to them with "+="
-AM_CFLAGS = @VISIBILITY_CFLAGS@ @HWLOC_EMBEDDED_CFLAGS@
-AM_CPPFLAGS = @HWLOC_EMBEDDED_CPPFLAGS@
+AM_CFLAGS = @VISIBILITY_CFLAGS@
+AM_CPPFLAGS =
 AM_FFLAGS =
 AM_FCFLAGS =
 include_HEADERS =
@@ -49,11 +48,11 @@ pkgconfigdir = @pkgconfigdir@
 # to build src/mpi/errhan/defmsg.h
 errnames_txt_files = 
 
-external_subdirs = @mplsrcdir@ @opasrcdir@ @zmsrcdir@ @hwlocsrcdir@
-external_ldflags = @mpllibdir@ @opalibdir@ @zmlibdir@ @hwloclibdir@ @netloclibdir@
+external_subdirs = @mplsrcdir@ @hwlocsrcdir@ @jsonsrcdir@ @yaksasrcdir@ @pmisrcdir@
+external_ldflags = @mpllibdir@ @yaksalibdir@
 external_libs = @WRAPPER_LIBS@
 mpi_convenience_libs =
-pmpi_convenience_libs = @opalib@ @mpllib@ @zmlib@ @hwloclib@
+pmpi_convenience_libs = @mpllib@ @hwloclib@ @jsonlib@ @yaksalib@ @pmilib@
 
 # NOTE on our semi-unconventional usage of DIST_SUBDIRS:
 # The automake manual recommends thinking of DIST_SUBDIRS as the list of all
@@ -66,25 +65,6 @@ pmpi_convenience_libs = @opalib@ @mpllib@ @zmlib@ @hwloclib@
 DIST_SUBDIRS = ${external_subdirs}
 SUBDIRS = ${external_subdirs}
 
-## Automake attempts to guess the correct linker among the various compilers
-## for each language (see "How the Linker is Chosen" in the AM manual).
-## However, this process is static and doesn't assume that you will "disable"
-## Fortran support for a library and still actually build that library.
-## lib@MPILIBNAME@.la contains both C and F77 source, so AM picks "F77LD" as the
-## linker.  Instead we manually override automake's choice based on the value of
-## enable_f77.
-if BUILD_F77_BINDING
-# link with libtool+F77LD
-lib_lib@MPILIBNAME@_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=F77 \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(F77LD) \
-	$(AM_FFLAGS) $(FFLAGS) $(lib_lib@MPILIBNAME@_la_LDFLAGS) \
-	$(LDFLAGS) -o $@
-lib_lib@PMPILIBNAME@_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=F77 \
-	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(F77LD) \
-	$(AM_FFLAGS) $(FFLAGS) $(lib_lib@PMPILIBNAME@_la_LDFLAGS) \
-	$(LDFLAGS) -o $@
-else !BUILD_F77_BINDING
-# link with libtool+CCLD
 lib_lib@MPILIBNAME@_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(lib_lib@MPILIBNAME@_la_CFLAGS) $(CFLAGS) \
@@ -93,7 +73,6 @@ lib_lib@PMPILIBNAME@_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(lib_lib@PMPILIBNAME@_la_CFLAGS) $(CFLAGS) \
 	$(lib_lib@PMPILIBNAME@_la_LDFLAGS) $(LDFLAGS) -o $@
-endif !BUILD_F77_BINDING
 
 if BUILD_F77_BINDING
 if BUILD_FC_BINDING
@@ -212,9 +191,11 @@ EXTRA_DIST += README.vin
 testing:
 	( cd test && $(MAKE) $(AM_MAKEFLAGS) testing )
 
+testconfig:
+	( cd test && $(MAKE) $(AM_MAKEFLAGS) mpi/Makefile )
+
 test-clean:
 	( cd test && $(MAKE) $(AM_MAKEFLAGS) clean )
-CLEAN_LOCAL_TARGETS += test-clean
 
 ## FIXME: this should live in src/env/Makefile.mk. Moving it there
 ## will not cause a problem, but it will break the build if another
@@ -222,6 +203,11 @@ CLEAN_LOCAL_TARGETS += test-clean
 ## better approach might be to have each Makefile.mk append to a
 ## common set of rules.
 install-exec-hook:
+	if test -e lib/lib@PMPILIBNAME@.la ; then \
+	    . lib/lib@PMPILIBNAME@.la ; \
+	elif test -e lib/lib@MPILIBNAME@.la ; then \
+	    . lib/lib@MPILIBNAME@.la ; \
+	fi ; \
 	for e in ${DESTDIR}${bindir}/@MPICC_NAME@ ${DESTDIR}${bindir}/@MPICXX_NAME@ \
 		${DESTDIR}${bindir}/@MPIF77_NAME@ ${DESTDIR}${bindir}/@MPIFORT_NAME@ ; do \
 		if test -e $${e} ; then \
@@ -229,7 +215,8 @@ install-exec-hook:
 				-e 's|__EXEC_PREFIX_TO_BE_FILLED_AT_INSTALL_TIME__|${exec_prefix}|g' \
 				-e 's|__SYSCONFDIR_TO_BE_FILLED_AT_INSTALL_TIME__|${sysconfdir}|g' \
 				-e 's|__INCLUDEDIR_TO_BE_FILLED_AT_INSTALL_TIME__|${includedir}|g' \
-				-e 's|__LIBDIR_TO_BE_FILLED_AT_INSTALL_TIME__|${libdir}|g' $${e} > $${e}.tmp ; \
+				-e 's|__LIBDIR_TO_BE_FILLED_AT_INSTALL_TIME__|${libdir}|g' \
+				-e "s|__LIBS_TO_BE_FILLED_AT_INSTALL_TIME__|$$dependency_libs|g" $${e} > $${e}.tmp ; \
 			$(INSTALL_SCRIPT) $${e}.tmp $${e} ; \
 			rm -f $${e}.tmp ; \
 		fi ; \
@@ -495,7 +482,7 @@ mandoc:
 	test -d $(mandoc_path1) || $(MKDIR_P) $(mandoc_path1)
 	test -d $(mandoc_path3) || $(MKDIR_P) $(mandoc_path3)
 	$(MAKE) $(AM_MAKEFLAGS) mandoc-local
-mandoc-local: $(mpi_sources:.c=.man-phony) $(doc1_src_txt:.txt=.man1-phony) \
+mandoc-local: $(doc1_src_txt:.txt=.man1-phony) \
 	$(doc3_src_txt:.txt=.man3-phony)
 	for subdir in $(MANDOC_SUBDIRS) - ; do \
 	    if test "x$$subdir" = "x-" ; then break ; fi ; \
@@ -513,8 +500,7 @@ mandoc-local: $(mpi_sources:.c=.man-phony) $(doc1_src_txt:.txt=.man1-phony) \
 		fi \
 	    fi \
 	done
-#      FIXME: the 'mancnst' script need to be committed for this to work
-#      (cd $(abs_top_builddir) && $(abs_top_srcdir)/doc/mansrc/mancnst)
+	$(srcdir)/maint/alias_mancnst
 
 # use htmldoc-local target to force directory creation before running DOCTEXT
 # Note that the mpi.cit is appended to by each update, so it must be removed
@@ -525,7 +511,7 @@ htmldoc:
 	rm -f $(htmldoc_path3)/mpi.cit
 	$(MAKE) $(AM_MAKEFLAGS) htmldoc-local
 
-htmldoc-local: $(mpi_sources:.c=.html-phony) $(doc1_src_txt:.txt=.html1-phony) \
+htmldoc-local: $(doc1_src_txt:.txt=.html1-phony) \
 	$(doc3_src_txt:.txt=.html3-phony)
 	for subdir in $(HTMLDOC_SUBDIRS) - ; do \
 	    if test "x$$subdir" = "x-" ; then break ; fi ; \
@@ -636,6 +622,11 @@ include $(top_srcdir)/doc/Makefile.mk
 # use the _TARGETS var as a workaround for being unable to define multiple
 # -local targets
 install-data-local: $(INSTALL_DATA_LOCAL_TARGETS)
+
+# the dist target created by automake won't work. Direct user to use release.pl
+dist:
+	@echo "To create release tarball, use:" ; \
+	echo "    maint/release.pl --branch=[git_ref_to_use] --version=[version] --git-repo=[path_to_git_repository]"
 
 
 # sometimes helpful when debugging macros to see the preprocessed output.

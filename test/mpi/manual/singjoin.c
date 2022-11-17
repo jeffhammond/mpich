@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* Test of MPI_Comm_join.  This should work even when each process
@@ -62,7 +60,8 @@ int opt_port = 0;
 SOCKET_FD_TYPE server_routine(int portnum)
 {
     SOCKET_FD_TYPE listenfd, peer_fd;
-    int ret, peer_addr_size;
+    int ret;
+    socklen_t peer_addr_size;
     struct sockaddr_in server_addr, peer_addr;
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -167,7 +166,6 @@ int parse_args(int argc, char **argv)
 {
 #ifndef HAVE_WINDOWS_H
     int c;
-    extern char *optarg;
     while ((c = getopt(argc, argv, "csp:")) != -1) {
         switch (c) {
             case 's':

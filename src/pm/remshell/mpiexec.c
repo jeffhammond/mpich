@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2004 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* OWNER=gropp */
@@ -267,9 +266,9 @@ int mypostfork(void *predata, void *data, ProcessState * pState)
         char rankStr[12];
 
         /* Insert into app->args */
-        newargs = (const char **) MPL_malloc((app->nArgs + 14 + 1, MPL_MEM_PM) * sizeof(char *));
+        newargs = (const char **) MPL_malloc((app->nArgs + 14 + 1) * sizeof(char *), MPL_MEM_PM);
         if (!pState->hostname) {
-            MPL_error_printf("No hostname avaliable for %s\n", app->exename);
+            MPL_error_printf("No hostname available for %s\n", app->exename);
             exit(1);
         }
 
@@ -379,7 +378,7 @@ int myspawn(ProcessWorld * pWorld, void *data)
  * to the postfork routine; this is called after the fork but before the
  * exec, and it can change the command line by making a copy of the app
  * structure, changing the command line, and setting the pState structure
- * to point to this new app (after the fork, these changes are visable only
+ * to point to this new app (after the fork, these changes are visible only
  * to the forked process).
  *
  * Enhancements:
@@ -419,7 +418,7 @@ static int AddEnvSetToCmdLine(const char *envName, const char *envValue, const c
             else
                 sname++;
             /* printf("Sname is %s\n", sname); */
-            if (strcmp(sname, "bash") == 0 || strcmp(sname, "sh") || strcmp(sname, "ash") == 0)
+            if (strcmp(sname, "bash") == 0 || strcmp(sname, "sh") == 0 || strcmp(sname, "ash") == 0)
                 useCSHFormat = 0;
             else
                 useCSHFormat = 1;

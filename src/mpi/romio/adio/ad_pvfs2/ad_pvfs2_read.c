@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*-
- *     vim: ts=8 sts=4 sw=4 noexpandtab
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -11,7 +9,7 @@
 #include "ad_pvfs2_io.h"
 #include "ad_pvfs2_common.h"
 
-void ADIOI_PVFS2_ReadContig(ADIO_File fd, void *buf, int count,
+void ADIOI_PVFS2_ReadContig(ADIO_File fd, void *buf, MPI_Aint count,
                             MPI_Datatype datatype, int file_ptr_type,
                             ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {
@@ -21,6 +19,15 @@ void ADIOI_PVFS2_ReadContig(ADIO_File fd, void *buf, int count,
     PVFS_sysresp_io resp_io;
     ADIOI_PVFS2_fs *pvfs_fs;
     static char myname[] = "ADIOI_PVFS2_READCONTIG";
+
+    if (count == 0) {
+#ifdef HAVE_STATUS_SET_BYTES
+        if (status)
+            MPIR_Status_set_bytes(status, datatype, 0);
+#endif
+        *error_code = MPI_SUCCESS;
+        return;
+    }
 
     pvfs_fs = (ADIOI_PVFS2_fs *) fd->fs_ptr;
 
@@ -81,7 +88,8 @@ void ADIOI_PVFS2_ReadContig(ADIO_File fd, void *buf, int count,
     fd->fp_sys_posn = offset + (int) resp_io.total_completed;
 
 #ifdef HAVE_STATUS_SET_BYTES
-    MPIR_Status_set_bytes(status, datatype, resp_io.total_completed);
+    if (status)
+        MPIR_Status_set_bytes(status, datatype, resp_io.total_completed);
 #endif
 
     *error_code = MPI_SUCCESS;
@@ -91,7 +99,7 @@ void ADIOI_PVFS2_ReadContig(ADIO_File fd, void *buf, int count,
     return;
 }
 
-static int ADIOI_PVFS2_ReadStridedListIO(ADIO_File fd, void *buf, int count,
+static int ADIOI_PVFS2_ReadStridedListIO(ADIO_File fd, void *buf, MPI_Aint count,
                                          MPI_Datatype datatype, int file_ptr_type,
                                          ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {
@@ -99,7 +107,7 @@ static int ADIOI_PVFS2_ReadStridedListIO(ADIO_File fd, void *buf, int count,
                                      datatype, file_ptr_type, offset, status, error_code, READ);
 }
 
-static int ADIOI_PVFS2_ReadStridedDtypeIO(ADIO_File fd, void *buf, int count,
+static int ADIOI_PVFS2_ReadStridedDtypeIO(ADIO_File fd, void *buf, MPI_Aint count,
                                           MPI_Datatype datatype, int file_ptr_type,
                                           ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {
@@ -107,7 +115,7 @@ static int ADIOI_PVFS2_ReadStridedDtypeIO(ADIO_File fd, void *buf, int count,
                                       datatype, file_ptr_type, offset, status, error_code, READ);
 }
 
-void ADIOI_PVFS2_ReadStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_PVFS2_ReadStrided(ADIO_File fd, void *buf, MPI_Aint count,
                              MPI_Datatype datatype, int file_ptr_type,
                              ADIO_Offset offset, ADIO_Status * status, int
                              *error_code)
@@ -117,7 +125,7 @@ void ADIOI_PVFS2_ReadStrided(ADIO_File fd, void *buf, int count,
      * - 'true' Datatype (from avery)
      * - new List I/O (from avery)
      * - classic List I/O  (the one that's always been in ROMIO)
-     * I imagine we'll keep Datatype as an optional optimization, and afer a
+     * I imagine we'll keep Datatype as an optional optimization, and after a
      * release or two promote it to the default
      */
     int ret = -1;
@@ -152,5 +160,4 @@ void ADIOI_PVFS2_ReadStrided(ADIO_File fd, void *buf, int count,
 
 
 /*
- * vim: ts=8 sts=4 sw=4 noexpandtab
  */

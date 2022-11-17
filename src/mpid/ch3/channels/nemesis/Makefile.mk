@@ -1,8 +1,6 @@
-## -*- Mode: Makefile; -*-
-## vim: set ft=automake :
 ##
-## (C) 2011 by Argonne National Laboratory.
-##     See COPYRIGHT in top-level directory.
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
 ##
 
 if BUILD_CH3_NEMESIS
@@ -30,6 +28,5 @@ noinst_HEADERS +=							\
 include $(top_srcdir)/src/mpid/ch3/channels/nemesis/src/Makefile.mk
 include $(top_srcdir)/src/mpid/ch3/channels/nemesis/netmod/Makefile.mk
 include $(top_srcdir)/src/mpid/ch3/channels/nemesis/utils/monitor/Makefile.mk
-include $(top_srcdir)/src/mpid/ch3/channels/nemesis/utils/replacements/Makefile.mk
 
 endif BUILD_CH3_NEMESIS

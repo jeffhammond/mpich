@@ -57,11 +57,11 @@ dnl D*/
 AC_DEFUN([PAC_ARG_SHAREDLIBS],[
 
 AC_ARG_ENABLE(shared,
-	AC_HELP_STRING([--enable-shared], [Enable shared library builds]),,
+	AS_HELP_STRING([--enable-shared], [Enable shared library builds]),,
 	enable_shared=no)
 
 AC_ARG_ENABLE(rpath,
-	AC_HELP_STRING([--enable-rpath],
+	AS_HELP_STRING([--enable-rpath],
 		[Determine whether the rpath is set when programs are
 		compiled and linked when shared libraries are built.
 		The default is yes; use --disable-rpath to turn this
@@ -192,7 +192,7 @@ case "$enable_sharedlibs" in
 	# our base approach.  Disabling for now
 	dnl LT_PREREQ([2.2.6])
         dnl LT_INIT([disable-shared])
-	AC_MSG_ERROR([To use this test verison, edit aclocal_shl.m4])
+	AC_MSG_ERROR([To use this test version, edit aclocal_shl.m4])
         # Likely to be
         # either CC or CC_SHL is libtool $cc
         CC_SHL='${LIBTOOL} --mode=compile ${CC}'
@@ -367,7 +367,7 @@ dnl This macro ensures that all of the necessary substitutions are
 dnl made by any subdirectory configure (which may simply SUBST the
 dnl necessary values rather than trying to determine them from scratch)
 dnl This is a more robust (and, in the case of libtool, only 
-dnl managable) method.
+dnl manageable) method.
 AC_DEFUN([PAC_CC_SUBDIR_SHLIBS],[
 	AC_SUBST(CC_SHL)
         AC_SUBST(C_LINK_SHL)
@@ -378,11 +378,11 @@ AC_DEFUN([PAC_CC_SUBDIR_SHLIBS],[
 	    if test -z "$LIBTOOL" ; then
 		AC_MSG_WARN([libtool selected for shared library support but LIBTOOL is not defined])
             fi
-	    # Libtool needs master_top_builddir
-	    if test "X$master_top_builddir" = "X" ; then
-	        AC_MSG_ERROR([Libtool requires master_top_builddir - check configure.ac sources])
+	    # Libtool needs main_top_builddir
+	    if test "X$main_top_builddir" = "X" ; then
+	        AC_MSG_ERROR([Libtool requires main_top_builddir - check configure.ac sources])
 	    fi
-	    AC_SUBST(master_top_builddir)
+	    AC_SUBST(main_top_builddir)
 	fi
 ])
 

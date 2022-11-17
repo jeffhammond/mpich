@@ -1,4 +1,9 @@
 #! /bin/sh
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
+
 #
 # Output a system dependent set of variables, describing how to set the
 # run time search path of shared libraries in an executable.
@@ -71,7 +76,7 @@ else
         ecc*)
           wl='-Wl,'
           ;;
-        icc* | ifort*)
+        icc* | icx* | ifort* | ifx*)
           wl='-Wl,'
           ;;
         lf95*)
@@ -97,8 +102,8 @@ else
             *Sun\ Ceres\ Fortran* | *Sun*Fortran*\ [[1-7]].* | *Sun*Fortran*\ 8.[[0-4]]*)
               wl=
               ;;
-            *Sun\ F* | *Sun*Fortran*)
-              wl='-Wl,'
+            *Sun\ F* | *Sun*Fortran* | *Studio*Fortran*)
+              wl='-Qoption ld '
               ;;
             *Sun\ C*)
               wl='-Wl,'
@@ -228,7 +233,7 @@ if test "$with_gnu_ld" = yes; then
           enable_dtags_flag="${wl}--enable-new-dtags"
           disable_dtags_flag="${wl}--disable-new-dtags"
         else
-          case $cc_basename in ifort*)
+          case $cc_basename in ifort* | ifx*)
             enable_dtags_flag="${wl}--enable-new-dtags"
             disable_dtags_flag="${wl}--disable-new-dtags"
             ;;
@@ -375,7 +380,7 @@ else
       ;;
     darwin* | rhapsody*)
       hardcode_direct=no
-      if { case $cc_basename in ifort*) true;; *) test "$GCC" = yes;; esac; }; then
+      if { case $cc_basename in ifort* | ifx*) true;; *) test "$GCC" = yes;; esac; }; then
         :
       else
         ld_shlibs=no

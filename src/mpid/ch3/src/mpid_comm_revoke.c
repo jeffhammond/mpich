@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   (C) 2014 by Argonne National Laboratory.
- *       See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
@@ -15,22 +14,17 @@
  *             be set to true. This way we'll know to decrement the counter twice
  *             (once for our local revocation and once for the remote).
  */
-#undef FUNCNAME
-#define FUNCNAME MPID_Comm_revoke
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_Comm_revoke(MPIR_Comm *comm_ptr, int is_remote)
 {
     MPIDI_VC_t *vc;
-    MPL_IOV iov[MPL_IOV_LIMIT];
+    struct iovec iov[MPL_IOV_LIMIT];
     int mpi_errno = MPI_SUCCESS;
     int i, size, my_rank;
     MPIR_Request *request;
     MPIDI_CH3_Pkt_t upkt;
     MPIDI_CH3_Pkt_revoke_t *revoke_pkt = &upkt.revoke;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_COMM_REVOKE);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_COMM_REVOKE);
+    MPIR_FUNC_ENTER;
 
     if (0 == comm_ptr->revoked) {
         /* Mark the communicator as revoked locally */
@@ -59,8 +53,8 @@ int MPID_Comm_revoke(MPIR_Comm *comm_ptr, int is_remote)
 
             MPIDI_Comm_get_vc_set_active(comm_ptr, i, &vc);
 
-            iov[0].MPL_IOV_BUF = (MPL_IOV_BUF_CAST) revoke_pkt;
-            iov[0].MPL_IOV_LEN = sizeof(*revoke_pkt);
+            iov[0].iov_base = (void *) revoke_pkt;
+            iov[0].iov_len = sizeof(*revoke_pkt);
 
             MPID_THREAD_CS_ENTER(POBJ, vc->pobj_mutex);
             mpi_errno = MPIDI_CH3_iStartMsgv(vc, iov, 1, &request);
@@ -98,6 +92,6 @@ int MPID_Comm_revoke(MPIR_Comm *comm_ptr, int is_remote)
         }
     }
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_COMM_REVOKE);
+    MPIR_FUNC_EXIT;
     return MPI_SUCCESS;
 }

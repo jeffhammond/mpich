@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_nfs.h"
@@ -19,12 +17,12 @@ struct ADIOI_Fns_struct ADIO_NFS_operations = {
     ADIOI_GEN_WriteStridedColl, /* WriteStridedColl */
     ADIOI_GEN_SeekIndividual,   /* SeekIndividual */
     ADIOI_NFS_Fcntl,    /* Fcntl */
-    ADIOI_GEN_SetInfo,  /* SetInfo */
+    ADIOI_NFS_SetInfo,  /* SetInfo */
     ADIOI_NFS_ReadStrided,      /* ReadStrided */
     ADIOI_NFS_WriteStrided,     /* WriteStrided */
     ADIOI_GEN_Close,    /* Close */
     /* Even with lockd running and NFS mounted 'noac', we have been unable to
-     * gaurantee correct behavior over NFS with asyncronous I/O operations */
+     * guarantee correct behavior over NFS with asynchronous I/O operations */
     ADIOI_FAKE_IreadContig,     /* IreadContig */
     ADIOI_FAKE_IwriteContig,    /* IwriteContig */
     ADIOI_NFS_ReadDone, /* ReadDone */
@@ -39,5 +37,10 @@ struct ADIOI_Fns_struct ADIO_NFS_operations = {
     ADIOI_NFS_Feature,  /* Features */
     "NFS:",     /* fsname: just a string */
     ADIOI_GEN_IreadStridedColl, /* IreadStridedColl */
-    ADIOI_GEN_IwriteStridedColl /* IwriteStridedColl */
+    ADIOI_GEN_IwriteStridedColl,        /* IwriteStridedColl */
+#if defined(F_SETLKW64)
+    ADIOI_GEN_SetLock   /* SetLock */
+#else
+    ADIOI_GEN_SetLock64 /* SetLock */
+#endif
 };

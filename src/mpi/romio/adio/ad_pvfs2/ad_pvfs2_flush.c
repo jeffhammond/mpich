@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_pvfs2.h"
@@ -29,7 +27,7 @@ void ADIOI_PVFS2_Flush(ADIO_File fd, int *error_code)
 
 
     /* unlike ADIOI_PVFS2_Resize, MPI_File_sync() does not perform any
-     * syncronization */
+     * synchronization */
     MPI_Reduce(&dummy_in, &dummy, 1, MPI_INT, MPI_SUM, fd->hints->ranklist[0], fd->comm);
 
     /* io_worker computed in ADIO_Open */
@@ -48,7 +46,3 @@ void ADIOI_PVFS2_Flush(ADIO_File fd, int *error_code)
     }
     /* --END ERROR HANDLING-- */
 }
-
-/*
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */

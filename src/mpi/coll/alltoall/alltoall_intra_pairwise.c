@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -24,26 +22,19 @@
  * where n is the total amount of data a process needs to send to all
  * other processes.
  */
-#undef FUNCNAME
-#define FUNCNAME MPIR_Alltoall_intra_pairwise
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Alltoall_intra_pairwise(const void *sendbuf,
-                                 int sendcount,
+                                 MPI_Aint sendcount,
                                  MPI_Datatype sendtype,
                                  void *recvbuf,
-                                 int recvcount,
+                                 MPI_Aint recvcount,
                                  MPI_Datatype recvtype,
                                  MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
-    int comm_size, i, pof2;
+    int comm_size, i;
     MPI_Aint sendtype_extent, recvtype_extent;
     int mpi_errno = MPI_SUCCESS, src, dst, rank;
     int mpi_errno_ret = MPI_SUCCESS;
     MPI_Status status;
-
-    if (recvcount == 0)
-        return MPI_SUCCESS;
 
     comm_size = comm_ptr->local_size;
     rank = comm_ptr->rank;
@@ -62,22 +53,15 @@ int MPIR_Alltoall_intra_pairwise(const void *sendbuf,
                                sendcount, sendtype,
                                ((char *) recvbuf +
                                 rank * recvcount * recvtype_extent), recvcount, recvtype);
-    if (mpi_errno) {
-        MPIR_ERR_POP(mpi_errno);
-    }
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* Is comm_size a power-of-two? */
-    i = 1;
-    while (i < comm_size)
-        i *= 2;
-    if (i == comm_size)
-        pof2 = 1;
-    else
-        pof2 = 0;
+    int is_pof2;
+    is_pof2 = MPL_is_pof2(comm_size);
 
     /* Do the pairwise exchanges */
     for (i = 1; i < comm_size; i++) {
-        if (pof2 == 1) {
+        if (is_pof2) {
             /* use exclusive-or algorithm */
             src = dst = rank ^ i;
         } else {

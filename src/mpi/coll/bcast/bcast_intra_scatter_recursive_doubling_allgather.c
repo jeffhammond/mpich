@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -27,12 +25,8 @@
  * it's still a logarithmic algorithm.) Therefore, for long messages
  * Total Cost = 2.lgp.alpha + 2.n.((p-1)/p).beta
 */
-#undef FUNCNAME
-#define FUNCNAME MPIR_Bcast_intra_scatter_recursive_doubling_allgather
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
-                                                          int count,
+                                                          MPI_Aint count,
                                                           MPI_Datatype datatype,
                                                           int root,
                                                           MPIR_Comm * comm_ptr,
@@ -43,13 +37,11 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
     int relative_rank, mask;
     int mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
-    int scatter_size;
     MPI_Aint curr_size, recv_size = 0;
     int j, k, i, tmp_mask, is_contig;
-    MPI_Aint type_size, nbytes = 0;
-    int relative_dst, dst_tree_root, my_tree_root, send_offset;
-    int recv_offset, tree_root, nprocs_completed, offset;
-    MPI_Aint position;
+    MPI_Aint type_size, nbytes;
+    int relative_dst, dst_tree_root, my_tree_root;
+    int tree_root, nprocs_completed;
     MPIR_CHKLMEM_DECL(1);
     MPI_Aint true_extent, true_lb;
     void *tmp_buf;
@@ -58,17 +50,7 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
     rank = comm_ptr->rank;
     relative_rank = (rank >= root) ? rank - root : rank - root + comm_size;
 
-    /* If there is only one process, return */
-    if (comm_size == 1)
-        goto fn_exit;
-
-#ifdef HAVE_ERROR_CHECKING
-    /* This algorithm can currently handle only power of 2 cases,
-     * non-power of 2 is still experimental */
-    MPIR_Assert(MPL_is_pof2(comm_size, NULL));
-#endif /* HAVE_ERROR_CHECKING */
-
-    if (HANDLE_GET_KIND(datatype) == HANDLE_KIND_BUILTIN)
+    if (HANDLE_IS_BUILTIN(datatype))
         is_contig = 1;
     else {
         MPIR_Datatype_is_contig(datatype, &is_contig);
@@ -84,19 +66,17 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
         /* contiguous. no need to pack. */
         MPIR_Type_get_true_extent_impl(datatype, &true_lb, &true_extent);
 
-        tmp_buf = (char *) buffer + true_lb;
+        tmp_buf = MPIR_get_contig_ptr(buffer, true_lb);
     } else {
         MPIR_CHKLMEM_MALLOC(tmp_buf, void *, nbytes, mpi_errno, "tmp_buf", MPL_MEM_BUFFER);
 
-        position = 0;
         if (rank == root) {
-            mpi_errno = MPIR_Pack_impl(buffer, count, datatype, tmp_buf, nbytes, &position);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            mpi_errno = MPIR_Localcopy(buffer, count, datatype, tmp_buf, nbytes, MPI_BYTE);
+            MPIR_ERR_CHECK(mpi_errno);
         }
     }
 
-
+    MPI_Aint scatter_size;
     scatter_size = (nbytes + comm_size - 1) / comm_size;        /* ceiling division */
 
     mpi_errno = MPII_Scatter_for_bcast(buffer, count, datatype, root, comm_ptr,
@@ -112,6 +92,7 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
 
     /* curr_size is the amount of data that this process now has stored in
      * buffer at byte offset (relative_rank*scatter_size) */
+    /* Note: since we are rounding up scatter_size, higher ranks may not have data and nbytes-offset may be negative */
     curr_size = MPL_MIN(scatter_size, (nbytes - (relative_rank * scatter_size)));
     if (curr_size < 0)
         curr_size = 0;
@@ -137,6 +118,7 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
         my_tree_root = relative_rank >> i;
         my_tree_root <<= i;
 
+        MPI_Aint send_offset, recv_offset;
         send_offset = my_tree_root * scatter_size;
         recv_offset = dst_tree_root * scatter_size;
 
@@ -191,6 +173,7 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
             }
             k--;
 
+            MPI_Aint offset;
             offset = scatter_size * (my_tree_root + mask);
             tmp_mask = mask >> 1;
 
@@ -237,7 +220,7 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
                     /* printf("Rank %d waiting to recv from rank %d\n",
                      * relative_rank, dst); */
                     mpi_errno = MPIC_Recv(((char *) tmp_buf + offset),
-                                          nbytes - offset,
+                                          nbytes - offset < 0 ? 0 : nbytes - offset,
                                           MPI_BYTE, dst, MPIR_BCAST_TAG,
                                           comm_ptr, &status, errflag);
                     /* nprocs_completed is also equal to the no. of processes
@@ -268,6 +251,7 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
         i++;
     }
 
+#ifdef HAVE_ERROR_CHECKING
     /* check that we received as much as we expected */
     if (curr_size != nbytes) {
         if (*errflag == MPIR_ERR_NONE)
@@ -277,13 +261,12 @@ int MPIR_Bcast_intra_scatter_recursive_doubling_allgather(void *buffer,
                       "**collective_size_mismatch %d %d", curr_size, nbytes);
         MPIR_ERR_ADD(mpi_errno_ret, mpi_errno);
     }
+#endif
 
     if (!is_contig) {
         if (rank != root) {
-            position = 0;
-            mpi_errno = MPIR_Unpack_impl(tmp_buf, nbytes, &position, buffer, count, datatype);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            mpi_errno = MPIR_Localcopy(tmp_buf, nbytes, MPI_BYTE, buffer, count, datatype);
+            MPIR_ERR_CHECK(mpi_errno);
         }
     }
 

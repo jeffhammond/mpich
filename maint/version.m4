@@ -1,7 +1,7 @@
 [#] start of __file__
-# 
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
+#
+# Copyright (C) by Argonne National Laboratory
+#     See COPYRIGHT in top-level directory
 #
 # This file contains versioning information for MPICH's configure process.
 # This was previously (as "maint/Version") a bit of shell code that was sourced
@@ -14,7 +14,7 @@
 # changing this by playing with diversions, but then we would probably be
 # playing with autotools-fire.
 
-m4_define([MPICH_VERSION_m4],[3.3])dnl
+m4_define([MPICH_VERSION_m4],[4.1b1])dnl
 m4_define([MPICH_RELEASE_DATE_m4],[unreleased development copy])dnl
 
 # For libtool ABI versioning rules see:
@@ -29,12 +29,14 @@ m4_define([MPICH_RELEASE_DATE_m4],[unreleased development copy])dnl
 #     3. If any interfaces have been added since the last public
 #     release, then increment age.
 #
-#     4. If any interfaces have been removed since the last public
-#     release, then set age to 0.
+#     4. If any interfaces have been removed or changed since the last
+#     public release, then set age to 0.
 
 # libmpi so version only includes functionality defined in the MPI
 # standard, and does not include MPIX_ functions and C++ bindings.
 
-m4_define([libmpi_so_version_m4],[13:6:1])dnl
+# Use [0:0:0] for unstable (e.g. alpha and beta) releases.
+
+m4_define([libmpi_so_version_m4],[0:0:0])dnl
 
 [#] end of __file__

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2007 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -65,7 +64,7 @@ int MPIR_Breakpoint(void);
    Neither the attribute __attribute__((noinline)) nor the use of
    asm(""), recommended by the GCC manual, prevented the inlining of
    this call.  Rather than place it in a separate file (and still
-   risk whole-program analysis removal), we use a globally visable
+   risk whole-program analysis removal), we use a globally visible
    function pointer.
 */
 int (*MPIR_breakpointFn) (void) = MPIR_Breakpoint;

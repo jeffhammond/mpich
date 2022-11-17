@@ -1,12 +1,10 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  Changes to this example
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
- * This example is taken from MPI-The complete reference, Vol 1,
+ * Adapted from the example taken from MPI-The complete reference, Vol 1,
  * pages 222-224.
  *
  * Lines after the "--CUT HERE--" were added to make this into a complete
@@ -199,7 +197,7 @@ int main(int argc, char *argv[])
 
     /* Create the local matrices.
      * Initialize the input matrix so that the entries are
-     * consequtive integers, by row, starting at 0.
+     * consecutive integers, by row, starting at 0.
      */
     if (rank == size - 1) {
         localA = (float *) malloc(gN * lmlast * sizeof(float));
@@ -225,7 +223,7 @@ int main(int argc, char *argv[])
     Transpose(localA, localB, gM, gN, comm);
 
     /* check the transposed matrix
-     * In the global matrix, the transpose has consequtive integers,
+     * In the global matrix, the transpose has consecutive integers,
      * organized by columns.
      */
     if (rank == size - 1) {

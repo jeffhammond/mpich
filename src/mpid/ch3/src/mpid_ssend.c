@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
@@ -9,11 +8,7 @@
 /*
  * MPID_Ssend()
  */
-#undef FUNCNAME
-#define FUNCNAME MPID_Ssend
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPID_Ssend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int tag, MPIR_Comm * comm, int context_offset,
+int MPID_Ssend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank, int tag, MPIR_Comm * comm, int attr,
 	       MPIR_Request ** request)
 {
     intptr_t data_sz;
@@ -27,10 +22,10 @@ int MPID_Ssend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank
 #endif    
     int eager_threshold = -1;
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_SSEND);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_SSEND);
+    MPIR_FUNC_ENTER;
 
+    int context_offset = MPIR_PT2PT_ATTR_CONTEXT_OFFSET(attr);
     MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_OTHER,VERBOSE,(MPL_DBG_FDEST,
               "rank=%d, tag=%d, context=%d", 
               rank, tag, comm->context_id + context_offset));
@@ -55,18 +50,13 @@ int MPID_Ssend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank
 	    /* --BEGIN ERROR HANDLING-- */
 	    if (sreq != NULL && MPIR_cc_get(sreq->cc) != 0)
 	    {
-		mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
+		mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, __func__, __LINE__, MPI_ERR_OTHER,
 						 "**dev|selfsenddeadlock", 0);
 		goto fn_exit;
 	    }
 	    /* --END ERROR HANDLING-- */
 	}
 #	endif
-	goto fn_exit;
-    }
-    
-    if (rank == MPI_PROC_NULL)
-    {
 	goto fn_exit;
     }
 
@@ -109,7 +99,7 @@ int MPID_Ssend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank
 	mpi_errno = vc->rndvSend_fn( &sreq, buf, count, datatype, dt_contig,
                                      data_sz, dt_true_lb, rank, tag, comm, 
                                      context_offset );
-	/* Note that we don't increase the ref cound on the datatype
+	/* Note that we don't increase the ref count on the datatype
 	   because this is a blocking call, and the calling routine 
 	   must wait until sreq completes */
     }
@@ -117,11 +107,14 @@ int MPID_Ssend(const void * buf, MPI_Aint count, MPI_Datatype datatype, int rank
   fn_fail:
   fn_exit:
     *request = sreq;
+    if (sreq) {
+        MPII_SENDQ_REMEMBER(sreq, rank, tag, comm->recvcontext_id, buf, count);
+    }
     
     MPL_DBG_STMT(MPIDI_CH3_DBG_OTHER,VERBOSE,{if (sreq!=NULL) {
             MPL_DBG_MSG_P(MPIDI_CH3_DBG_OTHER,VERBOSE,
 			   "request allocated, handle=0x%08x", sreq->handle);}});
     
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_SSEND);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }

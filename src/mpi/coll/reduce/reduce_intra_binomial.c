@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -11,27 +9,20 @@
 
    Cost = lgp.alpha + n.lgp.beta + n.lgp.gamma
  */
-#undef FUNCNAME
-#define FUNCNAME MPIR_Reduce_intra_binomial
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Reduce_intra_binomial(const void *sendbuf,
                                void *recvbuf,
-                               int count,
+                               MPI_Aint count,
                                MPI_Datatype datatype,
                                MPI_Op op, int root, MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
 {
     int mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
     MPI_Status status;
-    int comm_size, rank, is_commutative, type_size ATTRIBUTE((unused));
+    int comm_size, rank, is_commutative;
     int mask, relrank, source, lroot;
     MPI_Aint true_lb, true_extent, extent;
     void *tmp_buf;
     MPIR_CHKLMEM_DECL(2);
-
-    if (count == 0)
-        return MPI_SUCCESS;
 
     comm_size = comm_ptr->local_size;
     rank = comm_ptr->rank;
@@ -59,12 +50,8 @@ int MPIR_Reduce_intra_binomial(const void *sendbuf,
 
     if ((rank != root) || (sendbuf != MPI_IN_PLACE)) {
         mpi_errno = MPIR_Localcopy(sendbuf, count, datatype, recvbuf, count, datatype);
-        if (mpi_errno) {
-            MPIR_ERR_POP(mpi_errno);
-        }
+        MPIR_ERR_CHECK(mpi_errno);
     }
-
-    MPIR_Datatype_get_size_macro(datatype, type_size);
 
     /* This code is from MPICH-1. */
 
@@ -74,14 +61,14 @@ int MPIR_Reduce_intra_binomial(const void *sendbuf,
      * node with that bit set and combine (as long as that node is within the
      * group)
      *
-     * Note that by receiving with source selection, we guarentee that we get
+     * Note that by receiving with source selection, we guarantee that we get
      * the same bits with the same input.  If we allowed the parent to receive
      * the children in any order, then timing differences could cause different
      * results (roundoff error, over/underflows in some cases, etc).
      *
      * Because of the way these are ordered, if root is 0, then this is correct
-     * for both commutative and non-commutitive operations.  If root is not
-     * 0, then for non-commutitive, we use a root of zero and then send
+     * for both commutative and non-commutative operations.  If root is not
+     * 0, then for non-commutative, we use a root of zero and then send
      * the result to the root.  To see this, note that the ordering is
      * mask = 1: (ab)(cd)(ef)(gh)            (odds send to evens)
      * mask = 2: ((ab)(cd))((ef)(gh))        (3,6 send to 0,4)
@@ -125,17 +112,13 @@ int MPIR_Reduce_intra_binomial(const void *sendbuf,
                  * the second argument (in the noncommutative case). */
                 if (is_commutative) {
                     mpi_errno = MPIR_Reduce_local(tmp_buf, recvbuf, count, datatype, op);
-                    if (mpi_errno)
-                        MPIR_ERR_POP(mpi_errno);
+                    MPIR_ERR_CHECK(mpi_errno);
                 } else {
                     mpi_errno = MPIR_Reduce_local(recvbuf, tmp_buf, count, datatype, op);
-                    if (mpi_errno)
-                        MPIR_ERR_POP(mpi_errno);
+                    MPIR_ERR_CHECK(mpi_errno);
 
                     mpi_errno = MPIR_Localcopy(tmp_buf, count, datatype, recvbuf, count, datatype);
-                    if (mpi_errno) {
-                        MPIR_ERR_POP(mpi_errno);
-                    }
+                    MPIR_ERR_CHECK(mpi_errno);
                 }
             }
         } else {

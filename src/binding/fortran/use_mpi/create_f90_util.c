@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2004 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "create_f90_util.h"
@@ -29,17 +28,15 @@ static F90Predefined f90Types[MAX_F90_TYPES];
 static int MPIR_FreeF90Datatypes(void *d)
 {
     int i;
+    MPIR_Datatype *dptr;
 
     for (i = 0; i < nAlloc; i++) {
-        MPIR_Type_free_impl(&f90Types[i].d);
+        MPIR_Datatype_get_ptr(f90Types[i].d, dptr);
+        MPIR_Datatype_free(dptr);
     }
     return 0;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Create_unnamed_predefined
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_Create_unnamed_predefined(MPI_Datatype old, int combiner,
                                    int r, int p, MPI_Datatype * new_ptr)
 {
@@ -65,7 +62,7 @@ int MPIR_Create_unnamed_predefined(MPI_Datatype old, int combiner,
                                     MPI_ERR_INTERN, "**f90typetoomany", 0);
     }
     if (nAlloc == 0) {
-        /* Install the finalize callback that frees these datatyeps.
+        /* Install the finalize callback that frees these datatypes.
          * Set the priority high enough that this will be executed
          * before the handle allocation check */
         MPIR_Add_finalize(MPIR_FreeF90Datatypes, 0, 2);
@@ -78,8 +75,7 @@ int MPIR_Create_unnamed_predefined(MPI_Datatype old, int combiner,
 
     /* Create a contiguous type from one instance of the named type */
     mpi_errno = MPIR_Type_contiguous(1, old, &type->d);
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* Initialize the contents data */
     {
@@ -102,9 +98,9 @@ int MPIR_Create_unnamed_predefined(MPI_Datatype old, int combiner,
         }
 
         MPIR_Datatype_get_ptr(type->d, new_dtp);
-        mpi_errno = MPIR_Datatype_set_contents(new_dtp, combiner, nvals, 0, 0, vals, NULL, NULL);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        mpi_errno = MPIR_Datatype_set_contents(new_dtp, combiner, nvals, 0, 0, 0,
+                                               vals, NULL, NULL, NULL);
+        MPIR_ERR_CHECK(mpi_errno);
 
 #ifndef NDEBUG
         {
@@ -112,7 +108,7 @@ int MPIR_Create_unnamed_predefined(MPI_Datatype old, int combiner,
             MPI_Datatype new_basic = MPI_DATATYPE_NULL;
             /* we used MPIR_Type_contiguous and then stomped it's contents
              * information, so make sure that the basic_type is usable by
-             * MPIR_Type_commit */
+             * MPIR_Type_commit_impl */
             MPIR_Datatype_get_basic_type(old, old_basic);
             MPIR_Datatype_get_basic_type(new_dtp->handle, new_basic);
             MPIR_Assert(new_basic == old_basic);
@@ -121,9 +117,8 @@ int MPIR_Create_unnamed_predefined(MPI_Datatype old, int combiner,
 
         /* the MPI Standard requires that these types are pre-committed
          * (MPI-2.2, sec 16.2.5, pg 492) */
-        mpi_errno = MPIR_Type_commit(&type->d);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        mpi_errno = MPIR_Type_commit_impl(&type->d);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     *new_ptr = type->d;
@@ -210,7 +205,8 @@ static int MPIR_Create_unnamed_predefined(MPI_Datatype old, int combiner,
         }
 
         MPIR_Datatype_get_ptr(*new_ptr, new_dtp);
-        mpi_errno = MPIR_Datatype_set_contents(new_dtp, combiner, nvals, 0, 0, vals, NULL, NULL);
+        mpi_errno = MPIR_Datatype_set_contents(new_dtp, combiner, nvals, 0, 0, 0,
+                                               vals, NULL, NULL, NULL);
     }
 
     return mpi_errno;

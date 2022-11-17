@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -13,11 +11,10 @@
 
 int main(int argc, char **argv)
 {
-    int i, j, rank;
+    int rank;
     MPI_Info info_in, info_out;
     int errors = 0, errs = 0;
     MPI_Comm comm;
-    void *base;
     char invalid_key[] = "invalid_test_key";
     char buf[MPI_MAX_INFO_VAL];
     int flag;

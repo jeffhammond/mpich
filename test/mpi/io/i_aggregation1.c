@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* Test case from John Bent (ROMIO req #835)
@@ -10,12 +9,12 @@
 
 /* Uses nonblocking collective I/O.*/
 
+#include "mpitest.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <mpi.h>
 #include <stdio.h>
 #include <string.h>
-#include "mpitest.h"
 
 #define NUM_OBJS 4
 #define OBJ_SIZE 1048576
@@ -74,7 +73,7 @@ static void print_hints(int rank, MPI_File * mfh)
 static void fill_buffer(char *buffer, int bufsize, int rank, MPI_Offset offset)
 {
     memset((void *) buffer, 0, bufsize);
-    snprintf(buffer, bufsize, "Hello from %d at %lld\n", rank, offset);
+    snprintf(buffer, bufsize, "Hello from %d at %lld\n", rank, (long long) offset);
 }
 
 static MPI_Offset get_offset(int rank, int num_objs, int obj_size, int which_obj)
@@ -84,7 +83,7 @@ static MPI_Offset get_offset(int rank, int num_objs, int obj_size, int which_obj
     return offset;
 }
 
-static void write_file(char *target, int rank, MPI_Info * info)
+static void write_file(const char *target, int rank, MPI_Info * info)
 {
     MPI_File wfh;
     MPI_Request *request;
@@ -138,7 +137,7 @@ static void write_file(char *target, int rank, MPI_Info * info)
     free(request);
 }
 
-static void read_file(char *target, int rank, MPI_Info * info, int *corrupt_blocks)
+static void read_file(const char *target, int rank, MPI_Info * info, int *corrupt_blocks)
 {
     MPI_File rfh;
     MPI_Offset *offset;
@@ -184,7 +183,7 @@ static void read_file(char *target, int rank, MPI_Info * info, int *corrupt_bloc
     for (i = 0; i < NUM_OBJS; i++) {
         if (memcmp(verify_buf[i], buffer[i], OBJ_SIZE) != 0) {
             (*corrupt_blocks)++;
-            printf("Corruption at %lld\n", offset[i]);
+            printf("Corruption at %lld\n", (long long) offset[i]);
             if (debug) {
                 printf("\tExpecting %s\n" "\tRecieved  %s\n", verify_buf[i], buffer[i]);
             }
@@ -237,7 +236,7 @@ set_hints(MPI_Info *info, char *hints) {
 int main(int argc, char *argv[])
 {
     int nproc = 1, rank = 0;
-    char *target = NULL;
+    const char *target = NULL;
     int c;
     MPI_Info info;
     int mpi_ret;

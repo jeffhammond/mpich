@@ -1,21 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
-#include "mpi.h"
-#include "mpitestconf.h"
+
 #include "mpitest.h"
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
-#if defined(HAVE_STDLIB_H) || defined(STDC_HEADERS)
 #include <stdlib.h>
-#endif
-#if defined(HAVE_STRING_H) || defined(STDC_HEADERS)
 #include <string.h>
-#endif
 #ifdef HAVE_STDARG_H
 #include <stdarg.h>
 #endif
@@ -29,7 +20,6 @@
 #include <sys/resource.h>
 #endif
 #include <errno.h>
-
 
 /*
  * Utility routines for writing MPI tests.
@@ -49,7 +39,6 @@ static void MTestResourceSummary(FILE *);
    memory testing */
 
 static int dbgflag = 0;         /* Flag used for debugging */
-static int wrank = -1;          /* World rank */
 static int verbose = 0;         /* Message level (0 is none) */
 static int returnWithVal = 1;   /* Allow programs to return with a non-zero
                                  * if there was an error (may cause problems
@@ -62,72 +51,6 @@ static int usageOutput = 0;     /* */
 #endif
 #if MPI_VERSION < 2
 #define MPI_THREAD_SINGLE 0
-#endif
-
-/* MTest_init_thread_pkg()
- * Initialize the threading package if needed. Argobots requires this
- * but Pthreads doesn't, for example. */
-
-#if defined(THREAD_PACKAGE_NAME) && (THREAD_PACKAGE_NAME == THREAD_PACKAGE_ARGOBOTS)
-static ABT_xstream xstreams[MTEST_NUM_XSTREAMS];
-static ABT_sched scheds[MTEST_NUM_XSTREAMS];
-ABT_pool pools[MTEST_NUM_XSTREAMS];
-
-static void MTest_init_thread_pkg(int argc, char **argv)
-{
-    int i, k, ret;
-    int num_xstreams;
-
-    ABT_init(argc, argv);
-
-    /* Create pools */
-    for (i = 0; i < MTEST_NUM_XSTREAMS; i++) {
-        ret = ABT_pool_create_basic(ABT_POOL_FIFO, ABT_POOL_ACCESS_MPMC, ABT_TRUE, &pools[i]);
-        MTEST_ABT_ERROR(ret, "ABT_pool_create_basic");
-    }
-
-    /* Create schedulers */
-    ABT_pool my_pools[MTEST_NUM_XSTREAMS];
-    num_xstreams = MTEST_NUM_XSTREAMS;
-    for (i = 0; i < num_xstreams; i++) {
-        for (k = 0; k < num_xstreams; k++) {
-            my_pools[k] = pools[(i + k) % num_xstreams];
-        }
-
-        ret = ABT_sched_create_basic(ABT_SCHED_RANDWS, num_xstreams, my_pools,
-                                     ABT_SCHED_CONFIG_NULL, &scheds[i]);
-        MTEST_ABT_ERROR(ret, "ABT_sched_create_basic");
-    }
-
-    /* Create Execution Streams */
-    ret = ABT_xstream_self(&xstreams[0]);
-    MTEST_ABT_ERROR(ret, "ABT_xstream_self");
-    ret = ABT_xstream_set_main_sched(xstreams[0], scheds[0]);
-    MTEST_ABT_ERROR(ret, "ABT_xstream_set_main_sched");
-    for (i = 1; i < num_xstreams; i++) {
-        ret = ABT_xstream_create(scheds[i], &xstreams[i]);
-        MTEST_ABT_ERROR(ret, "ABT_xstream_create");
-    }
-}
-
-static void MTest_finalize_thread_pkg()
-{
-    int i, ret;
-    int num_xstreams = MTEST_NUM_XSTREAMS;
-
-    for (i = 1; i < num_xstreams; i++) {
-        ret = ABT_xstream_join(xstreams[i]);
-        MTEST_ABT_ERROR(ret, "ABT_xstream_join");
-        ret = ABT_xstream_free(&xstreams[i]);
-        MTEST_ABT_ERROR(ret, "ABT_xstream_free");
-    }
-
-    ret = ABT_finalize();
-    MTEST_ABT_ERROR(ret, "ABT_finalize");
-}
-#else
-#define MTest_init_thread_pkg(argc, argv) do { } while (0)
-#define MTest_finalize_thread_pkg() do { } while (0)
 #endif
 
 /*
@@ -151,7 +74,7 @@ void MTest_Init_thread(int *argc, char ***argv, int required, int *provided)
     int flag;
     char *envval = 0;
 
-    MTest_init_thread_pkg(*argc, *argv);
+    MTest_init_thread_pkg();
 
     MPI_Initialized(&flag);
     if (!flag) {
@@ -167,7 +90,6 @@ void MTest_Init_thread(int *argc, char ***argv, int required, int *provided)
     /* Check for debugging control */
     if (getenv("MPITEST_DEBUG")) {
         dbgflag = 1;
-        MPI_Comm_rank(MPI_COMM_WORLD, &wrank);
     }
 
     /* Check for verbose control */
@@ -248,6 +170,7 @@ void MTest_Init(int *argc, char ***argv)
 #endif
 }
 
+static void MTestCommRandomize_cleanup(void);
 /*
   Finalize MTest.  errs is the number of errors on the calling process;
   this routine will write the total number of errors over all of MPI_COMM_WORLD
@@ -276,6 +199,8 @@ void MTest_Finalize(int errs)
     if (usageOutput)
         MTestResourceSummary(stdout);
 
+    /* Clean up any comms from MTestCommRandomize() */
+    MTestCommRandomize_cleanup();
 
     /* Clean up any persistent objects that we allocated */
     MTestRMACleanup();
@@ -283,6 +208,7 @@ void MTest_Finalize(int errs)
     MPI_Finalize();
 
     MTest_finalize_thread_pkg();
+    MTest_finalize_gpu();
 }
 
 /* ------------------------------------------------------------------------ */
@@ -626,7 +552,7 @@ int MTestGetIntercomm(MPI_Comm * comm, int *isLeftGroup, int min_size)
                     } else if (rank == size / 2) {
                         rleader = 0;
                     } else {
-                        /* Remote leader is signficant only for the processes
+                        /* Remote leader is significant only for the processes
                          * designated local leaders */
                         rleader = -1;
                     }
@@ -655,7 +581,7 @@ int MTestGetIntercomm(MPI_Comm * comm, int *isLeftGroup, int min_size)
                     } else if (rank == 1) {
                         rleader = 0;
                     } else {
-                        /* Remote leader is signficant only for the processes
+                        /* Remote leader is significant only for the processes
                          * designated local leaders */
                         rleader = -1;
                     }
@@ -685,7 +611,7 @@ int MTestGetIntercomm(MPI_Comm * comm, int *isLeftGroup, int min_size)
                     } else if (rank == 2) {
                         rleader = 0;
                     } else {
-                        /* Remote leader is signficant only for the processes
+                        /* Remote leader is significant only for the processes
                          * designated local leaders */
                         rleader = -1;
                     }
@@ -715,7 +641,7 @@ int MTestGetIntercomm(MPI_Comm * comm, int *isLeftGroup, int min_size)
                     } else if (rank == size / 2) {
                         rleader = 0;
                     } else {
-                        /* Remote leader is signficant only for the processes
+                        /* Remote leader is significant only for the processes
                          * designated local leaders */
                         rleader = -1;
                     }
@@ -755,7 +681,7 @@ int MTestGetIntercomm(MPI_Comm * comm, int *isLeftGroup, int min_size)
                     } else if (rank == size / 2) {
                         rleader = 0;
                     } else {
-                        /* Remote leader is signficant only for the processes
+                        /* Remote leader is significant only for the processes
                          * designated local leaders */
                         rleader = -1;
                     }
@@ -806,7 +732,7 @@ int MTestGetIntercomm(MPI_Comm * comm, int *isLeftGroup, int min_size)
                     } else if (rank == (size / 2)) {
                         rleader = 1;
                     } else {
-                        /* Remote leader is signficant only for the processes
+                        /* Remote leader is significant only for the processes
                          * designated local leaders */
                         rleader = -1;
                     }
@@ -847,7 +773,7 @@ int MTestGetIntercomm(MPI_Comm * comm, int *isLeftGroup, int min_size)
                     } else if (rank == (size / 2)) {
                         rleader = 0;
                     } else {
-                        /* Remote leader is signficant only for the processes
+                        /* Remote leader is significant only for the processes
                          * designated local leaders */
                         rleader = -1;
                     }
@@ -1092,6 +1018,33 @@ void MTestFreeComm(MPI_Comm * comm)
     }
 }
 
+/* Directly calling MTestGetIntercomm maybe insufficient since all the processes
+ * may end up with the same context_id even between different groups of the intercomm.
+ * Radomize it by duplicate MPI_Comm_self different times */
+
+#define MAX_COMM_SELF_DUPS 4
+static MPI_Comm comm_self_dups[MAX_COMM_SELF_DUPS];
+static int num_self_dups = 0;
+
+void MTestCommRandomize(void)
+{
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    srand(rank);
+
+    num_self_dups = rand() % MAX_COMM_SELF_DUPS;
+    for (int i = 0; i < num_self_dups; i++) {
+        MPI_Comm_dup(MPI_COMM_SELF, &comm_self_dups[i]);
+    }
+}
+
+static void MTestCommRandomize_cleanup(void)
+{
+    for (int i = 0; i < num_self_dups; i++) {
+        MPI_Comm_free(&comm_self_dups[i]);
+    }
+}
+
 /* ------------------------------------------------------------------------ */
 void MTestPrintError(int errcode)
 {
@@ -1123,11 +1076,10 @@ void MTestPrintErrorMsg(const char msg[], int errcode)
 void MTestPrintfMsg(int level, const char format[], ...)
 {
     va_list list;
-    int n;
 
     if (verbose && level <= verbose) {
         va_start(list, format);
-        n = vprintf(format, list);
+        vprintf(format, list);
         va_end(list);
         fflush(stdout);
     }
@@ -1383,129 +1335,4 @@ int MTestSpawnPossible(int *can_spawn)
         }
     }
     return errs;
-}
-
-/* ------------------------------------------------------------------------ */
-/* All dtpools related code */
-
-#include "dtpools.h"
-
-struct _dt_type {
-    const char *name;
-    MPI_Datatype type;
-};
-static struct _dt_type typelist[] = { DTPOOLS_TYPE_LIST };
-
-int MTestInitBasicSignature(int argc, char *argv[], int *count, MPI_Datatype * basic_type)
-{
-    int i, j;
-
-    if (argc < 3) {
-        fprintf(stdout, "Usage: %s -type=[TYPE] -count=[COUNT]\n", argv[0]);
-        return MTestReturnValue(1);
-    } else {
-        for (i = 1; i < argc; i++) {
-            if (!strncmp(argv[i], "-type=", strlen("-type="))) {
-                j = 0;
-                while (strcmp(typelist[j].name, "MPI_DATATYPE_NULL") &&
-                       strcmp(argv[i] + strlen("-type="), typelist[j].name)) {
-                    j++;
-                }
-
-                if (strcmp(typelist[j].name, "MPI_DATATYPE_NULL")) {
-                    *basic_type = typelist[j].type;
-                } else {
-                    fprintf(stdout, "Error: datatype not recognized\n");
-                    return MTestReturnValue(1);
-                }
-            } else if (!strncmp(argv[i], "-count=", strlen("-count="))) {
-                *count = atoi(argv[i] + strlen("-count="));
-            }
-        }
-    }
-
-    return MTestReturnValue(0);
-}
-
-int MTestInitBasicPt2ptSignature(int argc, char *argv[], int *count, MPI_Datatype * basic_type)
-{
-    int i, j;
-
-    if (argc < 4) {
-        fprintf(stdout, "Usage: %s -type=[TYPE] -sendcnt=[COUNT] -recvcnt=[COUNT]\n", argv[0]);
-        return MTestReturnValue(1);
-    } else {
-        for (i = 1; i < argc; i++) {
-            if (!strncmp(argv[i], "-type=", strlen("-type="))) {
-                j = 0;
-                while (strcmp(typelist[j].name, "MPI_DATATYPE_NULL") &&
-                       strcmp(argv[i] + strlen("-type="), typelist[j].name)) {
-                    j++;
-                }
-
-                if (strcmp(typelist[j].name, "MPI_DATATYPE_NULL")) {
-                    *basic_type = typelist[j].type;
-                } else {
-                    fprintf(stdout, "Error: datatype not recognized\n");
-                    return MTestReturnValue(1);
-                }
-            } else if (!strncmp(argv[i], "-sendcnt=", strlen("-sendcnt="))) {
-                count[0] = atoi(argv[i] + strlen("-sendcnt="));
-            } else if (!strncmp(argv[i], "-recvcnt=", strlen("-recvcnt="))) {
-                count[1] = atoi(argv[i] + strlen("-recvcnt="));
-            }
-        }
-    }
-
-    return MTestReturnValue(0);
-}
-
-int MTestInitStructSignature(int argc, char *argv[], int *numtypes, int **counts,
-                             MPI_Datatype ** basic_types)
-{
-    int i, j, k;
-    char *input_string, *token;
-
-    if (argc < 4) {
-        fprintf(stdout, "Usage: %s -numtypes=[NUM] -types=[TYPES] -counts=[COUNTS]\n", argv[0]);
-        return MTestReturnValue(1);
-    } else {
-        for (i = 1; i < argc; i++) {
-            if (!strncmp(argv[i], "-numtypes=", strlen("-numtypes="))) {
-                *numtypes = atoi(argv[i] + strlen("-numtypes="));
-                /* allocate arrays */
-                *counts = (int *) malloc(*numtypes * sizeof(int));
-                *basic_types = (MPI_Datatype *) malloc(*numtypes * sizeof(MPI_Datatype));
-            } else if (!strncmp(argv[i], "-types=", strlen("-types="))) {
-                input_string = strdup(argv[i] + strlen("-types="));
-
-                for (k = 0, token = strtok(input_string, ","); token; token = strtok(NULL, ",")) {
-                    j = 0;
-                    while (strcmp(typelist[j].name, "MPI_DATATYPE_NULL") &&
-                           strcmp(token, typelist[j].name)) {
-                        j++;
-                    }
-
-                    if (strcmp(typelist[j].name, "MPI_DATATYPE_NULL")) {
-                        (*basic_types)[k++] = typelist[j].type;
-                    } else {
-                        fprintf(stdout, "Error: datatype not recognized\n");
-                        return MTestReturnValue(1);
-                    }
-                }
-
-                free(input_string);
-            } else if (!strncmp(argv[i], "-counts=", strlen("-counts="))) {
-                input_string = strdup(argv[i] + strlen("-counts="));
-
-                for (k = 0, token = strtok(input_string, ","); token; token = strtok(NULL, ",")) {
-                    (*counts)[k++] = atoi(token);
-                }
-
-                free(input_string);
-            }
-        }
-    }
-
-    return MTestReturnValue(0);
 }

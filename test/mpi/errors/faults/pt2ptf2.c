@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2009 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,7 +65,7 @@ int main(int argc, char *argv[])
     /* Now, try sending in MPI_COMM_WORLD on dead processes */
     /* There is a race condition here - we don't know for sure that the faulted
      * processes have exited.  However, we can ensure a failure by using
-     * synchronous sends - the sender will wait until the reciever handles
+     * synchronous sends - the sender will wait until the receiver handles
      * receives the message, which will not happen (the process will exit
      * without matching the message, even if it has not yet exited). */
     for (j = 1; j <= wsize / 2; j++) {

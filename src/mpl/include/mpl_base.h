@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPL_BASE_H_INCLUDED
@@ -17,24 +16,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdint.h>
-
-#if defined _mpl_restrict
-#define mpl_restrict _mpl_restrict
-#else
-#define mpl_restrict restrict
-#endif /* _mpl_restrict */
-
-#if defined _mpl_const
-#define mpl_const _mpl_const
-#else
-#define mpl_const const
-#endif /* _mpl_const */
-
-#if defined _mpl_inline
-#define mpl_inline _mpl_inline
-#else
-#define mpl_inline inline
-#endif /* _mpl_inline */
+#include <limits.h>
 
 #if defined MPL_HAVE_CTYPE_H
 #include <ctype.h>
@@ -61,23 +43,22 @@
 #endif /* ATTRIBUTE */
 
 #define MPL_UNUSED ATTRIBUTE((unused))
+#ifdef MPL_ENABLE_ALWAYS_INLINE
 #define MPL_STATIC_INLINE_PREFIX ATTRIBUTE((always_inline)) static inline
 #define MPL_STATIC_INLINE_SUFFIX ATTRIBUTE((always_inline))
-
-#ifdef MPL_HAVE_FUNC_ATTRIBUTE_FALLTHROUGH
-#define MPL_FALLTHROUGH ATTRIBUTE((fallthrough))
 #else
-#define MPL_FALLTHROUGH
+#define MPL_STATIC_INLINE_PREFIX static inline
+#define MPL_STATIC_INLINE_SUFFIX
 #endif
 
 #ifdef MPL_HAVE_VAR_ATTRIBUTE_ALIGNED
-#define MPL_ATTR_ALIGNED(x) ATTRIBUTE((aligned(x)))
+#define MPL_ATTR_ALIGNED(x) __attribute__((aligned(x)))
 #else
 #define MPL_ATTR_ALIGNED(x)
 #endif
 
 #ifdef MPL_HAVE_VAR_ATTRIBUTE_USED
-#define MPL_USED ATTRIBUTE((used))
+#define MPL_USED __attribute__((used))
 #else
 #define MPL_USED
 #endif

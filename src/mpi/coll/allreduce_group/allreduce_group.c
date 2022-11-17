@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -12,15 +11,11 @@
     do {                                                                                                      \
         int gr_tmp_ = (gr_);                                                                                  \
         mpi_errno = MPIR_Group_translate_ranks_impl(group_ptr, 1, &(gr_tmp_), comm_ptr->local_group, &(cr_)); \
-        if (mpi_errno) MPIR_ERR_POP(mpi_errno);                                                               \
+        MPIR_ERR_CHECK(mpi_errno);                                                                            \
         MPIR_Assert((cr_) != MPI_UNDEFINED);                                                                  \
     } while (0)
 
-#undef FUNCNAME
-#define FUNCNAME MPII_Allreduce_group_intra
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
+int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, MPI_Aint count,
                                MPI_Datatype datatype, MPI_Op op, MPIR_Comm * comm_ptr,
                                MPIR_Group * group_ptr, int tag, MPIR_Errflag_t * errflag)
 {
@@ -28,8 +23,7 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
     int mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
     /* newrank is a rank in group_ptr */
-    int mask, dst, is_commutative, pof2, newrank, rem, newdst, i,
-        send_idx, recv_idx, last_idx, send_cnt, recv_cnt, *cnts, *disps;
+    int mask, dst, is_commutative, pof2, newrank, rem, newdst, i, send_idx, recv_idx, last_idx;
     MPI_Aint true_extent, true_lb, extent;
     void *tmp_buf;
     int group_rank, group_size;
@@ -55,8 +49,7 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
     /* copy local data into recvbuf */
     if (sendbuf != MPI_IN_PLACE) {
         mpi_errno = MPIR_Localcopy(sendbuf, count, datatype, recvbuf, count, datatype);
-        if (mpi_errno)
-            MPIR_ERR_POP(mpi_errno);
+        MPIR_ERR_CHECK(mpi_errno);
     }
 
     MPIR_Datatype_get_size_macro(datatype, type_size);
@@ -106,8 +99,7 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
              * ordering is right, it doesn't matter whether
              * the operation is commutative or not. */
             mpi_errno = MPIR_Reduce_local(tmp_buf, recvbuf, count, datatype, op);
-            if (mpi_errno)
-                MPIR_ERR_POP(mpi_errno);
+            MPIR_ERR_CHECK(mpi_errno);
 
             /* change the rank */
             newrank = group_rank / 2;
@@ -126,7 +118,7 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
 
     if (newrank != -1) {
         if ((count * type_size <= MPIR_CVAR_ALLREDUCE_SHORT_MSG_SIZE) ||
-            (HANDLE_GET_KIND(op) != HANDLE_KIND_BUILTIN) || (count < pof2)) {
+            (!HANDLE_IS_BUILTIN(op)) || (count < pof2)) {
             /* use recursive doubling */
             mask = 0x1;
             while (mask < pof2) {
@@ -156,19 +148,16 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
                     if (is_commutative || (dst < group_rank)) {
                         /* op is commutative OR the order is already right */
                         mpi_errno = MPIR_Reduce_local(tmp_buf, recvbuf, count, datatype, op);
-                        if (mpi_errno)
-                            MPIR_ERR_POP(mpi_errno);
+                        MPIR_ERR_CHECK(mpi_errno);
                     } else {
                         /* op is noncommutative and the order is not right */
                         mpi_errno = MPIR_Reduce_local(recvbuf, tmp_buf, count, datatype, op);
-                        if (mpi_errno)
-                            MPIR_ERR_POP(mpi_errno);
+                        MPIR_ERR_CHECK(mpi_errno);
 
                         /* copy result back into recvbuf */
                         mpi_errno = MPIR_Localcopy(tmp_buf, count, datatype,
                                                    recvbuf, count, datatype);
-                        if (mpi_errno)
-                            MPIR_ERR_POP(mpi_errno);
+                        MPIR_ERR_CHECK(mpi_errno);
                     }
                 }
                 mask <<= 1;
@@ -183,10 +172,11 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
              * each process receives and the displacement within
              * the buffer */
 
-            MPIR_CHKLMEM_MALLOC(cnts, int *, pof2 * sizeof(int), mpi_errno, "counts",
+            MPI_Aint *cnts, *disps;
+            MPIR_CHKLMEM_MALLOC(cnts, MPI_Aint *, pof2 * sizeof(MPI_Aint), mpi_errno, "counts",
                                 MPL_MEM_BUFFER);
-            MPIR_CHKLMEM_MALLOC(disps, int *, pof2 * sizeof(int), mpi_errno, "displacements",
-                                MPL_MEM_BUFFER);
+            MPIR_CHKLMEM_MALLOC(disps, MPI_Aint *, pof2 * sizeof(MPI_Aint), mpi_errno,
+                                "displacements", MPL_MEM_BUFFER);
 
             for (i = 0; i < (pof2 - 1); i++)
                 cnts[i] = count / pof2;
@@ -206,6 +196,7 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
                 dst = (newdst < rem) ? newdst * 2 + 1 : newdst + rem;
                 to_comm_rank(cdst, dst);
 
+                MPI_Aint send_cnt, recv_cnt;
                 send_cnt = recv_cnt = 0;
                 if (newrank < newdst) {
                     send_idx = recv_idx + pof2 / (mask * 2);
@@ -247,8 +238,7 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
                 mpi_errno = MPIR_Reduce_local(((char *) tmp_buf + disps[recv_idx] * extent),
                                               ((char *) recvbuf + disps[recv_idx] * extent),
                                               recv_cnt, datatype, op);
-                if (mpi_errno)
-                    MPIR_ERR_POP(mpi_errno);
+                MPIR_ERR_CHECK(mpi_errno);
 
                 /* update send_idx for next iteration */
                 send_idx = recv_idx;
@@ -270,6 +260,7 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
                 dst = (newdst < rem) ? newdst * 2 + 1 : newdst + rem;
                 to_comm_rank(cdst, dst);
 
+                MPI_Aint send_cnt, recv_cnt;
                 send_cnt = recv_cnt = 0;
                 if (newrank < newdst) {
                     /* update last_idx except on first iteration */
@@ -348,11 +339,7 @@ int MPII_Allreduce_group_intra(void *sendbuf, void *recvbuf, int count,
     goto fn_exit;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPII_Allreduce_group
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPII_Allreduce_group(void *sendbuf, void *recvbuf, int count,
+int MPII_Allreduce_group(void *sendbuf, void *recvbuf, MPI_Aint count,
                          MPI_Datatype datatype, MPI_Op op, MPIR_Comm * comm_ptr,
                          MPIR_Group * group_ptr, int tag, MPIR_Errflag_t * errflag)
 {
@@ -363,8 +350,7 @@ int MPII_Allreduce_group(void *sendbuf, void *recvbuf, int count,
 
     mpi_errno = MPII_Allreduce_group_intra(sendbuf, recvbuf, count, datatype,
                                            op, comm_ptr, group_ptr, tag, errflag);
-    if (mpi_errno)
-        MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
   fn_exit:
     return mpi_errno;

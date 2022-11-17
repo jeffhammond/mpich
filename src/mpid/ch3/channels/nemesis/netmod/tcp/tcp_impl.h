@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef TCP_IMPL_H_INCLUDED
@@ -81,7 +80,7 @@ int MPID_nem_tcp_connpoll(int in_blocking_poll);
 int MPID_nem_tcp_sm_init(void);
 int MPID_nem_tcp_sm_finalize(void);
 int MPID_nem_tcp_set_sockopts(int fd);
-MPID_NEM_TCP_SOCK_STATUS_t MPID_nem_tcp_check_sock_status(const struct pollfd *const plfd);
+int MPID_nem_tcp_check_sock_status(const struct pollfd *const plfd);
 int MPID_nem_tcp_send_finalize(void);
 int MPID_nem_tcp_bind(int sockfd);
 int MPID_nem_tcp_conn_est(MPIDI_VC_t * vc);
@@ -103,7 +102,10 @@ int MPID_nem_tcp_iStartContigMsg(MPIDI_VC_t * vc, void *hdr, intptr_t hdr_sz, vo
                                  intptr_t data_sz, MPIR_Request ** sreq_ptr);
 int MPID_nem_tcp_iStartContigMsg_paused(MPIDI_VC_t * vc, void *hdr, intptr_t hdr_sz, void *data,
                                         intptr_t data_sz, MPIR_Request ** sreq_ptr);
-int MPID_nem_tcp_SendNoncontig(MPIDI_VC_t * vc, MPIR_Request * sreq, void *header, intptr_t hdr_sz);
+int MPID_nem_tcp_SendNoncontig(MPIDI_VC_t * vc, MPIR_Request * sreq, void *header, intptr_t hdr_sz,
+                               struct iovec * hdr_iov, int n_hdr_iov);
+int MPID_nem_tcp_iSendIov(MPIDI_VC_t * vc, MPIR_Request * sreq, void *hdr, intptr_t hdr_sz,
+                          struct iovec * iov, int n_iov);
 int MPID_nem_tcp_get_addr_port_from_bc(const char *business_card, struct in_addr *addr,
                                        in_port_t * port);
 
@@ -164,22 +166,6 @@ int MPID_nem_tcp_pkt_unpause_handler(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt,
 #define S_PUSH(sp, ep) GENERIC_S_PUSH (sp, ep, next)
 #define S_PUSH_MULTIPLE(sp, ep0, ep1) GENERIC_S_PUSH_MULTIPLE (sp, ep0, ep1, next)
 #define S_POP(sp, ep) GENERIC_S_POP (sp, ep, next)
-
-/* interface utilities */
-/*S
-  MPIDI_CH3I_nem_tcp_ifaddr_t - Structure to hold an Internet address.
-
-+ len - Length of the address.  4 for IPv4, 16 for IPv6.
-- ifaddr - Address bytes (as bytes, not characters)
-
-S*/
-typedef struct MPIDI_CH3I_nem_tcp_ifaddr_t {
-    unsigned int len;
-    int type;
-    unsigned char ifaddr[16];
-} MPIDI_CH3I_nem_tcp_ifaddr_t;
-int MPIDI_GetIPInterface(MPIDI_CH3I_nem_tcp_ifaddr_t * ifaddr, int *found);
-int MPIDI_Get_IP_for_iface(const char *ifname, MPIDI_CH3I_nem_tcp_ifaddr_t * ifaddr, int *found);
 
 /* Keys for business cards */
 #define MPIDI_CH3I_PORT_KEY "port"

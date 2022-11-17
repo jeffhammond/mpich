@@ -1,13 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
- *  Portions of this code were written by Intel Corporation.
- *  Copyright (C) 2011-2017 Intel Corporation.  Intel provides this material
- *  to Argonne National Laboratory subject to Software Grant and Corporate
- *  Contributor License Agreement dated February 8, 2012.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #ifndef POSIX_IMPL_H_INCLUDED
 #define POSIX_IMPL_H_INCLUDED
 
@@ -17,5 +12,22 @@
 #include "posix_types.h"
 #include "posix_eager.h"
 #include "posix_eager_impl.h"
+#include "posix_progress.h"
+
+#define MPIDI_POSIX_THREAD_CS_ENTER_VCI(vci) \
+    do { \
+        if (!MPIDI_VCI_IS_EXPLICIT(vci)) { \
+            MPID_THREAD_CS_ENTER(VCI, MPIDI_VCI(vci).lock); \
+        } \
+    } while (0)
+
+#define MPIDI_POSIX_THREAD_CS_EXIT_VCI(vci) \
+    do { \
+        if (!MPIDI_VCI_IS_EXPLICIT(vci)) { \
+            MPID_THREAD_CS_EXIT(VCI, MPIDI_VCI(vci).lock); \
+        } \
+    } while (0)
+
+void MPIDI_POSIX_delay_shm_mutex_destroy(int rank, MPL_proc_mutex_t * shm_mutex_ptr);
 
 #endif /* POSIX_IMPL_H_INCLUDED */

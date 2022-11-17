@@ -1,9 +1,9 @@
-/* This file created from test/mpi/f77/ext/c2fmult.c with f77tof90 */
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
+/* This file created from test/mpi/f77/ext/c2fmult.c with f77tof90 */
 
 /*
   Check that MPI_xxxx_c2f, applied to the same object several times,
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
         printf("Unable to cancel MPI_Irecv request\n");
     }
     /* Using MPI_Request_free should be ok, but some MPI implementations
-     * object to it imediately after the cancel and that isn't essential to
+     * object to it immediately after the cancel and that isn't essential to
      * this test */
 
     MTest_Finalize(errs);

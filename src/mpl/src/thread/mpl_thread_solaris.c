@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpl.h"
@@ -40,7 +39,7 @@ void *MPLI_thread_start(void *arg);
 void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * idp, int *errp)
 {
     struct MPLI_thread_info *thread_info;
-    int err = MPL_THREAD_SUCCESS;
+    int err = MPL_SUCCESS;
 
     /* FIXME: faster allocation, or avoid it all together? */
     thread_info =
@@ -50,7 +49,7 @@ void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * idp
         thread_info->data = data;
 
         err = thr_create(NULL, 0, MPLI_thread_start, thread_info, THR_DETACHED, idp);
-        /* FIXME: convert error to an MPL_THREAD_ERR value */
+        /* FIXME: convert error to an MPL_ERR_THREAD value */
     } else {
         err = 1000000000;
     }
@@ -78,6 +77,14 @@ void *MPLI_thread_start(void *arg)
     func(data);
 
     return NULL;
+}
+
+/* See mpl_thread_posix.h for interface description. */
+void MPL_thread_set_affinity(MPL_thread_id_t thread, int *affinity_arr, int affinity_size, int *err)
+{
+    /* stub implementation */
+    if (err)
+        *err = MPL_ERR_THREAD;
 }
 
 #endif

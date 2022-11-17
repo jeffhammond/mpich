@@ -1,71 +1,49 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidi_ch3_impl.h"
 
-#undef FUNCNAME
-#define FUNCNAME update_request
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-static void update_request(MPIR_Request * sreq, MPL_IOV * iov, int iov_count,
+static void update_request(MPIR_Request * sreq, struct iovec * iov, int iov_count,
                            int iov_offset, size_t nb)
 {
     int i;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_UPDATE_REQUEST);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_UPDATE_REQUEST);
+    MPIR_FUNC_ENTER;
 
     for (i = 0; i < iov_count; i++) {
         sreq->dev.iov[i] = iov[i];
     }
     if (iov_offset == 0) {
-        MPIR_Assert(iov[0].MPL_IOV_LEN == sizeof(MPIDI_CH3_Pkt_t));
-        sreq->dev.pending_pkt = *(MPIDI_CH3_Pkt_t *) iov[0].MPL_IOV_BUF;
-        sreq->dev.iov[0].MPL_IOV_BUF = (MPL_IOV_BUF_CAST) & sreq->dev.pending_pkt;
+        MPIR_Assert(iov[0].iov_len == sizeof(MPIDI_CH3_Pkt_t));
+        sreq->dev.pending_pkt = *(MPIDI_CH3_Pkt_t *) iov[0].iov_base;
+        sreq->dev.iov[0].iov_base = (void *) & sreq->dev.pending_pkt;
     }
-    sreq->dev.iov[iov_offset].MPL_IOV_BUF =
-        (MPL_IOV_BUF_CAST) ((char *) sreq->dev.iov[iov_offset].MPL_IOV_BUF + nb);
-    sreq->dev.iov[iov_offset].MPL_IOV_LEN -= nb;
+    sreq->dev.iov[iov_offset].iov_base =
+        (void *) ((char *) sreq->dev.iov[iov_offset].iov_base + nb);
+    sreq->dev.iov[iov_offset].iov_len -= nb;
     sreq->dev.iov_count = iov_count;
 
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_UPDATE_REQUEST);
+    MPIR_FUNC_EXIT;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3_iSendv
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_iov)
+int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, struct iovec * iov, int n_iov)
 {
     int mpi_errno = MPI_SUCCESS;
     MPIDI_CH3I_VC *vcch = &vc->ch;
     int (*reqFn) (MPIDI_VC_t *, MPIR_Request *, int *);
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3_ISENDV);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3_ISENDV);
-
-    if (sreq->dev.ext_hdr_sz > 0) {
-        int i;
-        for (i = n_iov - 1; i >= 1; i--) {
-            iov[i + 1].MPL_IOV_BUF = iov[i].MPL_IOV_BUF;
-            iov[i + 1].MPL_IOV_LEN = iov[i].MPL_IOV_LEN;
-        }
-        iov[1].MPL_IOV_BUF = (MPL_IOV_BUF_CAST) sreq->dev.ext_hdr_ptr;
-        iov[1].MPL_IOV_LEN = sreq->dev.ext_hdr_sz;
-        n_iov++;
-    }
+    MPIR_FUNC_ENTER;
 
     MPIR_Assert(n_iov <= MPL_IOV_LIMIT);
-    MPIR_Assert(iov[0].MPL_IOV_LEN <= sizeof(MPIDI_CH3_Pkt_t));
+    MPIR_Assert(iov[0].iov_len <= sizeof(MPIDI_CH3_Pkt_t));
 
     /* The sock channel uses a fixed length header, the size of which is the
      * maximum of all possible packet headers */
-    iov[0].MPL_IOV_LEN = sizeof(MPIDI_CH3_Pkt_t);
+    iov[0].iov_len = sizeof(MPIDI_CH3_Pkt_t);
     MPL_DBG_STMT(MPIDI_CH3_DBG_CHANNEL, VERBOSE,
-                 MPIDI_DBG_Print_packet((MPIDI_CH3_Pkt_t *) iov[0].MPL_IOV_BUF));
+                 MPIDI_DBG_Print_packet((MPIDI_CH3_Pkt_t *) iov[0].iov_base));
 
     if (vcch->state == MPIDI_CH3I_VC_STATE_CONNECTED) { /* MT */
         /* Connection already formed.  If send queue is empty attempt to send
@@ -76,13 +54,13 @@ int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_
 
             MPL_DBG_MSG(MPIDI_CH3_DBG_CHANNEL, VERBOSE, "send queue empty, attempting to write");
 
-            MPL_DBG_PKT(vcch->conn, (MPIDI_CH3_Pkt_t *) iov[0].MPL_IOV_BUF, "isendv");
+            MPL_DBG_PKT(vcch->conn, (MPIDI_CH3_Pkt_t *) iov[0].iov_base, "isendv");
             /* MT - need some signalling to lock down our right to use the
              * channel, thus insuring that the progress engine does
              * also try to write */
 
-            /* FIXME: the current code only agressively writes the first IOV.
-             * Eventually it should be changed to agressively write
+            /* FIXME: the current code only aggressively writes the first IOV.
+             * Eventually it should be changed to aggressively write
              * as much as possible.  Ideally, the code would be shared between
              * the send routines and the progress engine. */
             rc = MPIDI_CH3I_Sock_writev(vcch->sock, iov, n_iov, &nb);
@@ -93,8 +71,8 @@ int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_
                               "wrote %ld bytes", (unsigned long) nb);
 
                 while (offset < n_iov) {
-                    if (iov[offset].MPL_IOV_LEN <= nb) {
-                        nb -= iov[offset].MPL_IOV_LEN;
+                    if (iov[offset].iov_len <= nb) {
+                        nb -= iov[offset].iov_len;
                         offset++;
                     } else {
                         MPL_DBG_MSG(MPIDI_CH3_DBG_CHANNEL, VERBOSE,
@@ -111,7 +89,7 @@ int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_
                         /* --BEGIN ERROR HANDLING-- */
                         if (mpi_errno != MPI_SUCCESS) {
                             mpi_errno =
-                                MPIR_Err_create_code(mpi_errno, MPIR_ERR_FATAL, FCNAME, __LINE__,
+                                MPIR_Err_create_code(mpi_errno, MPIR_ERR_FATAL, __func__, __LINE__,
                                                      MPI_ERR_OTHER, "**ch3|sock|postwrite",
                                                      "ch3|sock|postwrite %p %p %p", sreq,
                                                      vcch->conn, vc);
@@ -129,14 +107,11 @@ int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_
                     if (!reqFn) {
                         MPIR_Assert(MPIDI_Request_get_type(sreq) != MPIDI_REQUEST_TYPE_GET_RESP);
                         mpi_errno = MPID_Request_complete(sreq);
-                        if (mpi_errno != MPI_SUCCESS) {
-                            MPIR_ERR_POP(mpi_errno);
-                        }
+                        MPIR_ERR_CHECK(mpi_errno);
                     } else {
                         int complete;
                         mpi_errno = reqFn(vc, sreq, &complete);
-                        if (mpi_errno)
-                            MPIR_ERR_POP(mpi_errno);
+                        MPIR_ERR_CHECK(mpi_errno);
                         if (!complete) {
                             MPIDI_CH3I_SendQ_enqueue_head(vcch, sreq);
                             MPL_DBG_MSG_FMT(MPIDI_CH3_DBG_CHANNEL, VERBOSE,
@@ -148,7 +123,7 @@ int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_
                             /* --BEGIN ERROR HANDLING-- */
                             if (mpi_errno != MPI_SUCCESS) {
                                 mpi_errno =
-                                    MPIR_Err_create_code(mpi_errno, MPIR_ERR_FATAL, FCNAME,
+                                    MPIR_Err_create_code(mpi_errno, MPIR_ERR_FATAL, __func__,
                                                          __LINE__, MPI_ERR_OTHER,
                                                          "**ch3|sock|postwrite",
                                                          "ch3|sock|postwrite %p %p %p", sreq,
@@ -174,7 +149,7 @@ int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_
 
                 vcch->state = MPIDI_CH3I_VC_STATE_FAILED;
                 sreq->status.MPI_ERROR = MPIR_Err_create_code(rc,
-                                                              MPIR_ERR_RECOVERABLE, FCNAME,
+                                                              MPIR_ERR_RECOVERABLE, __func__,
                                                               __LINE__, MPI_ERR_INTERN,
                                                               "**ch3|sock|writefailed",
                                                               "**ch3|sock|writefailed %d", rc);
@@ -200,9 +175,7 @@ int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_
         update_request(sreq, iov, n_iov, 0, 0);
         MPIDI_CH3I_SendQ_enqueue(vcch, sreq);
         mpi_errno = MPIDI_CH3I_VC_post_connect(vc);
-        if (mpi_errno) {
-            MPIR_ERR_POP(mpi_errno);
-        }
+        MPIR_ERR_CHECK(mpi_errno);
     } else if (vcch->state != MPIDI_CH3I_VC_STATE_FAILED) {
         /* Unable to send data at the moment, so queue it for later */
         MPL_DBG_VCUSE(vc, "still connecting.  enqueuing request");
@@ -221,6 +194,6 @@ int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov, int n_
     /* --END ERROR HANDLING-- */
 
   fn_fail:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3_ISENDV);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }

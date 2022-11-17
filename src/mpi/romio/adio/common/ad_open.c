@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -93,6 +91,11 @@ MPI_File ADIO_Open(MPI_Comm orig_comm,
     fd->hints->initialized = 0;
     fd->info = MPI_INFO_NULL;
 
+    /* Some ROMIO drivers will support "write tracking": omit an fsync() call
+     * if no writes happened.  Drivers supporting that feature will set the bit
+     * on write, and clear the bit on open, close, and sync. */
+    fd->dirty_write = 1;
+
     /* move system-wide hint processing *back* into open, but this time the
      * hintfile reader will do a scalable read-and-broadcast.  The global
      * ADIOI_syshints will get initialized at first open.  subsequent open
@@ -127,7 +130,7 @@ MPI_File ADIO_Open(MPI_Comm orig_comm,
 
     /* Instead of repeatedly allocating this buffer in collective read/write,
      * allocating up-front might make memory management on small platforms
-     * (e.g. Blue Gene) more efficent */
+     * (e.g. Blue Gene) more efficient */
 
     fd->io_buf = ADIOI_Malloc(fd->hints->cb_buffer_size);
     /* deferred open:
@@ -142,7 +145,7 @@ MPI_File ADIO_Open(MPI_Comm orig_comm,
     }
     if (ADIO_Feature(fd, ADIO_SCALABLE_OPEN))
         /* disable deferred open on these fs so that scalable broadcast
-         * will always use the propper communicator */
+         * will always use the proper communicator */
         fd->hints->deferred_open = 0;
 
 
@@ -204,7 +207,8 @@ MPI_File ADIO_Open(MPI_Comm orig_comm,
             }
         }
         ADIOI_Free(fd->filename);
-        ADIOI_Free(fd->hints->ranklist);
+        if (fd->hints->ranklist != NULL)
+            ADIOI_Free(fd->hints->ranklist);
         if (fd->hints->cb_config_list != NULL)
             ADIOI_Free(fd->hints->cb_config_list);
         ADIOI_Free(fd->hints);
@@ -251,7 +255,7 @@ int is_aggregator(int rank, ADIO_File fd)
 
 /*
  * If file system implements some version of two-phase -- doesn't have to be
- * generic -- we can still carry out the defered open optimization
+ * generic -- we can still carry out the deferred open optimization
  */
 static int uses_generic_read(ADIO_File fd)
 {
@@ -318,7 +322,3 @@ static int build_cb_config_list(ADIO_File fd,
     }
     return 0;
 }
-
-/*
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */

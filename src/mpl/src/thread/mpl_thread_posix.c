@@ -1,14 +1,10 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpl.h"
-
-#if MPL_THREAD_PACKAGE_NAME == MPL_THREAD_PACKAGE_UTI
-#include "uti.h"
-#endif
+#include <sched.h>
 
 MPL_SUPPRESS_OSX_HAS_NO_SYMBOLS_WARNING;
 
@@ -20,7 +16,7 @@ MPL_SUPPRESS_OSX_HAS_NO_SYMBOLS_WARNING;
  * header files and included as needed. [goodell@ 2009-06-24] */
 
 /* Implementation specific function definitions (usually in the form of macros) */
-#if MPL_THREAD_PACKAGE_NAME == MPL_THREAD_PACKAGE_POSIX || MPL_THREAD_PACKAGE_NAME == MPL_THREAD_PACKAGE_UTI
+#if MPL_THREAD_PACKAGE_NAME == MPL_THREAD_PACKAGE_POSIX
 
 /*
  * struct MPLI_thread_info
@@ -44,58 +40,18 @@ void *MPLI_thread_start(void *arg);
 void MPL_thread_create(MPL_thread_func_t func, void *data, MPL_thread_id_t * idp, int *errp)
 {
     struct MPLI_thread_info *thread_info;
-    int err = MPL_THREAD_SUCCESS;
+    int err = MPL_SUCCESS;
 
     /* FIXME: faster allocation, or avoid it all together? */
     thread_info =
         (struct MPLI_thread_info *) MPL_malloc(sizeof(struct MPLI_thread_info), MPL_MEM_THREAD);
     if (thread_info != NULL) {
-        pthread_attr_t attr;
 
         thread_info->func = func;
         thread_info->data = data;
 
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-
-#if MPL_THREAD_PACKAGE_NAME == MPL_THREAD_PACKAGE_UTI
-        uti_attr_t *uti_attr = NULL;
-        err = uti_attr_init(uti_attr);
-        if (err) {
-            goto uti_exit;
-        }
-
-        /* Give a hint that it's beneficial to put the thread
-         * on the same NUMA-node as the creator */
-        err = UTI_ATTR_SAME_NUMA_DOMAIN(uti_attr);
-        if (err) {
-            goto uti_destroy_and_exit;
-        }
-
-        /* Give a hint that the thread repeatedly monitors a device
-         * using CPU. */
-        err = UTI_ATTR_CPU_INTENSIVE(uti_attr);
-        if (err) {
-            goto uti_destroy_and_exit;
-        }
-
-        err = uti_pthread_create(idp, &attr, MPLI_thread_start, thread_info, uti_attr);
-        if (err) {
-            goto uti_destroy_and_exit;
-        }
-
-      uti_destroy_and_exit:
-        err = uti_attr_destroy(uti_attr);
-        if (err) {
-            goto uti_exit;
-        }
-
-      uti_exit:;
-#else
-        err = pthread_create(idp, &attr, MPLI_thread_start, thread_info);
-        /* FIXME: convert error to an MPL_THREAD_ERR value */
-#endif
-        pthread_attr_destroy(&attr);
+        err = pthread_create(idp, NULL, MPLI_thread_start, thread_info);
+        /* FIXME: convert error to an MPL_ERR_THREAD value */
     } else {
         err = 1000000000;
     }
@@ -125,6 +81,47 @@ void *MPLI_thread_start(void *arg)
     func(data);
 
     return NULL;
+}
+
+void MPL_thread_set_affinity(MPL_thread_id_t thread, int *affinity_arr, int affinity_size,
+                             int *errp)
+{
+#if defined(MPL_HAVE_PTHREAD_SETAFFINITY_NP) && defined(MPL_HAVE_CPU_SET_MACROS)
+    int err = MPL_SUCCESS;
+    int proc_idx, set_size = 0;
+    cpu_set_t cpuset;
+    CPU_ZERO_S(sizeof(cpu_set_t), &cpuset);
+
+    for (proc_idx = 0; proc_idx < affinity_size; proc_idx++)
+        CPU_SET_S(affinity_arr[proc_idx], sizeof(cpu_set_t), &cpuset);
+
+    if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset) != 0) {
+        err = MPL_ERR_THREAD;
+        goto fn_exit;
+    }
+
+    if (pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset) != 0) {
+        err = MPL_ERR_THREAD;
+        goto fn_exit;
+    }
+
+    for (proc_idx = 0; proc_idx < affinity_size; proc_idx++) {
+        if (CPU_ISSET_S(affinity_arr[proc_idx], sizeof(cpu_set_t), &cpuset))
+            set_size++;
+    }
+    if (set_size != affinity_size) {
+        err = MPL_ERR_THREAD;
+        goto fn_exit;
+    }
+
+  fn_exit:
+    if (errp != NULL)
+        *errp = err;
+#else
+    /* stub implementation */
+    if (errp)
+        *errp = MPL_ERR_THREAD;
+#endif
 }
 
 #endif
