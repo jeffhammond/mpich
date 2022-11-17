@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -126,7 +125,7 @@ int main(int argc, char *argv[])
         /* Perform several communication operations, mixing synchronization
          * types.  Use multiple communication to avoid the single-operation
          * optimization that may be present. */
-        MTestPrintfMsg(3, "Begining loop %d of mixed sync put/acc operations\n", loop);
+        MTestPrintfMsg(3, "Beginning loop %d of mixed sync put/acc operations\n", loop);
         memset(winbuf, 0, count * sizeof(int));
         MPI_Barrier(comm);
         if (crank == source) {
@@ -171,7 +170,7 @@ int main(int argc, char *argv[])
         /* Perform several communication operations, mixing synchronization
          * types.  Use multiple communication to avoid the single-operation
          * optimization that may be present. */
-        MTestPrintfMsg(3, "Begining loop %d of mixed sync put/get/acc operations\n", loop);
+        MTestPrintfMsg(3, "Beginning loop %d of mixed sync put/get/acc operations\n", loop);
         MPI_Barrier(comm);
         if (crank == source) {
             MPI_Win_lock(MPI_LOCK_EXCLUSIVE, dest, 0, win);

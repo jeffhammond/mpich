@@ -1,5 +1,10 @@
-#include "hcoll/api/hcoll_dte.h"
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 #include "mpiimpl.h"
+#include "hcoll/api/hcoll_dte.h"
 #include "hcoll_dtypes.h"
 
 extern int hcoll_initialized;
@@ -124,7 +129,7 @@ int hcoll_type_commit_hook(MPIR_Datatype * dtype_p)
         return MPI_ERR_OTHER;
     }
 
-    if (HCOL_DTE_IS_ZERO(dtype_p->dev.hcoll_datatype))
+    if (!HCOL_DTE_IS_ZERO(dtype_p->dev.hcoll_datatype))
         MPIR_Datatype_add_ref_if_not_builtin(dtype_p->handle);
 
     return MPI_SUCCESS;
@@ -136,7 +141,7 @@ int hcoll_type_free_hook(MPIR_Datatype * dtype_p)
         return MPI_SUCCESS;
     }
 
-    if (HCOL_DTE_IS_ZERO(dtype_p->dev.hcoll_datatype))
+    if (!HCOL_DTE_IS_ZERO(dtype_p->dev.hcoll_datatype))
         MPIR_Datatype_release_if_not_builtin(dtype_p->handle);
 
     int rc = hcoll_dt_destroy(dtype_p->dev.hcoll_datatype);

@@ -1,12 +1,18 @@
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
+
 AC_INIT
 
 AC_ARG_WITH(aint-size,
-    AC_HELP_STRING([--with-aint-size],
+    AS_HELP_STRING([--with-aint-size],
                    [Override the size of MPI_AINT (in bytes)]),,
     with_aint_size=0)
 
 AC_PROG_CPP
 AC_PROG_CC
+AC_PROG_CC_C99
 AC_CHECK_SIZEOF([char])
 AC_CHECK_SIZEOF([short])
 AC_CHECK_SIZEOF([int])

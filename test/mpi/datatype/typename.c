@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include "mpitest.h"
 #include <stdio.h>
@@ -40,8 +39,6 @@ static mpi_names_t mpi_names[] = {
 #endif
 
     {MPI_PACKED, "MPI_PACKED"},
-    {MPI_LB, "MPI_LB"},
-    {MPI_UB, "MPI_UB"},
     {MPI_FLOAT_INT, "MPI_FLOAT_INT"},
     {MPI_DOUBLE_INT, "MPI_DOUBLE_INT"},
     {MPI_LONG_INT, "MPI_LONG_INT"},
@@ -56,14 +53,6 @@ static mpi_names_t mpi_names[] = {
     {MPI_DOUBLE_PRECISION, "MPI_DOUBLE_PRECISION"},
     {MPI_INTEGER, "MPI_INTEGER"},
     {MPI_2INTEGER, "MPI_2INTEGER"},
-    /* 2COMPLEX (and the 2DOUBLE_COMPLEX) were in MPI 1.0 but not later */
-#ifdef HAVE_MPI_2COMPLEX
-    {MPI_2COMPLEX, "MPI_2COMPLEX"},
-#endif
-#ifdef HAVE_MPI_2DOUBLE_COMPLEX
-    /* MPI_2DOUBLE_COMPLEX is an extension - it is not part of MPI 2.1 */
-    {MPI_2DOUBLE_COMPLEX, "MPI_2DOUBLE_COMPLEX"},
-#endif
     {MPI_2REAL, "MPI_2REAL"},
     {MPI_2DOUBLE_PRECISION, "MPI_2DOUBLE_PRECISION"},
     {MPI_CHARACTER, "MPI_CHARACTER"},
@@ -108,6 +97,13 @@ static mpi_names_t mpi_names[] = {
      * this ifdef allows the test to be built and run. */
     {MPI_INTEGER16, "MPI_INTEGER16"},
 #endif
+
+    /* C++ types */
+    {MPI_CXX_BOOL, "MPI_CXX_BOOL"},
+    {MPI_CXX_FLOAT_COMPLEX, "MPI_CXX_FLOAT_COMPLEX"},
+    {MPI_CXX_DOUBLE_COMPLEX, "MPI_CXX_DOUBLE_COMPLEX"},
+    {MPI_CXX_LONG_DOUBLE_COMPLEX, "MPI_CXX_LONG_DOUBLE_COMPLEX"},
+
     /* Semi-optional types - if the compiler doesn't support long double
      * or long long, these might be MPI_DATATYPE_NULL */
     {MPI_LONG_DOUBLE, "MPI_LONG_DOUBLE"},
@@ -125,7 +121,7 @@ static mpi_names_t mpi_names[] = {
     /* added in MPI 3 */
     {MPI_COUNT, "MPI_COUNT"},
 #endif
-    {0, (char *) 0},    /* Sentinal used to indicate the last element */
+    {0, (char *) 0},    /* Sentinel used to indicate the last element */
 };
 
 int main(int argc, char **argv)
@@ -172,11 +168,11 @@ int main(int argc, char **argv)
         name[0] = 0;
         MPI_Type_get_name(mpi_names[i].dtype, name, &namelen);
 
-        /* LONG_LONG is a synonym of LONG_LONG_INT, thus LONG_LONG_INT is a vaild name */
+        /* LONG_LONG is a synonym of LONG_LONG_INT, thus LONG_LONG_INT is a valid name */
         isSynonymName = (mpi_names[i].dtype == MPI_LONG_LONG &&
                          !strncmp(name, "MPI_LONG_LONG_INT", MPI_MAX_OBJECT_NAME));
 #if MTEST_HAVE_MIN_MPI_VERSION(2,2)
-        /* C_FLOAT_COMPLEX is a synonym of C_COMPLEX, thus C_COMPLEX is a vaild name */
+        /* C_FLOAT_COMPLEX is a synonym of C_COMPLEX, thus C_COMPLEX is a valid name */
         isSynonymName = isSynonymName || (mpi_names[i].dtype == MPI_C_FLOAT_COMPLEX &&
                                           !strncmp(name, "MPI_C_COMPLEX", MPI_MAX_OBJECT_NAME));
 #endif

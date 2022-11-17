@@ -1,15 +1,32 @@
-dnl PAC_F77_SEARCH_LIST - expands to a whitespace separated list of fortran 77
-dnl compilers for use with AC_PROG_F77 that is more suitable for HPC software
-dnl packages
-AC_DEFUN([PAC_F77_SEARCH_LIST],[ifort pgf77 af77 xlf frt cf77 fort77 fl32 fort ifc efc ftn gfortran f77 g77])
-dnl PAC_PROG_F77 - reprioritize the F77 compiler search order
-dnl NOTE: this macro suffers from a basically intractable "expanded before it
-dnl was required" problem when libtool is also used
-AC_DEFUN([PAC_PROG_F77],[
-PAC_PUSH_FLAG([FFLAGS])
-AC_PROG_F77([PAC_F77_SEARCH_LIST])
-PAC_POP_FLAG([FFLAGS])
+dnl
+dnl Check PIE cflags and use it whenever we are linking C objects with Fortran.
+dnl
+dnl To link C objects with Fortran compiler, the objects often require to be
+dnl PIE objects. Some compiler may produce non-PIE objects unless explicit
+dnl option is given, for example, clang under -O2. Note that this is
+dnl unnecessary when compiler is configured to set PIE by default, such as
+dnl gcc on Debian/Ubuntu systems. Setting -fPIE during config test on such
+dnl system should not make a difference.
+dnl
+AC_DEFUN([PAC_C_CHECK_fPIE_OK], [
+    PAC_C_CHECK_COMPILER_OPTION([-fPIE], [fPIE_OK=yes], [fPIE_OK=no])
 ])
+
+AC_DEFUN([PAC_LANG_PUSH_C_PIE], [
+    AC_LANG_PUSH([C])
+    if test "$fPIE_OK" = "yes" ; then
+        PAC_PUSH_FLAG(CFLAGS)
+        CFLAGS="$CFLAGS -fPIE"
+    fi
+])
+
+AC_DEFUN([PAC_LANG_POP_C_PIE], [
+    if test "$fPIE_OK" = "yes" ; then
+        PAC_POP_FLAG(CFLAGS)
+    fi
+    AC_LANG_POP([C])
+])
+
 dnl
 dnl/*D
 dnl PAC_PROG_F77_NAME_MANGLE - Determine how the Fortran compiler mangles
@@ -90,7 +107,7 @@ dnl
 # it may be that the programs have to be linked with the Fortran compiler,
 # not the C compiler.  Try reversing the language used for the test
 if test  "$pac_found" != "yes" ; then
-    AC_LANG_PUSH([C])
+    PAC_LANG_PUSH_C_PIE
     for call in "" __stdcall ; do
         for sym in my_name_ my_name__ my_name MY_NAME MY_name MY_name_ NONE ; do
             AC_COMPILE_IFELSE([
@@ -113,7 +130,7 @@ if test  "$pac_found" != "yes" ; then
         done
         test "$pac_found" = "yes" && break
     done
-    AC_LANG_POP([C])
+    PAC_LANG_POP_C_PIE
 fi
 if test "$pac_found" = "yes" ; then
     case ${sym} in
@@ -221,7 +238,6 @@ dnl message.  You can use '0' to specify undetermined.
 dnl
 dnl D*/
 AC_DEFUN([PAC_PROG_F77_CHECK_SIZEOF],[
-AC_REQUIRE([AC_HEADER_STDC])
 AC_REQUIRE([AC_F77_LIBRARY_LDFLAGS])
 changequote(<<, >>)dnl
 dnl The name to #define.
@@ -249,9 +265,7 @@ AC_COMPILE_IFELSE([
     AC_LANG_PUSH([C])
     AC_RUN_IFELSE([
         AC_LANG_PROGRAM([
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
 #ifdef F77_NAME_UPPER
 #define cisize_ CISIZE
 #define isize_ ISIZE
@@ -300,6 +314,7 @@ AC_DEFINE_UNQUOTED(PAC_TYPE_NAME,$PAC_CV_NAME,[Define size of PAC_TYPE_NAME])
 undefine([PAC_TYPE_NAME])
 undefine([PAC_CV_NAME])
 ])
+
 dnl
 dnl This version uses a Fortran program to link programs.
 dnl This is necessary because some compilers provide shared libraries
@@ -315,19 +330,16 @@ dnl The cache variable name.
 define(<<PAC_CV_NAME>>, translit(pac_cv_f77_sizeof_$1, [ *], [__]))dnl
 changequote([,])dnl
 AC_CACHE_CHECK([for size of Fortran type $1],PAC_CV_NAME,[
-AC_REQUIRE([AC_HEADER_STDC])
 AC_REQUIRE([PAC_PROG_F77_NAME_MANGLE])
 dnl if test "$cross_compiling" = yes ; then
 dnl     ifelse([$2],[],
 dnl         [AC_MSG_WARN([No value provided for size of $1 when cross-compiling])],
 dnl         [eval PAC_CV_NAME=$2])
 dnl fi
-AC_LANG_PUSH([C])
+PAC_LANG_PUSH_C_PIE
 AC_COMPILE_IFELSE([
     AC_LANG_SOURCE([
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
 #ifdef F77_NAME_UPPER
 #define cisize_ CISIZE
 #define isize_ ISIZE
@@ -377,7 +389,7 @@ int cisize_(char *i1p, char *i2p) {
 ],[
     AC_MSG_WARN([Unable to compile the C routine for finding the size of a $1])
 ])
-AC_LANG_POP([C])
+PAC_LANG_POP_C_PIE
 ])
 dnl Endof ac_cache_check
 if test "$PAC_CV_NAME" = "-9999" ; then
@@ -399,7 +411,7 @@ dnl Check whether '!' may be used to begin comments in Fortran.
 dnl
 dnl This macro requires a version of autoconf `after` 2.13; the 'acgeneral.m4'
 dnl file contains an error in the handling of Fortran programs in 
-dnl 'AC_TRY_COMPILE' (fixed in our local version).
+dnl 'AC_COMPILE_IFELSE' (fixed in our local version).
 dnl
 dnl D*/
 AC_DEFUN([PAC_PROG_F77_EXCLAIM_COMMENTS],[
@@ -666,7 +678,6 @@ dnl Fortran routine MUST be named ftest unless you include code
 dnl to select the appropriate Fortran name.
 dnl 
 AC_DEFUN([PAC_PROG_F77_RUN_PROC_FROM_C],[
-AC_REQUIRE([AC_HEADER_STDC])
 AC_REQUIRE([AC_F77_LIBRARY_LDFLAGS])
 AC_LANG_PUSH([Fortran 77])
 AC_COMPILE_IFELSE([
@@ -680,9 +691,7 @@ AC_COMPILE_IFELSE([
     AC_LANG_PUSH([C])
     AC_RUN_IFELSE([
         AC_LANG_SOURCE([
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
 #ifdef F77_NAME_UPPER
 #define ftest_ FTEST
 #elif defined(F77_NAME_LOWER) || defined(F77_NAME_MIXED)
@@ -707,7 +716,7 @@ AC_LANG_POP([Fortran 77])
 dnl PAC_PROG_F77_IN_C_LIBS
 dnl
 dnl Find the essential libraries that are needed to use the C linker to 
-dnl create a program that includes a trival Fortran code.  
+dnl create a program that includes a trivial Fortran code.  
 dnl
 dnl For example, all pgf90 compiled objects include a reference to the
 dnl symbol pgf90_compiled, found in libpgf90 .
@@ -720,7 +729,6 @@ dnl by trying to *run* a trivial program.  It only checks for *linking*.
 dnl 
 dnl
 AC_DEFUN([PAC_PROG_F77_IN_C_LIBS],[
-AC_REQUIRE([AC_HEADER_STDC])
 AC_REQUIRE([AC_F77_LIBRARY_LDFLAGS])
 AC_MSG_CHECKING([for which Fortran libraries are needed to link C with Fortran])
 F77_IN_C_LIBS="invalid"
@@ -741,9 +749,7 @@ AC_COMPILE_IFELSE([
     # Create conftest for all link tests.
     AC_LANG_CONFTEST([
         AC_LANG_PROGRAM([
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
         ],[
 #ifdef F77_NAME_UPPER
 #define ftest_ FTEST
@@ -831,7 +837,7 @@ pac_linkwithC=no
 
 dnl Use F77 as a linker to compile a Fortran main and C subprogram.
 if test "$pac_linkwithC" != "yes" ; then
-    AC_LANG_PUSH([C])
+    PAC_LANG_PUSH_C_PIE
     AC_COMPILE_IFELSE([],[
         PAC_RUNLOG([mv conftest.$OBJEXT pac_conftest.$OBJEXT])
         saved_LIBS="$LIBS"
@@ -845,7 +851,7 @@ if test "$pac_linkwithC" != "yes" ; then
         LIBS="$saved_LIBS"
         rm -f pac_conftest.$OBJEXT
     ])
-    AC_LANG_POP([C])
+    PAC_LANG_POP_C_PIE
 fi
 
 dnl Use C as a linker and FLIBS to compile a Fortran main and C subprogram.
@@ -932,7 +938,6 @@ dnl sometimes requires -lSystemStubs.  If another library is needed,
 dnl add it to F77_OTHER_LIBS
 dnl
 AC_DEFUN([PAC_PROG_F77_AND_C_STDIO_LIBS],[
-AC_REQUIRE([AC_HEADER_STDC])
 AC_REQUIRE([PAC_PROG_F77_NAME_MANGLE])
 # To simply the code in the cache_check macro, chose the routine name
 # first, in case we need it
@@ -950,12 +955,10 @@ esac
 AC_CACHE_CHECK([for libraries to link Fortran main with C stdio routines],
 pac_cv_prog_f77_and_c_stdio_libs,[
 pac_cv_prog_f77_and_c_stdio_libs=unknown
-AC_LANG_PUSH([C])
+PAC_LANG_PUSH_C_PIE
 AC_COMPILE_IFELSE([
     AC_LANG_SOURCE([
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
 int $confname(int a) {
     printf( "The answer is %d\n", a ); fflush(stdout); return 0;
 }
@@ -985,7 +988,7 @@ int $confname(int a) {
     LIBS="$saved_LIBS"
     rm -f pac_conftest.$OBJEXT
 ])
-AC_LANG_POP([C])
+PAC_LANG_POP_C_PIE
 ])
 dnl Endof ac_cache_check
 if test "$pac_cv_prog_f77_and_c_stdio_libs" != "none" \
@@ -1087,7 +1090,7 @@ pac_linkwithC=no
 
 dnl Use F77 as a linker to compile a Fortran main and C subprogram.
 if test "$pac_linkwithC" != "yes" ; then
-    AC_LANG_PUSH([C])
+    PAC_LANG_PUSH_C_PIE
     AC_COMPILE_IFELSE([],[
         PAC_RUNLOG([mv conftest.$OBJEXT pac_conftest.$OBJEXT])
         saved_LIBS="$LIBS"
@@ -1103,7 +1106,7 @@ if test "$pac_linkwithC" != "yes" ; then
             rm -f pac_conftest.$OBJEXT
         fi
     ])
-    AC_LANG_POP([C])
+    PAC_LANG_POP_C_PIE
 fi
 
 dnl Use C as a linker and FLIBS to compile a Fortran main and C subprogram.
@@ -1143,8 +1146,8 @@ if test "$pac_linkwithf77" != "yes" -a "$pac_linkwithC" != "yes" ; then
         cobjtype="`${FILE} pac_conftest.$OBJEXT | sed -e \"s|pac_conftest\.$OBJEXT||g\"`"
         if test "$fobjtype" != "$cobjtype" ; then
             AC_MSG_ERROR([****  Incompatible Fortran and C Object File Types!  ****
-F77 Object File Type produced by \"${F77} ${FFLAGS}\" is : ${fobjtype}.
- C  Object File Type produced by \"${CC} ${CFLAGS}\" is : ${cobjtype}.])
+F77 Object File Type produced by "${F77} ${FFLAGS}" is : ${fobjtype}.
+ C  Object File Type produced by "${CC} ${CFLAGS}" is : ${cobjtype}.])
         fi
     fi
 fi
@@ -1261,7 +1264,6 @@ dnl
 dnl PAC_F77_INIT_WORKS_WITH_C
 dnl
 AC_DEFUN([PAC_F77_INIT_WORKS_WITH_C],[
-AC_REQUIRE([AC_HEADER_STDC])
 AC_MSG_CHECKING([whether Fortran init will work with C])
 pac_f_init_works_with_c=unknown
 AC_LANG_PUSH([Fortran 77])
@@ -1286,9 +1288,7 @@ AC_COMPILE_IFELSE([
     AC_LANG_PUSH([C])
     AC_LINK_IFELSE([
         AC_LANG_SOURCE([
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
 #ifdef F77_NAME_UPPER
 #define minit_ MINIT
 #elif defined(F77_NAME_LOWER) || defined(F77_NAME_MIXED)
@@ -1338,21 +1338,16 @@ dnl rest of the bits were ignored.  For now, we'll assume that there are
 dnl unique true and false values.
 dnl
 AC_DEFUN([PAC_F77_LOGICALS_IN_C],[
-AC_REQUIRE([AC_HEADER_STDC])
 AC_REQUIRE([PAC_PROG_F77_NAME_MANGLE])
 pac_mpi_fint="$1"
 AC_MSG_CHECKING([for values of Fortran logicals])
 AC_CACHE_VAL(pac_cv_prog_f77_true_false_value,[
 pac_cv_prog_f77_true_false_value=""
-AC_LANG_PUSH([C])
+PAC_LANG_PUSH_C_PIE
 AC_COMPILE_IFELSE([
     AC_LANG_SOURCE([
-#if defined(HAVE_STDIO_H) || defined(STDC_HEADERS)
 #include <stdio.h>
-#endif
-#if defined(HAVE_STDLIB_H) || defined(STDC_HEADERS)
 #include <stdlib.h>
-#endif
 #ifdef F77_NAME_UPPER
 #define ftest_ FTEST
 #elif defined(F77_NAME_LOWER) || defined(F77_NAME_MIXED)
@@ -1397,7 +1392,7 @@ void ftest_( $pac_mpi_fint *itrue, $pac_mpi_fint *ifalse )
     LIBS="$saved_LIBS"
     rm -f pac_conftest.$OBJEXT
 ])
-AC_LANG_POP([C])
+PAC_LANG_POP_C_PIE
 ])
 dnl Endof ac_cache_val
 if test "X$pac_cv_prog_f77_true_false_value" != "X" ; then
@@ -1453,7 +1448,7 @@ if test "X$pac_cv_prog_f77_mismatched_args" = X ; then
 	# The best solution is to turn off errors on particular routines
 	# if that isn't possible (e.g., too many of them), then
 	# just try arguments that turn off all checking
-	for flags in ifelse($2,yes,,"-wmismatch=foo1") "-mismatch" ; do
+	for flags in ifelse($2,yes,,"-wmismatch=foo1") "-mismatch" "-fallow-argument-mismatch" ; do
             testok=no
             FFLAGS="$FFLAGS $flags"
             AC_COMPILE_IFELSE([

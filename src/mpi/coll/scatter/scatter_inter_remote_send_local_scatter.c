@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -15,20 +13,15 @@
  * Cost: (lgp+1).alpha + n.((p-1)/p).beta + n.beta
  */
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_Scatter_inter_remote_send_local_scatter
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-int MPIR_Scatter_inter_remote_send_local_scatter(const void *sendbuf, int sendcount,
+int MPIR_Scatter_inter_remote_send_local_scatter(const void *sendbuf, MPI_Aint sendcount,
                                                  MPI_Datatype sendtype, void *recvbuf,
-                                                 int recvcount, MPI_Datatype recvtype, int root,
-                                                 MPIR_Comm * comm_ptr, MPIR_Errflag_t * errflag)
+                                                 MPI_Aint recvcount, MPI_Datatype recvtype,
+                                                 int root, MPIR_Comm * comm_ptr,
+                                                 MPIR_Errflag_t * errflag)
 {
     int rank, local_size, remote_size, mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
     MPI_Status status;
-    MPI_Aint extent, true_extent, true_lb = 0;
-    void *tmp_buf = NULL;
     MPIR_Comm *newcomm_ptr = NULL;
     MPIR_CHKLMEM_DECL(1);
 
@@ -57,27 +50,19 @@ int MPIR_Scatter_inter_remote_send_local_scatter(const void *sendbuf, int sendco
     } else {
         /* remote group. rank 0 receives data from root. need to
          * allocate temporary buffer to store this data. */
+        MPI_Aint recvtype_sz;
+        void *tmp_buf = NULL;
 
         rank = comm_ptr->rank;
 
         if (rank == 0) {
-            MPIR_Type_get_true_extent_impl(recvtype, &true_lb, &true_extent);
-
-            MPIR_Datatype_get_extent_macro(recvtype, extent);
-            MPIR_Ensure_Aint_fits_in_pointer(extent * recvcount * local_size);
-            MPIR_Ensure_Aint_fits_in_pointer(MPIR_VOID_PTR_CAST_TO_MPI_AINT sendbuf +
-                                             sendcount * remote_size * extent);
-
+            MPIR_Datatype_get_size_macro(recvtype, recvtype_sz);
             MPIR_CHKLMEM_MALLOC(tmp_buf, void *,
-                                recvcount * local_size * (MPL_MAX(extent, true_extent)), mpi_errno,
+                                recvcount * local_size * recvtype_sz, mpi_errno,
                                 "tmp_buf", MPL_MEM_BUFFER);
 
-            /* adjust for potential negative lower bound in datatype */
-            tmp_buf = (void *) ((char *) tmp_buf - true_lb);
-
-            mpi_errno =
-                MPIC_Recv(tmp_buf, recvcount * local_size, recvtype, root, MPIR_SCATTER_TAG,
-                          comm_ptr, &status, errflag);
+            mpi_errno = MPIC_Recv(tmp_buf, recvcount * local_size * recvtype_sz, MPI_BYTE,
+                                  root, MPIR_SCATTER_TAG, comm_ptr, &status, errflag);
             if (mpi_errno) {
                 /* for communication errors, just record the error but continue */
                 *errflag =
@@ -86,6 +71,9 @@ int MPIR_Scatter_inter_remote_send_local_scatter(const void *sendbuf, int sendco
                 MPIR_ERR_SET(mpi_errno, *errflag, "**fail");
                 MPIR_ERR_ADD(mpi_errno_ret, mpi_errno);
             }
+        } else {
+            /* silience -Wmaybe-uninitialized due to MPIR_Scatter by non-zero ranks */
+            recvtype_sz = 0;
         }
 
         /* Get the local intracommunicator */
@@ -95,9 +83,8 @@ int MPIR_Scatter_inter_remote_send_local_scatter(const void *sendbuf, int sendco
         newcomm_ptr = comm_ptr->local_comm;
 
         /* now do the usual scatter on this intracommunicator */
-        mpi_errno =
-            MPIR_Scatter(tmp_buf, recvcount, recvtype, recvbuf, recvcount, recvtype, 0, newcomm_ptr,
-                         errflag);
+        mpi_errno = MPIR_Scatter(tmp_buf, recvcount * recvtype_sz, MPI_BYTE,
+                                 recvbuf, recvcount, recvtype, 0, newcomm_ptr, errflag);
         if (mpi_errno) {
             /* for communication errors, just record the error but continue */
             *errflag =

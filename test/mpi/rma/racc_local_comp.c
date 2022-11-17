@@ -1,9 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include <mpi.h>
 #include <stdio.h>
 #include <assert.h>
@@ -44,7 +43,7 @@ int main(int argc, char *argv[])
             int val = -1;
 
             buf[0] = rank * i;
-            MPI_Raccumulate(&buf[0], 1, MPI_INT, 0, 0, 1, MPI_INT, MPI_MAX, window, &acc_req);
+            MPI_Raccumulate(&buf[0], 1, MPI_INT, 0, 0, 1, MPI_INT, MPI_REPLACE, window, &acc_req);
             MPI_Wait(&acc_req, MPI_STATUS_IGNORE);
 
             /* reset local buffer to check local completion */

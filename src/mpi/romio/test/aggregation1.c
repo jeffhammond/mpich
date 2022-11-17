@@ -1,13 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2007 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* Test case from John Bent (ROMIO req #835)
  * Aggregation code was not handling certain access patterns when collective
  * buffering forced */
-#define _XOPEN_SOURCE 500       /* strdup not in string.h otherwsie */
+#define _XOPEN_SOURCE 500       /* strdup not in string.h otherwise */
 #include <unistd.h>
 #include <stdlib.h>
 #include <mpi.h>

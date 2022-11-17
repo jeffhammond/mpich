@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -102,7 +100,7 @@ static int check_local_result(int iter)
 #define check_local_result(iter) (0)
 #endif
 
-static int run_test()
+static int run_test(void)
 {
     int i = 0, x = 0;
     int errors = 0;

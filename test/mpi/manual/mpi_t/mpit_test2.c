@@ -1,15 +1,13 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2011 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* A simple test of the proposed MPI_T_ interface that assumes the
  * presence of two performance variables: "posted_recvq_length" and
  * "unexpected_recvq_length".  Some information about these variables
  * is printed to stdout and then a few messages are sent/received to
- * show that theses variables are reporting useful information.
+ * show that these variables are reporting useful information.
  *
  * Author: Dave Goodell <goodell@mcs.anl.gov.
  */

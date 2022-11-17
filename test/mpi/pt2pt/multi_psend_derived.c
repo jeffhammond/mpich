@@ -1,15 +1,11 @@
 /*
- *  (C) 2018 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
- *
- *  Portions of this code were written by Intel Corporation.
- *  Copyright (C) 2011-2018 Intel Corporation.  Intel provides this material
- *  to Argonne National Laboratory subject to Software Grant and Corporate
- *  Contributor License Agreement dated February 8, 2012.
- *
- *  This program checks if MPICH can correctly handle multiple persistent
- *  communication calls with a derived datatype
- *
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
+/*
+ * This program checks if MPICH can correctly handle multiple
+ * persistent communication calls with a derived datatype
  */
 
 #include <mpi.h>
@@ -37,6 +33,9 @@ int main(int argc, char *argv[])
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
+    if (rank == 0)
+        MTestPrintfMsg(1, "Test 1: Persistent send - Recv\n");
+
     if (rank == 0) {
         MPI_Type_dup(MPI_INT, &int_dup);
         v = 42;
@@ -57,6 +56,32 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "Psend-recv iteration %d: Expected 42 but got %d\n", i, v);
             }
         }
+    }
+
+    if (rank == 0)
+        MTestPrintfMsg(1, "Test 2: Send - Persistent recv (with ANY_SOURCE)\n");
+
+    if (rank == 0) {
+        for (i = 0; i < ITER; i++) {
+            v = i;
+            MPI_Send(&v, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
+        }
+    } else {
+        MPI_Type_dup(MPI_INT, &int_dup);
+        MPI_Recv_init(&v, 1, int_dup, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &req);
+        MPI_Type_free(&int_dup);
+        for (i = 0; i < ITER; i++) {
+            MPI_Status s;
+            v = -1;
+            MPI_Start(&req);
+            MPI_Wait(&req, &s);
+            if (v != i) {
+                errs++;
+                fprintf(stderr, "Send-precv(anysrc) iteration %d: Expected %d but got %d\n",
+                        i, i, v);
+            }
+        }
+        MPI_Request_free(&req);
     }
 
     MTest_Finalize(errs);

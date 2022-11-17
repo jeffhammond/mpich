@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpi.h"
@@ -61,7 +60,7 @@ int main(int argc, char *argv[])
         for (i = 0; i < size; i++) {
             for (j = 0; j < COUNT; j++) {
                 if (recvbuf[i * COUNT + j] != i * VERIFY_CONST + j) {
-                    printf("PE 0: mis-match error");
+                    printf("PE 0: mismatch error");
                     printf("  recbuf[%d * %d + %d] = ", i, COUNT, j);
                     printf("  %ld,", recvbuf[i * COUNT + j]);
                     printf("  should be %ld\n", i * VERIFY_CONST + j);

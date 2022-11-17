@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2013 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* Types and interfaces in this file are internally used by MPIR_T itself.
@@ -19,13 +18,21 @@
 #include "uthash.h"
 #include "mpir_objects.h"
 
+/* MPI T should not use MPIR_ error routines. */
+#include "mpit_err.h"
+#include "mpit_mem.h"
+
 #ifdef HAVE_ERROR_CHECKING
 typedef enum {
     MPIR_T_OBJECT_INVALID = 0,
     MPIR_T_ENUM_HANDLE,
     MPIR_T_CVAR_HANDLE,
     MPIR_T_PVAR_HANDLE,
-    MPIR_T_PVAR_SESSION
+    MPIR_T_PVAR_SESSION,
+    MPIR_T_SOURCE,
+    MPIR_T_EVENT,
+    MPIR_T_EVENT_REG,
+    MPIR_T_EVENT_INSTANCE
 } MPIR_T_object_kind;
 #endif
 
@@ -51,6 +58,7 @@ typedef struct {
     UT_array *cvar_indices;
     UT_array *pvar_indices;
     UT_array *subcat_indices;
+    UT_array *event_indices;
     const char *desc;
 } cat_table_entry_t;
 
@@ -75,7 +83,7 @@ typedef union MPIR_T_cvar_value_s {
     unsigned ul;
     unsigned ull;
     MPI_Count c;
-    char *str;
+    const char *str;
     double f;
     MPIR_T_cvar_range_value_t range;
 } MPIR_T_cvar_value_t;
@@ -235,10 +243,10 @@ typedef struct {
 /* Timer type */
 typedef struct {
     /* Accumulated time */
-    MPID_Time_t total;
+    MPL_time_t total;
 
     /* Time when the timer was started recently */
-    MPID_Time_t curstart;
+    MPL_time_t curstart;
 
     /* A counter recording how many times the timer is started */
     unsigned long long count;
@@ -289,7 +297,7 @@ typedef struct MPIR_T_pvar_handle_s {
     /* Bytes of an element of datatype */
     int bytes;
 
-    /* Basic flags copied from pvar info + auxilary flags in pvar handle */
+    /* Basic flags copied from pvar info + auxiliary flags in pvar handle */
     int flags;
 
     /* Store info here in case we need other fields */
@@ -305,7 +313,7 @@ typedef struct MPIR_T_pvar_handle_s {
      *
      * For pvars of counter, timer or aggregate type, we cache their value at
      * the last start time in offset, their current value in current, and
-     * their accumlated value in accum. Generally, when such a pvar is running,
+     * their accumulated value in accum. Generally, when such a pvar is running,
      * reading the pvar should return
      *      accum[i] + current[i] - offset[i], 0 <= i < count - 1.
      * When the pvar is stopped, reading just returns accum.
@@ -615,9 +623,9 @@ extern void MPIR_T_PVAR_REGISTER_impl(MPIR_T_pvar_class_t varclass, MPI_Datatype
 
 #define MPIR_T_PVAR_COUNTER_ARRAY_INIT_impl(name_) \
     do { \
-        int count_; \
-        count_ = sizeof(PVAR_COUNTER_##name_)/sizeof(PVAR_COUNTER_##name_[0]); \
-        MPIR_T_PVAR_COUNTER_ARRAY_INIT_VAR_impl(PVAR_COUNTER_##name_, count_); \
+        int init_count_; \
+        init_count_ = sizeof(PVAR_COUNTER_##name_)/sizeof(PVAR_COUNTER_##name_[0]); \
+        MPIR_T_PVAR_COUNTER_ARRAY_INIT_VAR_impl(PVAR_COUNTER_##name_, init_count_); \
     } while (0)
 #define MPIR_T_PVAR_COUNTER_ARRAY_GET_impl(name_, idx_) \
     MPIR_T_PVAR_COUNTER_ARRAY_GET_VAR_impl(PVAR_COUNTER_##name_, idx_)
@@ -629,7 +637,7 @@ extern void MPIR_T_PVAR_REGISTER_impl(MPIR_T_pvar_class_t varclass, MPI_Datatype
             verb_, bind_, flags_, cat_, desc_) \
     do { \
         void *addr_; \
-        int count_;  \
+        int static_count_;  \
         /* Allowable datatypes only */ \
         MPIR_Assert((dtype_) == MPI_UNSIGNED || (dtype_) == MPI_UNSIGNED_LONG || \
                     (dtype_) == MPI_UNSIGNED_LONG_LONG); \
@@ -637,9 +645,9 @@ extern void MPIR_T_PVAR_REGISTER_impl(MPIR_T_pvar_class_t varclass, MPI_Datatype
         MPIR_Assert(sizeof(PVAR_COUNTER_##name_[0]) == MPIR_Datatype_get_basic_size(dtype_)); \
         addr_ = PVAR_COUNTER_##name_; \
         MPIR_T_PVAR_COUNTER_ARRAY_INIT_impl(name_); \
-        count_ = sizeof(PVAR_COUNTER_##name_)/sizeof(mpit_pvar_##name_[0]); \
+        static_count_ = sizeof(PVAR_COUNTER_##name_)/sizeof(PVAR_COUNTER_##name_[0]); \
         MPIR_T_PVAR_REGISTER_impl(MPI_T_PVAR_CLASS_COUNTER, dtype_, #name_, \
-            addr_, count_, MPI_T_ENUM_NULL, verb_, bind_, flags_, NULL, NULL, cat_, desc_); \
+            addr_, static_count_, MPI_T_ENUM_NULL, verb_, bind_, flags_, NULL, NULL, cat_, desc_); \
     } while (0)
 
 /* Dynamic counter array is already provided by MPIR_T_PVAR_COUNTER_REGISTER_DYNAMIC */
@@ -700,22 +708,22 @@ extern void MPIR_T_PVAR_REGISTER_impl(MPIR_T_pvar_class_t varclass, MPI_Datatype
 #define MPIR_T_PVAR_TIMER_INIT_VAR_impl(ptr_) \
     do { \
         /* FIXME: need a generic approach to init a timer */ \
-        memset(&((ptr_)->total), 0, sizeof(MPID_Time_t)); \
+        memset(&((ptr_)->total), 0, sizeof(MPL_time_t)); \
     } while (0)
 #define MPIR_T_PVAR_TIMER_GET_VAR_impl(ptr_, buf) \
     do { \
-        MPID_Wtime_todouble(&((ptr_)->total), buf); \
+        MPL_wtime_todouble(&((ptr_)->total), buf); \
     } while (0)
 #define MPIR_T_PVAR_TIMER_START_VAR_impl(ptr_) \
     do { \
-        MPID_Wtime(&((ptr_)->curstart)); \
+        MPL_wtime(&((ptr_)->curstart)); \
         (ptr_)->count++; \
     } while (0)
 #define MPIR_T_PVAR_TIMER_END_VAR_impl(ptr_) \
     do { \
-        MPID_Time_t tmp_; \
-        MPID_Wtime(&tmp_); \
-        MPID_Wtime_acc(&((ptr_)->curstart), &tmp_, &((ptr_)->total)); \
+        MPL_time_t tmp_; \
+        MPL_wtime(&tmp_); \
+        MPL_wtime_acc(&((ptr_)->curstart), &tmp_, &((ptr_)->total)); \
     } while (0)
 
 #define MPIR_T_PVAR_TIMER_INIT_impl(name_) \
@@ -736,7 +744,7 @@ static inline
 {
     int i;
     for (i = 0; i < count; i++)
-        MPID_Wtime_todouble(&(timer[i].total), &buf[i]);
+        MPL_wtime_todouble(&(timer[i].total), &buf[i]);
 }
 
 /* Registration for static storage */
@@ -1173,7 +1181,7 @@ static inline int MPIR_T_pvar_unset_first(MPIR_T_pvar_handle_t * handle)
 /* A counter that keeps track of the relative balance of calls to
  * MPI_T_init_thread and MPI_T_finalize */
 extern int MPIR_T_init_balance;
-static inline int MPIR_T_is_initialized()
+static inline int MPIR_T_is_initialized(void)
 {
     return MPIR_T_init_balance > 0;
 }
@@ -1192,6 +1200,8 @@ extern MPID_Thread_mutex_t mpi_t_mutex;
     do { \
         int err_; \
         MPIR_T_THREAD_CHECK_BEGIN \
+        MPID_Thread_init(&err_); \
+        MPIR_Assert(err_ == 0); \
         MPID_Thread_mutex_create(&mpi_t_mutex, &err_); \
         MPIR_Assert(err_ == 0); \
         MPIR_T_THREAD_CHECK_END \
@@ -1202,6 +1212,8 @@ extern MPID_Thread_mutex_t mpi_t_mutex;
         int err_; \
         MPIR_T_THREAD_CHECK_BEGIN \
         MPID_Thread_mutex_destroy(&mpi_t_mutex, &err_); \
+        MPIR_Assert(err_ == 0); \
+        MPID_Thread_finalize(&err_); \
         MPIR_Assert(err_ == 0); \
         MPIR_T_THREAD_CHECK_END \
     } while (0)
@@ -1229,7 +1241,92 @@ extern MPID_Thread_mutex_t mpi_t_mutex;
 #endif
 
 /* Init and finalize routines */
-extern void MPIR_T_env_init(void);
+
+extern void MPIR_T_pvar_env_init(void);
+extern int MPIR_T_env_init(void);
 extern void MPIR_T_env_finalize(void);
+extern void MPIR_T_events_finalize(void);
+
+typedef MPI_Count(*MPIR_T_timestamp_fn) (void);
+
+typedef struct MPIR_T_source_s {
+#ifdef HAVE_ERROR_CHECKING
+    MPIR_T_object_kind kind;
+#endif
+    int index;
+    char *name;
+    char *desc;
+    MPI_T_source_order ordering;
+    MPIR_T_timestamp_fn timestamp_fn;
+    MPI_Count ticks_per_second;
+    MPI_Count max_ticks;
+
+    UT_hash_handle hh;          /* Makes this structure hashable */
+} MPIR_T_source_t;
+
+void MPIR_T_register_source(const char *name, const char *desc, MPI_T_source_order ordering,
+                            MPIR_T_timestamp_fn timestamp_fn, MPI_Count ticks_per_second,
+                            MPI_Count max_ticks, int *index);
+
+typedef struct MPIR_T_event_s {
+#ifdef HAVE_ERROR_CHECKING
+    MPIR_T_object_kind kind;
+#endif
+    int index;
+    int source_index;
+    char *name;
+    MPIR_T_verbosity_t verbosity;
+    MPI_Datatype *array_of_datatypes;
+    MPI_Aint *array_of_displacements;
+    int num_elements;
+    MPIR_T_enum_t *enumtype;
+    char *desc;
+    MPIR_T_bind_t bind;
+
+    struct MPIR_T_event_registration_s *reg_list_head;
+    struct MPIR_T_event_registration_s *reg_list_tail;
+
+    UT_hash_handle hh;          /* Makes this structure hashable */
+} MPIR_T_event_t;
+
+void MPIR_T_register_event(int source_index, const char *name, MPIR_T_verbosity_t verbosity,
+                           MPI_Datatype array_of_datatypes[], MPI_Aint array_of_displacements[],
+                           MPI_Aint num_elements, const char *desc, MPIR_T_bind_t bind,
+                           const char *category, int *index);
+
+typedef struct MPIR_T_event_cb_s {
+    MPI_T_event_cb_function *cb_function;
+    void *user_data;
+} MPIR_T_event_cb_t;
+
+typedef struct MPIR_T_event_registration_s {
+#ifdef HAVE_ERROR_CHECKING
+    MPIR_T_object_kind kind;
+#endif
+    MPIR_T_event_t *event;
+    void *obj_handle;
+    MPIR_T_event_cb_t callbacks[4];     /* one for each safety level */
+    MPI_T_event_dropped_cb_function *dropped_cb;
+    MPI_Count dropped_count;
+
+    struct MPIR_T_event_registration_s *next;
+} MPIR_T_event_registration_t;
+
+typedef struct MPIR_T_event_instance_s {
+#ifdef HAVE_ERROR_CHECKING
+    MPIR_T_object_kind kind;
+#endif
+    MPIR_T_event_t *event;
+    MPI_Count timestamp;
+    void *data;
+} MPIR_T_event_instance_t;
+
+void MPIR_T_event_instance(int event_index, MPI_T_cb_safety cb_safety, void *data);
+
+#ifdef HAVE_MPIT_EVENTS
+#define MPIR_T_DO_EVENT(...) MPIR_T_event_instance(__VA_ARGS__)
+#else
+#define MPIR_T_DO_EVENT(...) do {} while (0)
+#endif
 
 #endif /* MPITIMPL_H_INCLUDED */

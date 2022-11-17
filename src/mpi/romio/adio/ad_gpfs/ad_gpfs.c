@@ -1,16 +1,13 @@
-/* ---------------------------------------------------------------- */
-/* (C)Copyright IBM Corp.  2007, 2008                               */
-/* ---------------------------------------------------------------- */
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 /**
  * \file ad_gpfs.c
  * \brief ???
  */
 
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
-/*
- *   Copyright (C) 2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
- */
 #include "ad_gpfs.h"
 
 /* adioi.h has the ADIOI_Fns_struct define */
@@ -25,11 +22,7 @@ struct ADIOI_Fns_struct ADIO_GPFS_operations = {
     ADIOI_GPFS_WriteStridedColl,        /* WriteStridedColl */
     ADIOI_GEN_SeekIndividual,   /* SeekIndividual */
     ADIOI_GEN_Fcntl,    /* Fcntl */
-#if defined(BGQPLATFORM) || defined(PEPLATFORM)
-    ADIOI_GPFS_SetInfo, /* SetInfo for BlueGene or PE */
-#else
-    ADIOI_GEN_SetInfo,  /* SetInfo for any platform besides BlueGene or PE */
-#endif
+    ADIOI_GPFS_SetInfo, /* SetInfo, including parsing environment variables for GPFS driver  */
     ADIOI_GEN_ReadStrided,      /* ReadStrided */
     ADIOI_GEN_WriteStrided,     /* WriteStrided */
     ADIOI_GPFS_Close,   /* Close */
@@ -59,5 +52,10 @@ struct ADIOI_Fns_struct ADIO_GPFS_operations = {
     "GPFS: IBM GPFS",
 #endif
     ADIOI_GEN_IreadStridedColl, /* IreadStridedColl */
-    ADIOI_GEN_IwriteStridedColl /* IwriteStridedColl */
+    ADIOI_GEN_IwriteStridedColl,        /* IwriteStridedColl */
+#if defined(F_SETLKW64)
+    ADIOI_GEN_SetLock   /* SetLock */
+#else
+    ADIOI_GEN_SetLock64 /* SetLock */
+#endif
 };

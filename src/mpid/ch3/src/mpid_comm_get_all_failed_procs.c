@@ -1,20 +1,14 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
-#ifdef USE_PMI2_API
-#include "pmi2.h"
-#else
-#include "pmi.h"
-#endif
 
 /* Generates a bitarray based on orig_comm where all procs in group are marked with 1 */
 static void group_to_bitarray(MPIR_Group *group, MPIR_Comm *orig_comm, int **bitarray, int *bitarray_size) {
     int mask;
-    int *group_ranks, *comm_ranks, i, index;
+    int *group_ranks, *comm_ranks, i;
 
     /* Calculate the bitarray size in ints and allocate space */
     *bitarray_size = (orig_comm->local_size / (8 * sizeof(int)) + (orig_comm->local_size % (8 * sizeof(int)) ? 1 : 0));
@@ -40,9 +34,9 @@ static void group_to_bitarray(MPIR_Group *group, MPIR_Comm *orig_comm, int **bit
      * add it to the bitarray. */
     for (i = 0; i < group->size ; i++) {
         if (comm_ranks[i] == MPI_UNDEFINED) continue;
-        index = comm_ranks[i] / (sizeof(int) * 8);
+        int idx = comm_ranks[i] / (sizeof(int) * 8);
         mask = 0x1 << comm_ranks[i] % (sizeof(int) * 8);
-        (*bitarray)[index] |= mask;
+        (*bitarray)[idx] |= mask;
     }
 
     MPL_free(group_ranks);
@@ -82,10 +76,6 @@ static MPIR_Group *bitarray_to_group(MPIR_Comm *comm_ptr, int *bitarray)
     return ret_group;
 }
 
-#undef FUNCNAME
-#define FUNCNAME MPID_Comm_get_all_failed_procs
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_Comm_get_all_failed_procs(MPIR_Comm *comm_ptr, MPIR_Group **failed_group, int tag)
 {
     int mpi_errno = MPI_SUCCESS, ret_errno;
@@ -93,9 +83,8 @@ int MPID_Comm_get_all_failed_procs(MPIR_Comm *comm_ptr, MPIR_Group **failed_grou
     int i, j, bitarray_size;
     int *bitarray, *remote_bitarray;
     MPIR_Group *local_fail;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_COMM_GET_ALL_FAILED_PROCS);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_COMM_GET_ALL_FAILED_PROCS);
+    MPIR_FUNC_ENTER;
 
     /* Kick the progress engine in case it's been a while so we get all the
      * latest updates about failures */
@@ -105,7 +94,7 @@ int MPID_Comm_get_all_failed_procs(MPIR_Comm *comm_ptr, MPIR_Group **failed_grou
     MPIDI_CH3U_Check_for_failed_procs();
 
     mpi_errno = MPIDI_CH3U_Get_failed_group(-2, &local_fail);
-    if (mpi_errno) MPIR_ERR_POP(mpi_errno);
+    MPIR_ERR_CHECK(mpi_errno);
 
     /* Generate a bitarray based on the list of failed procs */
     group_to_bitarray(local_fail, comm_ptr, &bitarray, &bitarray_size);
@@ -156,7 +145,7 @@ int MPID_Comm_get_all_failed_procs(MPIR_Comm *comm_ptr, MPIR_Group **failed_grou
     MPL_free(remote_bitarray);
 
   fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_COMM_GET_ALL_FAILED_PROCS);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
   fn_fail:
     goto fn_exit;

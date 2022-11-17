@@ -1,11 +1,9 @@
-# -*- Mode: Makefile; -*-
-# vim: set ft=automake :
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
-include $(top_srcdir)/Makefile.mtest
+include $(top_srcdir)/Makefile_single.mtest
 
 EXTRA_DIST = testlist
 
@@ -31,4 +29,5 @@ noinst_PROGRAMS = cfree \
                   intercomm_create_nullarg \
                   subcomm_abort \
                   subcomm_abort2 \
-                  intercomm_abort
+                  intercomm_abort \
+                  unmatched

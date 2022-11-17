@@ -1,16 +1,11 @@
-/* ---------------------------------------------------------------- */
-/* (C)Copyright IBM Corp.  2007, 2008                               */
-/* ---------------------------------------------------------------- */
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 /**
  * \file ad_gpfs_flush.c
  * \brief Scalable flush for GPFS
- */
-
-/* -*- Mode: C; c-basic-offset:4 ; -*- */
-/*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
  */
 
 #include "ad_gpfs.h"
@@ -30,7 +25,7 @@ void ADIOI_GPFS_Flush(ADIO_File fd, int *error_code)
      * to flush, we can consult the 'fd->hints->ranklist[]' array.  For now, a
      * flush from one process should suffice */
 
-    /* ensure all other proceses are done writing. On many platforms MPI_Reduce
+    /* ensure all other processes are done writing. On many platforms MPI_Reduce
      * is fastest because it has the lightest constraints. On Blue Gene, BARRIER
      * is optimized  */
     MPI_Barrier(fd->comm);

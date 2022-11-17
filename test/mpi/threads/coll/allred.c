@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -31,9 +30,8 @@
 MPI_Comm comms[NUM_THREADS];
 int rank, size;
 
-MTEST_THREAD_RETURN_TYPE test_iallred(void *arg)
+static MTEST_THREAD_RETURN_TYPE test_iallred(void *arg)
 {
-    MPI_Request req;
     int tid = *(int *) arg;
     int buf[BUF_SIZE];
 

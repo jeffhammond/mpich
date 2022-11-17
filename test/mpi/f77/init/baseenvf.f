@@ -1,8 +1,8 @@
-C -*- Mode: Fortran; -*- 
 C
-C  (C) 2003 by Argonne National Laboratory.
-C      See COPYRIGHT in top-level directory.
+C Copyright (C) by Argonne National Laboratory
+C     See COPYRIGHT in top-level directory
 C
+
        program main
        implicit none
        include 'mpif.h'
@@ -45,7 +45,7 @@ C
      &              MPI_SUBVERSION
           print *, 'Version in get_version is ', iv, '.', isubv
        endif
-       if (iv .lt. 1 .or. iv .gt. 3) then
+       if (iv .lt. 1 .or. iv .gt. 4) then
           errs = errs + 1
           print *, 'Version of MPI is invalid (=', iv, ')'
        endif

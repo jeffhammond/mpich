@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include "mpitest.h"
 #include <stdio.h>
@@ -21,13 +21,13 @@ int main(int argc, char **argv)
     void **inbufs, **outbufs;
     int *counts, *bytesize, ntype;
     MPI_Comm comm;
-    int ncomm = 20, rank, np, partner, tag, count;
-    int j, k, err, toterr, world_rank, errloc;
+    int rank, np, partner, tag, count;
+    int j, k, err, world_rank, errloc;
     MPI_Status status;
     char *obuf;
     MPI_Datatype offsettype;
     int blen;
-    MPI_Aint displ, extent, natural_extent;
+    MPI_Aint displ, extent, natural_extent, tmp_lb;
     char myname[MPI_MAX_OBJECT_NAME];
     int mynamelen;
 
@@ -62,14 +62,14 @@ int main(int argc, char **argv)
                  * simple shift of the offset won't work.  For now, we skip
                  * types whose extents are negative; the correct solution is
                  * to add, where required, an explicit MPI_UB */
-                MPI_Type_extent(offsettype, &extent);
+                MPI_Type_get_extent(offsettype, &tmp_lb, &extent);
                 if (extent < 0) {
                     if (world_rank == 0)
                         MTestPrintfMsg(10, "... skipping (appears to have explicit MPI_UB\n");
                     MPI_Type_free(&offsettype);
                     continue;
                 }
-                MPI_Type_extent(types[j], &natural_extent);
+                MPI_Type_get_extent(types[j], &tmp_lb, &natural_extent);
                 if (natural_extent != extent) {
                     MPI_Type_free(&offsettype);
                     continue;
@@ -90,12 +90,12 @@ int main(int argc, char **argv)
                  * simple shift of the offset won't work.  For now, we skip
                  * types whose extents are negative; the correct solution is
                  * to add, where required, an explicit MPI_UB */
-                MPI_Type_extent(offsettype, &extent);
+                MPI_Type_get_extent(offsettype, &tmp_lb, &extent);
                 if (extent < 0) {
                     MPI_Type_free(&offsettype);
                     continue;
                 }
-                MPI_Type_extent(types[j], &natural_extent);
+                MPI_Type_get_extent(types[j], &tmp_lb, &natural_extent);
                 if (natural_extent != extent) {
                     MPI_Type_free(&offsettype);
                     continue;

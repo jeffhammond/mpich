@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include <stdio.h>
 #include "mpi.h"
 
@@ -11,7 +11,7 @@ void ChkMsg(int, int, const char[]);
 /*
  * This routine is used to check the message associated with an error
  * code.  Currently, it uses MPI_Error_string to get the corresponding
- * message for a code, and prints out the cooresponding class and original
+ * message for a code, and prints out the corresponding class and original
  * message.
  *
  * Eventually, we should also access the generic anc specific messages

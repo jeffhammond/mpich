@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +20,7 @@ static char MTEST_Descrip[] = "Test contig asynchronous I/O";
    reads them back. The file name is taken as a command-line argument,
    and the process rank is appended to it.*/
 
-static void handle_error(int errcode, char *str)
+static void handle_error(int errcode, const char *str)
 {
     char msg[MPI_MAX_ERROR_STRING];
     int resultlen;

@@ -1,11 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
- *
- *   Copyright (C) 2007 Oak Ridge National Laboratory
- *
- *   Copyright (C) 2008 Sun Microsystems, Lustre group
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <unistd.h>
@@ -141,21 +136,26 @@ static ssize_t ADIOI_LUSTRE_Directio(ADIO_File fd, const void *buf, MPI_Count le
     return nbytes;
 }
 
-static void ADIOI_LUSTRE_IOContig(ADIO_File fd, const void *buf, int count,
+static void ADIOI_LUSTRE_IOContig(ADIO_File fd, const void *buf, MPI_Aint count,
                                   MPI_Datatype datatype, int file_ptr_type,
                                   ADIO_Offset offset, ADIO_Status * status,
                                   int io_mode, int *error_code);
-static void ADIOI_LUSTRE_IOContig(ADIO_File fd, const void *buf, int count,
+static void ADIOI_LUSTRE_IOContig(ADIO_File fd, const void *buf, MPI_Aint count,
                                   MPI_Datatype datatype, int file_ptr_type,
                                   ADIO_Offset offset, ADIO_Status * status,
                                   int io_mode, int *error_code)
 {
-    ssize_t err = -1;
+    ssize_t err = 0;
     size_t rw_count;
     ADIO_Offset bytes_xfered = 0;
     MPI_Count datatype_size, len;
     static char myname[] = "ADIOI_LUSTRE_IOCONTIG";
     char *p;
+
+    if (count == 0) {
+        err = 0;
+        goto fn_exit;
+    }
 
     MPI_Type_size_x(datatype, &datatype_size);
     len = datatype_size * count;
@@ -214,8 +214,10 @@ static void ADIOI_LUSTRE_IOContig(ADIO_File fd, const void *buf, int count,
     if (file_ptr_type == ADIO_INDIVIDUAL) {
         fd->fp_ind += bytes_xfered;
     }
+
+  fn_exit:
 #ifdef HAVE_STATUS_SET_BYTES
-    if (status)
+    if (status && err != -1)
         MPIR_Status_set_bytes(status, datatype, bytes_xfered);
 #endif
     *error_code = MPI_SUCCESS;
@@ -233,14 +235,14 @@ static void ADIOI_LUSTRE_IOContig(ADIO_File fd, const void *buf, int count,
     /* --END ERROR HANDLING-- */
 }
 
-void ADIOI_LUSTRE_WriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_LUSTRE_WriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {
     ADIOI_LUSTRE_IOContig(fd, buf, count, datatype, file_ptr_type, offset, status, 1, error_code);
 }
 
-void ADIOI_LUSTRE_ReadContig(ADIO_File fd, void *buf, int count,
+void ADIOI_LUSTRE_ReadContig(ADIO_File fd, void *buf, MPI_Aint count,
                              MPI_Datatype datatype, int file_ptr_type,
                              ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {

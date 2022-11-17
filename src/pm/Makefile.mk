@@ -1,8 +1,6 @@
-## -*- Mode: Makefile; -*-
-## vim: set ft=automake :
 ##
-## (C) 2011 by Argonne National Laboratory.
-##     See COPYRIGHT in top-level directory.
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
 ##
 
 # util comes first, sets some variables that may be used by each process
@@ -29,11 +27,5 @@ if BUILD_PM_HYDRA
 SUBDIRS += src/pm/hydra
 DIST_SUBDIRS += src/pm/hydra
 MANDOC_SUBDIRS += src/pm/hydra
+HTMLDOC_SUBDIRS += src/pm/hydra
 endif BUILD_PM_HYDRA
-
-# has its own full automake setup, not Makefile.mk
-if BUILD_PM_HYDRA2
-SUBDIRS += src/pm/hydra2
-DIST_SUBDIRS += src/pm/hydra2
-MANDOC_SUBDIRS += src/pm/hydra2
-endif BUILD_PM_HYDRA2

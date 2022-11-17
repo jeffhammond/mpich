@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
+ */
+
 #include <stdio.h>
 #include "mpi.h"
 #include "mpitest.h"
@@ -19,7 +24,7 @@ int main(int argc, char *argv[])
     if (nranks != 3)
         MPI_Abort(MPI_COMM_WORLD, 1);
 
-    MPI_Request reqs[nranks - 1];
+    MPI_Request reqs[2];
 
     if (rank == 0) {
         MPI_Datatype type;

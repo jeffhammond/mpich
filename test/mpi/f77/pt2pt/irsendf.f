@@ -1,8 +1,8 @@
-C -*- Mode: Fortran; -*-
 C
-C  (C) 2012 by Argonne National Laboratory.
-C      See COPYRIGHT in top-level directory.
+C Copyright (C) by Argonne National Laboratory
+C     See COPYRIGHT in top-level directory
 C
+
 C This program is based on the allpair.f test from the MPICH-1 test
 C (test/pt2pt/allpair.f), which in turn was inspired by a bug report from
 C fsset@corelli.lerc.nasa.gov (Scott Townsend)
@@ -33,7 +33,7 @@ C
       implicit none
       include 'mpif.h'
       integer comm, errs
-      integer rank, size, ierr, next, prev, tag, count, index, i
+      integer rank, size, ierr, next, prev, tag, count, index, completed, i
       integer TEST_SIZE
       integer dupcom
       parameter (TEST_SIZE=2000)
@@ -78,9 +78,10 @@ C
          call MPI_Irsend(send_buf, count, MPI_REAL, next, tag,
      .                   comm, requests(2), ierr)
 C
-         index = -1
-         do while (index .ne. 1)
+         completed = 0
+         do while (completed .lt. 2)
             call MPI_Waitany(2, requests, index, statuses, ierr)
+            completed = completed + 1
          end do
 C
          call rq_check( requests(1), 1, 'irsend and irecv' )

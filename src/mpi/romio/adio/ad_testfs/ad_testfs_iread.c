@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_testfs.h"
@@ -12,7 +10,7 @@
  *
  * Implemented by immediately calling ReadContig()
  */
-void ADIOI_TESTFS_IreadContig(ADIO_File fd, void *buf, int count,
+void ADIOI_TESTFS_IreadContig(ADIO_File fd, void *buf, MPI_Aint count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, ADIO_Request * request, int
                               *error_code)
@@ -36,7 +34,7 @@ void ADIOI_TESTFS_IreadContig(ADIO_File fd, void *buf, int count,
     MPIO_Completed_request_create(&fd, len, error_code, request);
 }
 
-void ADIOI_TESTFS_IreadStrided(ADIO_File fd, void *buf, int count,
+void ADIOI_TESTFS_IreadStrided(ADIO_File fd, void *buf, MPI_Aint count,
                                MPI_Datatype datatype, int file_ptr_type,
                                ADIO_Offset offset, ADIO_Request * request, int
                                *error_code)

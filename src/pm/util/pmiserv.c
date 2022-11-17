@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2003 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -56,8 +55,8 @@ int snprintf(char *, size_t, const char *, ...);
 #define PMI_MAX_INFO_KEY       256
 #define PMI_MAX_INFO_VAL      1025
 
-/* There is only a single PMI master, so we allocate it here */
-static PMIMaster pmimaster = { 0, 0, 0 };
+/* There is only a single PMI main, so we allocate it here */
+static PMIMain pmimain = { 0, 0, 0 };
 
 /* Allow the user to register a routine to be used for the PMI spawn
    command */
@@ -115,7 +114,7 @@ static PMICmdMap pmiCommands[] = {
     {"spawn", fPMI_Handle_spawn},
     {"get_universe_size", fPMI_Handle_get_universe_size},
     {"get_appnum", fPMI_Handle_get_appnum},
-    {"\0", 0},  /* Sentinal for end of list */
+    {"\0", 0},  /* Sentinel for end of list */
 };
 
 /* ------------------------------------------------------------------------- */
@@ -265,7 +264,7 @@ int PMISetupNewGroup(int nProcess, PMIKVSpace * kvs)
         return 1;
 
     curPMIGroup->nProcess = nProcess;
-    curPMIGroup->groupID = pmimaster.nGroups++;
+    curPMIGroup->groupID = pmimain.nGroups++;
     curPMIGroup->nInBarrier = 0;
     curPMIGroup->pmiProcess =
         (PMIProcess **) MPL_malloc(sizeof(PMIProcess *) * nProcess, MPL_MEM_PM);
@@ -274,10 +273,10 @@ int PMISetupNewGroup(int nProcess, PMIKVSpace * kvs)
     curPMIGroup->nextGroup = 0;
     curNprocess = 0;
 
-    /* Add to PMIMaster */
-    g = pmimaster.groups;
+    /* Add to PMIMain */
+    g = pmimain.groups;
     if (!g) {
-        pmimaster.groups = curPMIGroup;
+        pmimain.groups = curPMIGroup;
     } else {
         while (g) {
             if (!g->nextGroup) {
@@ -471,8 +470,8 @@ static PMIKVSpace *fPMIKVSAllocate(void)
     kvs->lastIdx = -1;
 
     /* Insert into the list of KV spaces */
-    kPrev = &pmimaster.kvSpaces;
-    k = pmimaster.kvSpaces;
+    kPrev = &pmimain.kvSpaces;
+    k = pmimain.kvSpaces;
     while (k) {
         rc = strcmp(k->kvsname, kvs->kvsname);
         if (rc > 0)
@@ -561,7 +560,7 @@ static int fPMIKVSAddPair(PMIKVSpace * kvs, const char key[], const char val[])
 
 static PMIKVSpace *fPMIKVSFindSpace(const char kvsname[])
 {
-    PMIKVSpace *kvs = pmimaster.kvSpaces;
+    PMIKVSpace *kvs = pmimain.kvSpaces;
     int rc;
 
     /* We require the kvs spaces to be stored in a sorted order */
@@ -595,9 +594,9 @@ static int PMIKVSFree(PMIKVSpace * kvs)
         p = pNext;
     }
 
-    /* Recover the KVS space, and remove it from the master's list */
-    kPrev = &pmimaster.kvSpaces;
-    k = pmimaster.kvSpaces;
+    /* Recover the KVS space, and remove it from the main process's list */
+    kPrev = &pmimain.kvSpaces;
+    k = pmimain.kvSpaces;
     rc = 1;
     while (k) {
         rc = strcmp(k->kvsname, kvs->kvsname);
@@ -611,7 +610,7 @@ static int PMIKVSFree(PMIKVSpace * kvs)
     }
 
     /* Note that if we did not find the kvs, we have an internal
-     * error, since all kv spaces are maintained within the pmimaster list */
+     * error, since all kv spaces are maintained within the pmimain list */
     if (rc != 0) {
         MPL_internal_error_printf("Could not find KV Space %s\n", kvs->kvsname);
         return 1;
@@ -874,7 +873,7 @@ static int fPMI_Handle_getbyidx(PMIProcess * pentry)
  * set up)
  * After the fork, the child will call
  *      PMISetupInClient(1, &pmiinfo)
- * This adds the PMI_PORT and PMI_ID values to the enviroment
+ * This adds the PMI_PORT and PMI_ID values to the environment
  * The parent also calls
  *      PMISetupFinishInServer(1, &pmiinfo, pState)
  * ? What should this do, since there is no connection yet?
@@ -1130,7 +1129,7 @@ static int fPMI_Handle_spawn(PMIProcess * pentry)
          * separate routine (not yet implemented).
          * simple_pmi.c sends (key,value), so we can keep just the
          * last key and pass the key/value to the registered info
-         * handler, along with tha app structure.  Alternately,
+         * handler, along with the app structure.  Alternately,
          * we could save all info items and let the user's
          * spawner handle it */
         else if (strcmp("info_num", cmdPtr) == 0) {
@@ -1212,7 +1211,7 @@ static int fPMI_Handle_spawn(PMIProcess * pentry)
  *     mpiexec, but possibly a separate pmiserver process)
  * 5. return kvsname; return code
  *    How do we handle soft (no specific return size required).
- *    Also, is part fo the group associated with these processes or
+ *    Also, is part of the group associated with these processes or
  *    another group (the spawner?) of processes?
  *
  * This should be called after receiving the cmd=initack from the client.

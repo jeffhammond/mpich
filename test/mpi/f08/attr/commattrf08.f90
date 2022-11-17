@@ -1,9 +1,10 @@
+!
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
+!
+
 ! This file created from test/mpi/f77/attr/commattrf.f with f77tof90
-! -*- Mode: Fortran; -*-
-!
-!  (C) 2003 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
-!
+
       program main
       use mpi_f08
       integer errs, ierr
@@ -117,8 +118,9 @@
 !
       subroutine mycopyfn( oldcomm, keyval, extrastate, valin, valout, &
       &                     flag, ierr )
-      use mpi
-      integer oldcomm, keyval, ierr
+      use mpi_f08
+      type(MPI_Comm) oldcomm
+      integer keyval, ierr
       integer (kind=MPI_ADDRESS_KIND) extrastate, valin, valout, val
 
       logical flag
@@ -138,8 +140,9 @@
       end
 !
       subroutine mydelfn( comm, keyval, val, extrastate, ierr )
-      use mpi
-      integer comm, keyval, ierr
+      use mpi_f08
+      type(MPI_Comm) comm
+      integer keyval, ierr
       integer (kind=MPI_ADDRESS_KIND) extrastate, valin, valout, val
 
       integer callcount, delcount

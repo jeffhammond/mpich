@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -15,7 +13,7 @@
 
 MPI_Comm comm_all;
 
-void error_handler(MPI_Comm * communicator, int *error_code, ...)
+static void error_handler(MPI_Comm * communicator, int *error_code, ...)
 {
     MPI_Comm *new_comm = malloc(sizeof(MPI_Comm));
 

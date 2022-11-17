@@ -1,8 +1,8 @@
-! -*- Mode: Fortran; -*-
 !
-!  (C) 2010 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
 !
+
        program main
        use mpi_f08
        integer ierr, provided, errs, rank, size
@@ -44,7 +44,7 @@
       &              MPI_SUBVERSION
           print *, 'Version in get_version is ', iv, '.', isubv
        endif
-       if (iv .lt. 1 .or. iv .gt. 3) then
+       if (iv .lt. 1 .or. iv .gt. 4) then
           errs = errs + 1
           print *, 'Version of MPI is invalid (=', iv, ')'
        endif

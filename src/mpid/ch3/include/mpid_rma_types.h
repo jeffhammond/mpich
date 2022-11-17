@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef MPID_RMA_TYPES_H_INCLUDED
@@ -39,14 +38,14 @@ typedef struct MPIDI_RMA_Op {
     struct MPIDI_RMA_Op *prev;  /* pointer to prev element in list */
 
     void *origin_addr;
-    int origin_count;
+    MPI_Aint origin_count;
     MPI_Datatype origin_datatype;
 
     void *compare_addr;
     MPI_Datatype compare_datatype;
 
     void *result_addr;
-    int result_count;
+    MPI_Aint result_count;
     MPI_Datatype result_datatype;
 
     struct MPIR_Request *single_req;    /* used for unstreamed RMA ops */

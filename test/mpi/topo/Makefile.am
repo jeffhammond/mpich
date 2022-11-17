@@ -1,11 +1,9 @@
-# -*- Mode: Makefile; -*-
-# vim: set ft=automake :
-#
-# (C) 2011 by Argonne National Laboratory.
-#     See COPYRIGHT in top-level directory.
-#
+##
+## Copyright (C) by Argonne National Laboratory
+##     See COPYRIGHT in top-level directory
+##
 
-include $(top_srcdir)/Makefile.mtest
+include $(top_srcdir)/Makefile_single.mtest
 
 EXTRA_DIST = testlist
 
@@ -18,6 +16,7 @@ noinst_PROGRAMS = \
     cartshift1    \
     cartsuball    \
     cartcreates   \
+    dims0         \
     dims1         \
     dims2         \
     dims3         \
@@ -30,3 +29,5 @@ noinst_PROGRAMS = \
     graphcr2      \
     distgraph1    \
     dgraph_unwgt
+
+noinst_HEADERS = baddims.h

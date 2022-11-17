@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -79,14 +77,9 @@ typedef struct MPIR_gccfloat128int_loctype {
     break
 
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_MAXLOC
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
-void MPIR_MAXLOC(void *invec, void *inoutvec, int *Len, MPI_Datatype * type)
+void MPIR_MAXLOC(void *invec, void *inoutvec, MPI_Aint * Len, MPI_Datatype * type)
 {
-    int mpi_errno = MPI_SUCCESS;
-    int i, len = *Len;
+    MPI_Aint i, len = *Len;
 
 #ifdef HAVE_FORTRAN_BINDING
 #ifndef HAVE_NO_FORTRAN_MPI_TYPES_IN_C
@@ -125,31 +118,14 @@ void MPIR_MAXLOC(void *invec, void *inoutvec, int *Len, MPI_Datatype * type)
             MPIR_MAXLOC_F_CASE(MPIR_FC_DOUBLE_CTYPE);
 #endif
 #endif
-            /* --BEGIN ERROR HANDLING-- */
-        default:{
-                MPIR_ERR_SET1(mpi_errno, MPI_ERR_OP, "**opundefined", "**opundefined %s",
-                              "MPI_MAXLOC");
-                {
-                    MPIR_Per_thread_t *per_thread = NULL;
-                    int err = 0;
-
-                    MPID_THREADPRIV_KEY_GET_ADDR(MPIR_ThreadInfo.isThreaded, MPIR_Per_thread_key,
-                                                 MPIR_Per_thread, per_thread, &err);
-                    MPIR_Assert(err == 0);
-                    per_thread->op_errno = mpi_errno;
-                }
-                break;
-            }
-            /* --END ERROR HANDLING-- */
+        default:
+            MPIR_Assert(0);
+            break;
     }
 
 }
 
 
-#undef FUNCNAME
-#define FUNCNAME MPIR_MAXLOC_check_dtype
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIR_MAXLOC_check_dtype(MPI_Datatype type)
 {
     int mpi_errno = MPI_SUCCESS;

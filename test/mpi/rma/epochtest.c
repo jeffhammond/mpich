@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2009 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -21,11 +19,13 @@
  *     fence                 fence
  */
 
+#include "mpitest.h"
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "mpitest.h"
 #include "dtpools.h"
+#include "mtest_dtp.h"
+#include <assert.h>
 
 /*
 static char MTEST_Descrip[] = "Put with Fences used to separate epochs";
@@ -33,265 +33,217 @@ static char MTEST_Descrip[] = "Put with Fences used to separate epochs";
 
 #define MAX_PERR 10
 
+int world_rank, world_size;
 
-int PrintRecvedError(const char *, MPI_Datatype, MPI_Datatype);
+int PrintRecvedError(const char *, const char *, const char *);
 
-int main(int argc, char **argv)
+static int epoch_test(int seed, int testsize, int count, const char *basic_type,
+                      mtest_mem_type_e origmem, mtest_mem_type_e targetmem)
 {
     int errs = 0, err;
-    int rank, size, orig, target;
-    int minsize = 2, count;
-    int i, j, len;
+    int rank, size, orig_rank, target_rank;
+    int minsize = 2;
+    int i;
     int onlyInt = 0;
     MPI_Aint origcount, targetcount;
     MPI_Comm comm;
     MPI_Win win;
     MPI_Aint extent, lb;
     MPI_Datatype origtype, targettype;
-    DTP_t orig_dtp, target_dtp;
-    char orig_name[MPI_MAX_OBJECT_NAME] = { 0 };
-    char target_name[MPI_MAX_OBJECT_NAME] = { 0 };
-    void *origbuf, *targetbuf;
+    DTP_pool_s dtp;
+    struct mtest_obj orig, target;
 
-    MTest_Init(&argc, &argv);
-
-#ifndef USE_DTP_POOL_TYPE__STRUCT       /* set in 'test/mpi/structtypetest.txt' to split tests */
-    MPI_Datatype basic_type;
-    char type_name[MPI_MAX_OBJECT_NAME] = { 0 };
-
-    err = MTestInitBasicSignature(argc, argv, &count, &basic_type);
-    if (err)
-        return MTestReturnValue(1);
-
-    err = DTP_pool_create(basic_type, count, &orig_dtp);
-    if (err != DTP_SUCCESS) {
-        MPI_Type_get_name(basic_type, type_name, &len);
-        fprintf(stdout, "Error while creating orig pool (%s,%d)\n", type_name, count);
-        fflush(stdout);
+    static char test_desc[200];
+    snprintf(test_desc, 200,
+             "./epoch_test -seed=%d -testsize=%d -type=%s -count=%d -origmem=%s -targetmem=%s",
+             seed, testsize, basic_type, count, MTest_memtype_name(origmem),
+             MTest_memtype_name(targetmem));
+    if (world_rank == 0) {
+        MTestPrintfMsg(1, " %s\n", test_desc);
     }
 
-    err = DTP_pool_create(basic_type, count, &target_dtp);
+    err = DTP_pool_create(basic_type, count, seed, &dtp);
     if (err != DTP_SUCCESS) {
-        MPI_Type_get_name(basic_type, type_name, &len);
-        fprintf(stdout, "Error while creating target pool (%s,%d)\n", type_name, count);
-        fflush(stdout);
+        fprintf(stderr, "Error while creating orig pool (%s,%d)\n", basic_type, count);
+        fflush(stderr);
     }
-#else
-    MPI_Datatype *basic_types = NULL;
-    int *basic_type_counts = NULL;
-    int basic_type_num;
-
-    err = MTestInitStructSignature(argc, argv, &basic_type_num, &basic_type_counts, &basic_types);
-    if (err)
-        return MTestReturnValue(1);
-
-    err = DTP_pool_create_struct(basic_type_num, basic_types, basic_type_counts, &orig_dtp);
-    if (err != DTP_SUCCESS) {
-        fprintf(stdout, "Error while creating struct pool\n");
-        fflush(stdout);
-    }
-
-    err = DTP_pool_create_struct(basic_type_num, basic_types, basic_type_counts, &target_dtp);
-    if (err != DTP_SUCCESS) {
-        fprintf(stdout, "Error while creating struct pool\n");
-        fflush(stdout);
-    }
-
-    /* this is ignored */
-    count = 0;
-#endif
 
     /* Check for a simple choice of communicator and datatypes */
     if (getenv("MTEST_SIMPLE"))
         onlyInt = 1;
 
+    if (MTestIsBasicDtype(dtp.DTP_base_type)) {
+        MPI_Type_get_extent(dtp.DTP_base_type, &lb, &extent);
+    } else {
+        /* if the base datatype is not a basic datatype, use an extent
+         * of 1 */
+        extent = 1;
+    }
+
+    MTest_dtp_obj_start(&orig, "origin", dtp, origmem, 0, false);
+    MTest_dtp_obj_start(&target, "target", dtp, targetmem, 1, true);
+
     while (MTestGetIntracommGeneral(&comm, minsize, 1)) {
-        if (comm == MPI_COMM_NULL)
+        if (comm == MPI_COMM_NULL) {
+            /* for NULL comms, make sure these processes create the
+             * same number of objects, so the target knows what
+             * datatype layout to check for */
+            errs += MTEST_CREATE_AND_FREE_DTP_OBJS(dtp, testsize);
+            errs += MTEST_CREATE_AND_FREE_DTP_OBJS(dtp, testsize);
             continue;
+        }
+
         /* Determine the sender and receiver */
         MPI_Comm_rank(comm, &rank);
         MPI_Comm_size(comm, &size);
-        orig = 0;
-        target = size - 1;
+        orig_rank = 0;
+        target_rank = size - 1;
 
-        for (i = 0; i < target_dtp->DTP_num_objs; i++) {
-            err = DTP_obj_create(target_dtp, i, 0, 0, 0);
-            if (err != DTP_SUCCESS) {
-                errs++;
-                break;
+        MPI_Win_create(target.buf, target.maxbufsize, extent, MPI_INFO_NULL, comm, &win);
+        /* To improve reporting of problems about operations, we
+         * change the error handler to errors return */
+        MPI_Win_set_errhandler(win, MPI_ERRORS_RETURN);
+
+        for (i = 0; i < testsize; i++) {
+            errs += MTest_dtp_create(&orig, true);
+            errs += MTest_dtp_create(&target, false);
+
+            errs += MTest_dtp_init(&orig, 0, 1, count);
+            errs += MTest_dtp_init(&target, -1, -1, count);
+
+            origcount = orig.dtp_obj.DTP_type_count;
+            origtype = orig.dtp_obj.DTP_datatype;
+
+            targetcount = target.dtp_obj.DTP_type_count;
+            targettype = target.dtp_obj.DTP_datatype;
+
+            /* At this point, we have all of the elements that we
+             * need to begin the multiple fence and put tests */
+            /* Fence 1 */
+            err = MPI_Win_fence(MPI_MODE_NOPRECEDE, win);
+            if (err) {
+                if (errs++ < MAX_PERR)
+                    MTestPrintError(err);
             }
 
-            targetcount = target_dtp->DTP_obj_array[i].DTP_obj_count;
-            targettype = target_dtp->DTP_obj_array[i].DTP_obj_type;
-            targetbuf = target_dtp->DTP_obj_array[i].DTP_obj_buf;
-
-            MPI_Type_get_extent(targettype, &lb, &extent);
-            MPI_Win_create(targetbuf, targetcount * extent + lb, extent, MPI_INFO_NULL, comm, &win);
-            /* To improve reporting of problems about operations, we
-             * change the error handler to errors return */
-            MPI_Win_set_errhandler(win, MPI_ERRORS_RETURN);
-
-            for (j = 0; j < orig_dtp->DTP_num_objs; j++) {
-                err = DTP_obj_create(orig_dtp, j, 0, 1, count);
-                if (err != DTP_SUCCESS) {
-                    errs++;
-                    break;
-                }
-
-                origcount = orig_dtp->DTP_obj_array[j].DTP_obj_count;
-                origtype = orig_dtp->DTP_obj_array[j].DTP_obj_type;
-                origbuf = orig_dtp->DTP_obj_array[j].DTP_obj_buf;
-
-                MPI_Type_get_name(targettype, target_name, &len);
-                MPI_Type_get_name(origtype, orig_name, &len);
-                MTestPrintfMsg(1,
-                               "Putting count = %d of origtype %s targettype %s\n",
-                               count, orig_name, target_name);
-
-                /* At this point, we have all of the elements that we
-                 * need to begin the multiple fence and put tests */
-                /* Fence 1 */
-                err = MPI_Win_fence(MPI_MODE_NOPRECEDE, win);
+            if (rank == orig_rank) {
+                err = MPI_Put((char *) orig.buf + orig.dtp_obj.DTP_buf_offset, origcount, origtype,
+                              target_rank, target.dtp_obj.DTP_buf_offset / extent, targetcount,
+                              targettype, win);
                 if (err) {
                     if (errs++ < MAX_PERR)
                         MTestPrintError(err);
                 }
-
-                if (rank == orig) {
-                    err =
-                        MPI_Put(origbuf, origcount, origtype, target, 0, targetcount, targettype,
-                                win);
-                    if (err) {
-                        if (errs++ < MAX_PERR)
-                            MTestPrintError(err);
-                    }
-                }
-
-                /* Fence 2 */
-                err = MPI_Win_fence(0, win);
-                if (err) {
-                    if (errs++ < MAX_PERR)
-                        MTestPrintError(err);
-                }
-                /* target checks data, then target puts */
-                if (rank == target) {
-                    err = DTP_obj_buf_check(target_dtp, i, 0, 1, count);
-                    if (err) {
-                        if (errs++ < MAX_PERR) {
-                            PrintRecvedError("fence2", origtype, targettype);
-                        }
-                    }
-
-                    err = MPI_Put(origbuf, origcount,
-                                  origtype, orig, 0, targetcount, targettype, win);
-                    if (err) {
-                        if (errs++ < MAX_PERR)
-                            MTestPrintError(err);
-                    }
-                }
-
-                /* Fence 3 */
-                err = MPI_Win_fence(0, win);
-                if (err) {
-                    if (errs++ < MAX_PERR)
-                        MTestPrintError(err);
-                }
-                /* src checks data, then Src and target puts */
-                if (rank == orig) {
-                    err = DTP_obj_buf_check(target_dtp, i, 0, 1, count);
-                    if (err != DTP_SUCCESS) {
-                        if (errs++ < MAX_PERR) {
-                            PrintRecvedError("fence3", origtype, targettype);
-                        }
-                    }
-
-                    err =
-                        MPI_Put(origbuf, origcount, origtype, target, 0, targetcount, targettype,
-                                win);
-                    if (err) {
-                        if (errs++ < MAX_PERR)
-                            MTestPrintError(err);
-                    }
-                }
-                if (rank == target) {
-                    err = MPI_Put(origbuf, origcount,
-                                  origtype, orig, 0, targetcount, targettype, win);
-                    if (err) {
-                        if (errs++ < MAX_PERR)
-                            MTestPrintError(err);
-                    }
-                }
-
-                /* Fence 4 */
-                err = MPI_Win_fence(MPI_MODE_NOSUCCEED, win);
-                if (err) {
-                    if (errs++ < MAX_PERR)
-                        MTestPrintError(err);
-                }
-                /* src and target checks data */
-                if (rank == orig) {
-                    err = DTP_obj_buf_check(target_dtp, i, 0, 1, count);
-                    if (err != DTP_SUCCESS) {
-                        if (errs++ < MAX_PERR) {
-                            PrintRecvedError("src fence4", origtype, targettype);
-                        }
-                    }
-                }
-                if (rank == target) {
-                    err = DTP_obj_buf_check(target_dtp, i, 0, 1, count);
-                    if (err != DTP_SUCCESS) {
-                        if (errs++ < MAX_PERR) {
-                            PrintRecvedError("target fence4", origtype, targettype);
-                        }
-                    }
-                }
-
-                DTP_obj_free(orig_dtp, j);
-                /* Only do one datatype in the simple case */
-                if (onlyInt)
-                    break;
             }
-            MPI_Win_free(&win);
-            DTP_obj_free(target_dtp, i);
+
+            /* Fence 2 */
+            err = MPI_Win_fence(0, win);
+            if (err) {
+                if (errs++ < MAX_PERR)
+                    MTestPrintError(err);
+            }
+            /* target checks data, then target puts */
+            if (rank == target_rank) {
+                errs += MTest_dtp_check(&target, 0, 1, count, &orig, errs < MAX_PERR);
+
+                err = MPI_Put((char *) orig.buf + orig.dtp_obj.DTP_buf_offset,
+                              origcount, origtype, orig_rank,
+                              target.dtp_obj.DTP_buf_offset / extent, targetcount, targettype, win);
+                if (err) {
+                    if (errs++ < MAX_PERR)
+                        MTestPrintError(err);
+                }
+            }
+
+            /* Fence 3 */
+            err = MPI_Win_fence(0, win);
+            if (err) {
+                if (errs++ < MAX_PERR)
+                    MTestPrintError(err);
+            }
+            /* src checks data, then Src and target puts */
+            if (rank == orig_rank) {
+                errs += MTest_dtp_check(&target, 0, 1, count, &orig, errs < MAX_PERR);
+
+                err = MPI_Put((char *) orig.buf + orig.dtp_obj.DTP_buf_offset, origcount, origtype,
+                              target_rank, target.dtp_obj.DTP_buf_offset / extent, targetcount,
+                              targettype, win);
+                if (err) {
+                    if (errs++ < MAX_PERR)
+                        MTestPrintError(err);
+                }
+            }
+            if (rank == target_rank) {
+                err = MPI_Put((char *) orig.buf + orig.dtp_obj.DTP_buf_offset,
+                              origcount, origtype, orig_rank,
+                              target.dtp_obj.DTP_buf_offset / extent, targetcount, targettype, win);
+                if (err) {
+                    if (errs++ < MAX_PERR)
+                        MTestPrintError(err);
+                }
+            }
+
+            /* Fence 4 */
+            err = MPI_Win_fence(MPI_MODE_NOSUCCEED, win);
+            if (err) {
+                if (errs++ < MAX_PERR)
+                    MTestPrintError(err);
+            }
+            /* src and target checks data */
+            if (rank == orig_rank) {
+                errs += MTest_dtp_check(&target, 0, 1, count, &orig, errs < MAX_PERR);
+            }
+            if (rank == target_rank) {
+                errs += MTest_dtp_check(&target, 0, 1, count, &orig, errs < MAX_PERR);
+            }
+
+            MTest_dtp_destroy(&orig);
+            MTest_dtp_destroy(&target);
 
             /* Only do one count in the simple case */
             if (onlyInt)
                 break;
         }
+        MPI_Win_free(&win);
         MTestFreeComm(&comm);
         /* Only do one communicator in the simple case */
         if (onlyInt)
             break;
     }
 
-    DTP_pool_free(orig_dtp);
-    DTP_pool_free(target_dtp);
+    MTest_dtp_obj_finish(&orig);
+    MTest_dtp_obj_finish(&target);
+    DTP_pool_free(dtp);
 
-#ifdef USE_DTP_POOL_TYPE__STRUCT
-    /* cleanup array if any */
-    if (basic_types) {
-        free(basic_types);
+    return errs;
+}
+
+int PrintRecvedError(const char *msg, const char *orig_name, const char *target_name)
+{
+    printf
+        ("At step %s, Data in target buffer did not match for destination datatype %s (put with orig datatype %s)\n",
+         msg, orig_name, target_name);
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    int errs = 0;
+
+    MTest_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+    struct dtp_args dtp_args;
+    dtp_args_init(&dtp_args, MTEST_DTP_RMA, argc, argv);
+    while (dtp_args_get_next(&dtp_args)) {
+        errs += epoch_test(dtp_args.seed, dtp_args.testsize,
+                           dtp_args.count, dtp_args.basic_type,
+                           dtp_args.u.rma.origmem, dtp_args.u.rma.targetmem);
+
     }
-    if (basic_type_counts) {
-        free(basic_type_counts);
-    }
-#endif
+    dtp_args_finalize(&dtp_args);
 
     MTest_Finalize(errs);
     return MTestReturnValue(errs);
-}
-
-int PrintRecvedError(const char *msg, MPI_Datatype origtype, MPI_Datatype targettype)
-{
-    int len;
-    char orig_name[MPI_MAX_OBJECT_NAME] = { 0 };
-    char target_name[MPI_MAX_OBJECT_NAME] = { 0 };
-
-    MPI_Type_get_name(origtype, orig_name, &len);
-    MPI_Type_get_name(targettype, target_name, &len);
-
-    printf
-        ("At step %s, Data in target buffer did not match for targetination datatype %s (put with orig datatype %s)\n",
-         msg, orig_name, target_name);
-    return 0;
 }

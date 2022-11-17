@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2013 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -15,10 +15,11 @@
 #define MIN_NUM_ITERATIONS 8
 #define NUM_WARMUP_ITER 1
 
+int max_num_iterations = MAX_NUM_ITERATIONS;
 const int verbose = 0;
 static int rank;
 
-void run_test(int lock_mode, int lock_assert)
+static void run_test(int lock_mode, int lock_assert)
 {
     int nproc, test_iter, target_rank, data_size;
     int *buf, *win_buf;
@@ -32,20 +33,17 @@ void run_test(int lock_mode, int lock_assert)
 
         printf("Synchronization mode: ");
 
-        switch (lock_mode) {
-            case MPI_LOCK_EXCLUSIVE:
-                printf("Exclusive lock");
-                break;
-            case MPI_LOCK_SHARED:
-                printf("Shared lock");
-                break;
-            default:
-                printf("Unknown lock");
-                break;
+        if (lock_mode == MPI_LOCK_EXCLUSIVE) {
+            printf("Exclusive lock");
+        } else if (lock_mode == MPI_LOCK_SHARED) {
+            printf("Shared lock");
+        } else {
+            printf("Unknown lock");
         }
 
-        if (lock_assert & MPI_MODE_NOCHECK)
+        if (lock_assert & MPI_MODE_NOCHECK) {
             printf(", MPI_MODE_NOCHECK");
+        }
 
         printf("\n");
     }
@@ -64,7 +62,7 @@ void run_test(int lock_mode, int lock_assert)
     for (target_rank = 0; rank == 0 && target_rank < nproc; target_rank++) {
         for (data_size = sizeof(double); data_size <= MAX_DATA_SIZE; data_size *= 2) {
             double t_get, t_put, t_acc;
-            int num_iter = MAX_NUM_ITERATIONS;
+            int num_iter = max_num_iterations;
 
             /* Scale the number of iterations by log_2 of the data size, so
              * that we run each test for a reasonable amount of time. */
@@ -103,7 +101,7 @@ void run_test(int lock_mode, int lock_assert)
 
                 MPI_Win_lock(lock_mode, target_rank, lock_assert, win);
                 MPI_Accumulate(buf, data_size / sizeof(int), MPI_INT, target_rank,
-                               0, data_size / sizeof(int), MPI_INT, MPI_SUM, win);
+                               0, data_size / sizeof(int), MPI_INT, MPI_BXOR, win);
                 MPI_Win_unlock(target_rank, win);
             }
             t_acc = (MPI_Wtime() - t_acc) / num_iter;
@@ -125,8 +123,11 @@ void run_test(int lock_mode, int lock_assert)
 
 int main(int argc, char **argv)
 {
-    MTest_Init(&argc, &argv);
+    MTestArgList *head = MTestArgListCreate(argc, argv);
+    max_num_iterations = MTestArgListGetInt_with_default(head, "iter", MAX_NUM_ITERATIONS);
+    MTestArgListDestroy(head);
 
+    MTest_Init(&argc, &argv);
     run_test(MPI_LOCK_EXCLUSIVE, 0);
     run_test(MPI_LOCK_EXCLUSIVE, MPI_MODE_NOCHECK);
     run_test(MPI_LOCK_SHARED, 0);

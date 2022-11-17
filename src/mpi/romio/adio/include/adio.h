@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* main include file for ADIO.
@@ -86,23 +85,23 @@
 #define FDTYPE HANDLE
 #else
 #define FDTYPE int
+#ifdef ROMIO_QUOBYTEFS
+#include "quobyte.h"
+#endif
 #endif
 
+typedef MPI_Offset ADIO_Offset;
 #ifdef MPI_OFFSET_IS_INT
-typedef int ADIO_Offset;
 #define ADIO_OFFSET MPI_INT
 #elif defined(HAVE_LONG_LONG_64)
-typedef long long ADIO_Offset;
 #ifdef HAVE_MPI_LONG_LONG_INT
 #define ADIO_OFFSET MPI_LONG_LONG_INT
 #else
 #define ADIO_OFFSET MPI_DOUBLE
 #endif
 #elif defined(HAVE_INT64)
-typedef __int64 ADIO_Offset;
 #define ADIO_OFFSET MPI_DOUBLE
 #else
-typedef long ADIO_Offset;
 #define ADIO_OFFSET MPI_LONG
 #endif
 
@@ -237,7 +236,10 @@ typedef struct ADIOI_FileD {
     MPI_Win io_buf_put_amounts_window;  /* Window over the io_buf_put_amounts */
     /* External32 */
     int is_external32;          /* bool:  0 means native view */
-
+#ifdef ROMIO_QUOBYTEFS
+    struct quobyte_fh *file_handle;     /* file handle for quobytefs */
+#endif
+    int dirty_write;            /* this client has written data */
 } ADIOI_FileD;
 
 typedef struct ADIOI_FileD *ADIO_File;
@@ -287,8 +289,10 @@ typedef struct {
 #define ADIO_PVFS2               160    /* PVFS2: 2nd generation PVFS */
 #define ADIO_PANFS               161    /* Panasas FS */
 #define ADIO_LUSTRE              163    /* Lustre */
-#define ADIO_GPFS                  168
+#define ADIO_GPFS                168
 #define ADIO_IME                 169    /* IME burst buffer */
+#define ADIO_DAOS                170
+#define ADIO_QUOBYTEFS           171    /* Quobyte FS */
 
 #define ADIO_SEEK_SET            SEEK_SET
 #define ADIO_SEEK_CUR            SEEK_CUR
@@ -315,11 +319,24 @@ typedef struct {
 #define ADIO_SCALABLE_RESIZE     307    /* file system supports resizing from one
                                          * processor (nfs, e.g. does not) */
 
+#define ADIO_IMMEDIATELY_VISIBLE 308    /* a write from one client immediately
+                                         * visible on other clients (POSIX semantics) */
+
 /* for default file permissions */
 #define ADIO_PERM_NULL           -1
 
 #define ADIOI_FILE_COOKIE 2487376
 #define ADIOI_REQ_COOKIE 3493740
+
+/* In collective read/write using send/recv for data exchange in multiple iterations,
+ * use following tag for consistency.
+ */
+/* Note: originally we used the formula - myrank + rank + 100 * iter. This is not
+ * safe since iter can be very large for huge messages and potentially exceed tag
+ * limit. Since we don't really need source/dest in the tag, and the message matching
+ * order is guaranteed, a constant tag will do.
+ */
+#define ADIOI_COLL_TAG(rank,iter) 0
 
 /* ADIO function prototypes */
 /* all these may not be necessary, as many of them are macro replaced to
@@ -335,17 +352,17 @@ MPI_File ADIO_Open(MPI_Comm orig_comm, MPI_Comm comm, const char *filename,
 void ADIOI_OpenColl(ADIO_File fd, int rank, int acces_mode, int *error_code);
 void ADIO_ImmediateOpen(ADIO_File fd, int *error_code);
 void ADIO_Close(ADIO_File fd, int *error_code);
-void ADIO_ReadContig(ADIO_File fd, void *buf, int count, MPI_Datatype datatype,
+void ADIO_ReadContig(ADIO_File fd, void *buf, MPI_Aint count, MPI_Datatype datatype,
                      int file_ptr_type, ADIO_Offset offset, ADIO_Status * status, int *error_code);
-void ADIO_WriteContig(ADIO_File fd, void *buf, int count,
+void ADIO_WriteContig(ADIO_File fd, void *buf, MPI_Aint count,
                       MPI_Datatype datatype, int file_ptr_type,
                       ADIO_Offset offset, int *bytes_written, int
                       *error_code);
-void ADIO_IwriteContig(ADIO_File fd, void *buf, int count,
+void ADIO_IwriteContig(ADIO_File fd, void *buf, MPI_Aint count,
                        MPI_Datatype datatype, int file_ptr_type,
                        ADIO_Offset offset, ADIO_Request * request, int
                        *error_code);
-void ADIO_IreadContig(ADIO_File fd, void *buf, int count,
+void ADIO_IreadContig(ADIO_File fd, void *buf, MPI_Aint count,
                       MPI_Datatype datatype, int file_ptr_type,
                       ADIO_Offset offset, ADIO_Request * request, int
                       *error_code);
@@ -359,34 +376,34 @@ void ADIO_ReadComplete(ADIO_Request * request, ADIO_Status * status, int
 void ADIO_WriteComplete(ADIO_Request * request, ADIO_Status * status, int *error_code);
 void ADIO_Fcntl(ADIO_File fd, int flag, ADIO_Fcntl_t * fcntl_struct, int
                 *error_code);
-void ADIO_ReadStrided(ADIO_File fd, void *buf, int count,
+void ADIO_ReadStrided(ADIO_File fd, void *buf, MPI_Aint count,
                       MPI_Datatype datatype, int file_ptr_type,
                       ADIO_Offset offset, ADIO_Status * status, int
                       *error_code);
-void ADIO_WriteStrided(ADIO_File fd, const void *buf, int count,
+void ADIO_WriteStrided(ADIO_File fd, const void *buf, MPI_Aint count,
                        MPI_Datatype datatype, int file_ptr_type,
                        ADIO_Offset offset, ADIO_Status * status, int
                        *error_code);
-void ADIO_ReadStridedColl(ADIO_File fd, void *buf, int count,
+void ADIO_ReadStridedColl(ADIO_File fd, void *buf, MPI_Aint count,
                           MPI_Datatype datatype, int file_ptr_type,
                           ADIO_Offset offset, ADIO_Status * status, int
                           *error_code);
-void ADIO_WriteStridedColl(ADIO_File fd, void *buf, int count,
+void ADIO_WriteStridedColl(ADIO_File fd, void *buf, MPI_Aint count,
                            MPI_Datatype datatype, int file_ptr_type,
                            ADIO_Offset offset, ADIO_Status * status, int
                            *error_code);
-void ADIO_IreadStrided(ADIO_File fd, void *buf, int count,
+void ADIO_IreadStrided(ADIO_File fd, void *buf, MPI_Aint count,
                        MPI_Datatype datatype, int file_ptr_type,
                        ADIO_Offset offset, ADIO_Request * request, int
                        *error_code);
-void ADIO_IwriteStrided(ADIO_File fd, void *buf, int count,
+void ADIO_IwriteStrided(ADIO_File fd, void *buf, MPI_Aint count,
                         MPI_Datatype datatype, int file_ptr_type,
                         ADIO_Offset offset, ADIO_Request * request, int
                         *error_code);
-void ADIO_IreadStridedColl(ADIO_File fd, void *buf, int count,
+void ADIO_IreadStridedColl(ADIO_File fd, void *buf, MPI_Aint count,
                            MPI_Datatype datatype, int file_ptr_type,
                            ADIO_Offset offset, ADIO_Request * request, int *error_code);
-void ADIO_IwriteStridedColl(ADIO_File fd, void *buf, int count,
+void ADIO_IwriteStridedColl(ADIO_File fd, void *buf, MPI_Aint count,
                             MPI_Datatype datatype, int file_ptr_type,
                             ADIO_Offset offset, ADIO_Request * request, int *error_code);
 ADIO_Offset ADIO_SeekIndividual(ADIO_File fd, ADIO_Offset offset, int whence, int *error_code);
@@ -394,8 +411,8 @@ void ADIO_Delete(char *filename, int *error_code);
 void ADIO_Flush(ADIO_File fd, int *error_code);
 void ADIO_Resize(ADIO_File fd, ADIO_Offset size, int *error_code);
 void ADIO_SetInfo(ADIO_File fd, MPI_Info users_info, int *error_code);
-void ADIO_ResolveFileType(MPI_Comm comm, const char *filename, int *fstype,
-                          ADIOI_Fns ** ops, int *error_code);
+int ADIO_ResolveFileType(MPI_Comm comm, const char *filename, int *fstype,
+                         ADIOI_Fns ** ops, int *error_code);
 void ADIO_Get_shared_fp(ADIO_File fd, ADIO_Offset size, ADIO_Offset * shared_fp, int *error_code);
 void ADIO_Set_shared_fp(ADIO_File fd, ADIO_Offset offset, int *error_code);
 void ADIO_Set_view(ADIO_File fd, ADIO_Offset disp, MPI_Datatype etype,
@@ -425,7 +442,7 @@ int MPIO_Err_create_code(int lastcode, int fatal, const char fcname[],
 int MPIO_Err_return_file(MPI_File mpi_fh, int error_code);
 int MPIO_Err_return_comm(MPI_Comm mpi_comm, int error_code);
 
-/* request managment helper functions */
+/* request management helper functions */
 void MPIO_Completed_request_create(MPI_File * fh, MPI_Offset nbytes,
                                    int *error_code, MPI_Request * request);
 

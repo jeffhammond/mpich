@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2017 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpi.h"
@@ -16,7 +15,7 @@ MPI_Win win[NUM_THREADS];
 int *win_mem[NUM_THREADS];
 int rank, nprocs;
 int thread_errs[NUM_THREADS];
-MTEST_THREAD_RETURN_TYPE run_test(void *arg)
+static MTEST_THREAD_RETURN_TYPE run_test(void *arg)
 {
     int i;
     int *local_b;

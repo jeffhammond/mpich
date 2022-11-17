@@ -1,33 +1,21 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpidimpl.h"
 
-#ifdef USE_PMI2_API
-#include "pmi2.h"
-#else
-#include "pmi.h"
-#endif
-
 /* FIXME: This routine *or* MPI_Abort should provide abort callbacks,
    similar to the support in MPI_Finalize */
 
-#undef FUNCNAME
-#define FUNCNAME MPID_Abort
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_Abort(MPIR_Comm * comm, int mpi_errno, int exit_code,
 	       const char *error_msg)
 {
     int rank;
     char msg[MPI_MAX_ERROR_STRING] = "";
     char error_str[MPI_MAX_ERROR_STRING + 100];
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_ABORT);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_ABORT);
+    MPIR_FUNC_ENTER;
 
     if (error_msg == NULL) {
 	/* Create a default error message */
@@ -42,14 +30,7 @@ int MPID_Abort(MPIR_Comm * comm, int mpi_errno, int exit_code,
 	}
 	else
 	{
-	    if (MPIR_Process.comm_world != NULL)
-	    {
-		rank = MPIR_Process.comm_world->rank;
-	    }
-	    else
-	    {
-		rank = -1;
-	    }
+            rank = MPIR_Process.rank;
 	}
 
 	if (mpi_errno != MPI_SUCCESS)
@@ -65,9 +46,6 @@ int MPID_Abort(MPIR_Comm * comm, int mpi_errno, int exit_code,
 	}
     }
     
-    MPIDU_Ftb_publish_me(MPIDU_FTB_EV_ABORT);
-    MPIDU_Ftb_finalize();
-    
 #ifdef HAVE_DEBUGGER_SUPPORT
     MPIR_Debugger_set_aborting( error_msg );
 #endif
@@ -82,20 +60,15 @@ int MPID_Abort(MPIR_Comm * comm, int mpi_errno, int exit_code,
     MPL_error_printf("%s\n", error_msg);
     fflush(stderr);
 
-    /* FIXME: What is the scope for PMI_Abort?  Shouldn't it be one or more
-       process groups?  Shouldn't abort of a communicator abort either the
-       process groups of the communicator or only the current process?
-       Should PMI_Abort have a parameter for which of these two cases to
-       perform? */
-#ifdef USE_PMI2_API
-    PMI2_Abort(TRUE, error_msg);
-#else
-    PMI_Abort(exit_code, error_msg);
-#endif
+    if (MPIR_CVAR_COREDUMP_ON_ABORT) {
+        abort();
+    }
+
+    MPIR_pmi_abort(exit_code, error_msg);
 
     /* pmi_abort should not return but if it does, exit here.  If it does,
        add the function exit code before calling the final exit.  */
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_ABORT);
+    MPIR_FUNC_EXIT;
     MPL_exit(exit_code);
 
     return MPI_ERR_INTERN;

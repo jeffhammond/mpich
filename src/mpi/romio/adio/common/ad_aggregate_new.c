@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   Copyright (C) 2008 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -71,7 +70,7 @@ void ADIOI_Calc_file_realms(ADIO_File fd, ADIO_Offset min_st_offset, ADIO_Offset
         *file_realm_st_offs = min_st_offset;
         MPI_Type_contiguous((max_end_offset - min_st_offset + 1), MPI_BYTE, file_realm_types);
         MPI_Type_commit(file_realm_types);
-        ADIOI_Flatten_datatype(*file_realm_types);
+        ADIOI_Flatten_and_find(*file_realm_types);
     } else if (fd->file_realm_st_offs == NULL) {
         file_realm_st_offs = (ADIO_Offset *)
             ADIOI_Malloc(nprocs_for_coll * sizeof(ADIO_Offset));
@@ -85,13 +84,13 @@ void ADIOI_Calc_file_realms(ADIO_File fd, ADIO_Offset min_st_offset, ADIO_Offset
                                        file_realm_st_offs, file_realm_types);
             /* flatten file realm datatype for future use - only one
              * because all are the same*/
-            ADIOI_Flatten_datatype(file_realm_types[0]);
+            ADIOI_Flatten_and_find(file_realm_types[0]);
         } else if (file_realm_calc_type == ADIOI_FR_FSZ) {
             ADIOI_Calc_file_realms_fsize(fd, nprocs_for_coll, max_end_offset,
                                          file_realm_st_offs, file_realm_types);
             /* flatten file realm datatype for future use - only one
              * because all are the same*/
-            ADIOI_Flatten_datatype(file_realm_types[0]);
+            ADIOI_Flatten_and_find(file_realm_types[0]);
         } else if (file_realm_calc_type == ADIOI_FR_USR_REALMS) {
             /* copy user provided realm datatypes and realm offsets in
              * hints to file descriptor. may also want to verify that
@@ -102,7 +101,7 @@ void ADIOI_Calc_file_realms(ADIO_File fd, ADIO_Offset min_st_offset, ADIO_Offset
                                              nprocs_for_coll, file_realm_st_offs, file_realm_types);
             /* flatten file realm datatype for future use - only one
              * because all are the same */
-            ADIOI_Flatten_datatype(file_realm_types[0]);
+            ADIOI_Flatten_and_find(file_realm_types[0]);
         }
     }
     fd->file_realm_st_offs = file_realm_st_offs;
@@ -132,14 +131,15 @@ void ADIOI_Calc_file_realms_user_size(ADIO_File fd, int fr_size,
         file_realm_st_offs[0] = aligned_fr_off;
     file_realm_types[0] = simpletype;
 #ifdef DEBUG
-    printf("file_realm[0] = (%lld, %d)\n", file_realm_st_offs[0], fr_size);
+    printf("file_realm[0] = (%lld, %d)\n", (long long) file_realm_st_offs[0], fr_size);
 #endif
 
     for (i = 1; i < nprocs_for_coll; i++) {
         file_realm_st_offs[i] = file_realm_st_offs[i - 1] + fr_size;
         file_realm_types[i] = simpletype;
 #ifdef DEBUG
-        printf("file_realm[%d] = (%lld, %d)\n", i, file_realm_st_offs[i], aligned_fr_size);
+        printf("file_realm[%d] = (%lld, %d)\n", i, (long long) file_realm_st_offs[i],
+               aligned_fr_size);
 #endif
     }
 }
@@ -168,13 +168,13 @@ void ADIOI_Calc_file_realms_aar(ADIO_File fd, int nprocs_for_coll, int cb_pfr,
     file_realm_types[0] = simpletype;
 
 #ifdef DEBUG
-    printf("file_realm[0] = (%lld, %d)\n", file_realm_st_offs[0], fr_size);
+    printf("file_realm[0] = (%lld, %d)\n", (long long) file_realm_st_offs[0], fr_size);
 #endif
     for (i = 1; i < nprocs_for_coll; i++) {
         file_realm_st_offs[i] = file_realm_st_offs[i - 1] + fr_size;
         file_realm_types[i] = simpletype;
 #ifdef DEBUG
-        printf("file_realm[%d] = (%lld, %d)\n", i, file_realm_st_offs[i], fr_size);
+        printf("file_realm[%d] = (%lld, %d)\n", i, (long long) file_realm_st_offs[i], fr_size);
 #endif
     }
     if (fd->hints->cb_pfr == ADIOI_HINT_ENABLE) {
@@ -210,18 +210,16 @@ void ADIOI_Calc_file_realms_fsize(ADIO_File fd, int nprocs_for_coll,
 /* creates a datatype with an empty trailing edge */
 void ADIOI_Create_fr_simpletype(int size, int nprocs_for_coll, MPI_Datatype * simpletype)
 {
-    int count = 2, blocklens[2];
-    MPI_Aint indices[2];
-    MPI_Datatype old_types[2];
+    MPI_Aint lb, ub;
+    MPI_Datatype type;
 
-    blocklens[0] = size;
-    blocklens[1] = 1;
-    indices[0] = 0;
-    indices[1] = size * nprocs_for_coll;
-    old_types[0] = MPI_BYTE;
-    old_types[1] = MPI_UB;
+    lb = 0;
+    ub = size * nprocs_for_coll;
 
-    MPI_Type_struct(count, blocklens, indices, old_types, simpletype);
+    MPI_Type_contiguous(size, MPI_BYTE, &type);
+    MPI_Type_create_resized(type, lb, ub, simpletype);
+
+    MPI_Type_free(&type);
 
     MPI_Type_commit(simpletype);
 }

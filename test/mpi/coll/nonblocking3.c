@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2011 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test attempts to execute multiple simultaneous nonblocking collective
@@ -13,12 +12,12 @@
  * - post operations on multiple comms from multiple threads
  */
 
+#include "mpitest.h"
 #include "mpi.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include "mpitest.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -123,7 +122,7 @@ static void cleanup_laundry(struct laundry *l)
 }
 
 /* Starts a "random" operation on "comm" corresponding to "rndnum" and returns
- * in (*req) a request handle corresonding to that operation.  This call should
+ * in (*req) a request handle corresponding to that operation.  This call should
  * be considered collective over comm (with a consistent value for "rndnum"),
  * even though the operation may only be a point-to-point request. */
 static void start_random_nonblocking(MPI_Comm comm, unsigned int rndnum, MPI_Request * req,
@@ -415,12 +414,6 @@ static void check_after_completion(struct laundry *l)
     MPI_Comm comm = l->comm;
     int *buf = l->buf;
     int *recvbuf = l->recvbuf;
-    int *sendcounts = l->sendcounts;
-    int *recvcounts = l->recvcounts;
-    int *sdispls = l->sdispls;
-    int *rdispls = l->rdispls;
-    int *sendtypes = l->sendtypes;
-    int *recvtypes = l->recvtypes;
     char *buf_alias = (char *) buf;
 
     MPI_Comm_rank(comm, &rank);
@@ -617,9 +610,7 @@ static void check_after_completion(struct laundry *l)
 
         case 18:       /* MPI_Iexscan */
             for (i = 0; i < COUNT; ++i) {
-                if (rank == 0)
-                    my_assert(recvbuf[i] == 0xdeadbeef);
-                else
+                if (rank != 0)
                     my_assert(recvbuf[i] ==
                               ((rank * (rank + 1) / 2) + (i * (rank + 1)) - (rank + i)));
             }

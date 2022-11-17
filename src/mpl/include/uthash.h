@@ -1,9 +1,8 @@
-/* MPICH changes:
- *
- * - some configure-time checking for __typeof() support was added
- * - intentionally omitted from "mpl.h" in order to require using code to opt-in
- * - override malloc/free/realloc to call MPL routines
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 /*
 Copyright (c) 2003-2017, Troy D. Hanson     http://troydhanson.github.com/uthash/
 All rights reserved.
@@ -26,6 +25,14 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+/* MPICH changes:
+ *
+ * - some configure-time checking for __typeof() support was added
+ * - intentionally omitted from "mpl.h" in order to require using code to opt-in
+ * - override malloc/free/realloc to call MPL routines
+ * - check head first before calculating HASH_VALUE in HASH_FIND
+ */
 
 #ifndef UTHASH_H_INCLUDED
 #define UTHASH_H_INCLUDED
@@ -70,23 +77,6 @@ do {                                                                            
 do {                                                                             \
   (dst) = DECLTYPE(dst)(src);                                                    \
 } while (0)
-#endif
-
-/* a number of the hash function use uint32_t which isn't defined on Pre VS2010 */
-#if defined(_WIN32)
-#if defined(_MSC_VER) && _MSC_VER >= 1600
-#include <stdint.h>
-#elif defined(__WATCOMC__) || defined(__MINGW32__) || defined(__CYGWIN__)
-#include <stdint.h>
-#else
-typedef unsigned int uint32_t;
-typedef unsigned char uint8_t;
-#endif
-#elif defined(__GNUC__) && !defined(__VXWORKS__)
-#include <stdint.h>
-#else
-typedef unsigned int uint32_t;
-typedef unsigned char uint8_t;
 #endif
 
 #ifndef uthash_fatal
@@ -142,8 +132,11 @@ do {                                                                            
 #define HASH_FIND(hh,head,keyptr,keylen,out)                                     \
 do {                                                                             \
   unsigned _hf_hashv;                                                            \
-  HASH_VALUE(keyptr, keylen, _hf_hashv);                                         \
-  HASH_FIND_BYHASHVALUE(hh, head, keyptr, keylen, _hf_hashv, out);               \
+  (out) = NULL;                                                                  \
+  if (head) {                                                                    \
+    HASH_VALUE(keyptr, keylen, _hf_hashv);                                       \
+    HASH_FIND_BYHASHVALUE(hh, head, keyptr, keylen, _hf_hashv, out);             \
+  }                                                                              \
 } while (0)
 
 #ifdef HASH_BLOOM

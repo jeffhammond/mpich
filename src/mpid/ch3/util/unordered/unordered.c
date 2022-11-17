@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -21,17 +20,12 @@ int MPIDI_CH3U_Handle_unordered_recv_pkt(MPIDI_VC_t * vc, MPIDI_CH3_Pkt_t * pkt)
 #define MPIDI_CH3U_Pkt_send_container_alloc() (MPL_malloc(sizeof(MPIDI_CH3_Pkt_send_container_t), MPL_MEM_BUFFER))
 #define MPIDI_CH3U_Pkt_send_container_free(pc_) MPL_free(pc_)
 
-#undef FUNCNAME
-#define FUNCNAME MPIDI_CH3U_Handle_unordered_recv_pkt
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPIDI_CH3U_Handle_unordered_recv_pkt(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t * pkt,
 					 MPIR_Request ** rreqp)
 {
     int mpi_errno = MPI_SUCCESS;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPIDI_CH3U_HANDLE_UNORDERED_RECV_PKT);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPIDI_CH3U_HANDLE_UNORDERED_RECV_PKT);
+    MPIR_FUNC_ENTER;
 
     /* FIXME: This should probably be *rreqp = NULL? */
     rreqp = NULL;
@@ -76,7 +70,7 @@ int MPIDI_CH3U_Handle_unordered_recv_pkt(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t * pkt,
 		    /* --BEGIN ERROR HANDLING-- */
 		    if (mpi_errno != MPI_SUCCESS)
 		    {
-			mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_FATAL, FCNAME, __LINE__, MPI_ERR_OTHER,
+			mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_FATAL, __func__, __LINE__, MPI_ERR_OTHER,
 							 "**ch3|pktordered", 0);
 			goto fn_exit;
 		    }
@@ -97,7 +91,7 @@ int MPIDI_CH3U_Handle_unordered_recv_pkt(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t * pkt,
 		/* --BEGIN ERROR HANDLING-- */
 		if (pc_new == NULL)
 		{
-		    mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_FATAL, FCNAME, __LINE__, MPI_ERR_OTHER,
+		    mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_FATAL, __func__, __LINE__, MPI_ERR_OTHER,
 						     "**ch3|nopktcontainermem", 0);
 		    goto fn_exit;
 		}
@@ -110,7 +104,7 @@ int MPIDI_CH3U_Handle_unordered_recv_pkt(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t * pkt,
 		while (pc_cur != NULL)
 		{
 		    /* the current recv seqnum is subtracted from both the 
-		       seqnums prior to comparision so as to remove any wrap
+		       seqnums prior to comparison so as to remove any wrap
 		       around effects. */
 		    if (pc_new->pkt.seqnum - vc->seqnum_recv < 
 			pc_cur->pkt.seqnum - vc->seqnum_recv)
@@ -142,7 +136,7 @@ int MPIDI_CH3U_Handle_unordered_recv_pkt(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t * pkt,
 	    /* --BEGIN ERROR HANDLING-- */
 	    /* FIXME: processing send cancel requests requires that we be 
 	       aware of pkts in the reorder queue */
-	    mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, FCNAME, __LINE__, MPI_ERR_OTHER,
+	    mpi_errno = MPIR_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE, __func__, __LINE__, MPI_ERR_OTHER,
 					     "**ch3|ooocancelreq", 0);
 	    goto fn_exit;
 	    break;
@@ -157,7 +151,7 @@ int MPIDI_CH3U_Handle_unordered_recv_pkt(MPIDI_VC_t *vc, MPIDI_CH3_Pkt_t * pkt,
     }
 
   fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPIDI_CH3U_HANDLE_UNORDERED_RECV_PKT);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
 }
 #endif /* defined(MPIDI_CH3_MSGS_UNORDERED) */

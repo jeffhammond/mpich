@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test test MPI_Comm_create_group tests calling by multiple threads
@@ -28,7 +27,7 @@ MPI_Group global_group;
 int rank, size;
 int verbose = 0;
 
-MTEST_THREAD_RETURN_TYPE test_comm_create_group(void *arg)
+static MTEST_THREAD_RETURN_TYPE test_comm_create_group(void *arg)
 {
     int i;
     MPI_Group half_group, full_group;

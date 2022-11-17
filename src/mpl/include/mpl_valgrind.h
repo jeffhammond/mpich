@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2010 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* IMPORTANT!!!: you must define MPL_VG_ENABLED before including mpl.h if you
@@ -136,6 +135,7 @@
 #define MPL_VG_CHECK_MEM_IS_ADDRESSABLE(addr_,len_) VALGRIND_CHECK_WRITABLE((addr_),(len_))
 #endif
 #define MPL_VG_CREATE_BLOCK(addr_,len_,desc_)       do { (void) VALGRIND_CREATE_BLOCK((addr_),(len_),(desc_)); } while (0)
+#define MPL_VG_DISCARD(addr_)                       do { (void) VALGRIND_DISCARD(addr_); } while (0)
 #define MPL_VG_RUNNING_ON_VALGRIND()                RUNNING_ON_VALGRIND
 #define MPL_VG_PRINTF_BACKTRACE                     VALGRIND_PRINTF_BACKTRACE
 /* Valgrind has a bug
@@ -161,13 +161,14 @@
 #define MPL_VG_CHECK_MEM_IS_DEFINED(addr_,len_)     do {} while (0)
 #define MPL_VG_CHECK_MEM_IS_ADDRESSABLE(addr_,len_) do {} while (0)
 #define MPL_VG_CREATE_BLOCK(addr_,len_,desc_)       do {} while (0)
+#define MPL_VG_DISCARD(addr_)                       do {} while (0)
 #define MPL_VG_RUNNING_ON_VALGRIND()                (0) /*always false */
 #define MPL_VG_MEM_INIT(addr_,len_)                 do {} while (0)
 #if defined(MPL_HAVE_MACRO_VA_ARGS)
 #define MPL_VG_PRINTF_BACKTRACE(...)              do {} while (0)
 #else
 #define MPL_VG_PRINTF_BACKTRACE MPL_VG_printf_do_nothing_func
-static mpl_inline void MPL_VG_printf_do_nothing_func(char *fmt, ...)
+static inline void MPL_VG_printf_do_nothing_func(char *fmt, ...)
 {
     /* do nothing */
 }

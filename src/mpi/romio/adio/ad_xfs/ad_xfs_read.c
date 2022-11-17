@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 1997 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_xfs.h"
@@ -15,7 +13,7 @@
 static void ADIOI_XFS_Aligned_Mem_File_Read(ADIO_File fd, void *buf, int len,
                                             ADIO_Offset offset, int *err);
 
-void ADIOI_XFS_ReadContig(ADIO_File fd, void *buf, int count,
+void ADIOI_XFS_ReadContig(ADIO_File fd, void *buf, MPI_Aint count,
                           MPI_Datatype datatype, int file_ptr_type,
                           ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {
@@ -23,6 +21,11 @@ void ADIOI_XFS_ReadContig(ADIO_File fd, void *buf, int count,
     MPI_Count err = -1, datatype_size, len;
     void *newbuf;
     static char myname[] = "ADIOI_XFS_READCONTIG";
+
+    if (count == 0) {
+        err = 0;
+        goto fn_exit;
+    }
 
     MPI_Type_size_x(datatype, &datatype_size);
     len = datatype_size * count;
@@ -89,8 +92,9 @@ void ADIOI_XFS_ReadContig(ADIO_File fd, void *buf, int count,
     if (file_ptr_type == ADIO_INDIVIDUAL)
         fd->fp_ind += err;
 
+  fn_exit:
 #ifdef HAVE_STATUS_SET_BYTES
-    if (err != -1)
+    if (status && err != -1)
         MPIR_Status_set_bytes(status, datatype, err);
 #endif
 

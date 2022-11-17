@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2006 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpid_nem_impl.h"
@@ -33,17 +32,12 @@ int MPID_nem_netmod_id = -1;
 
 MPID_nem_net_module_vc_dbg_print_sendq_t  MPID_nem_net_module_vc_dbg_print_sendq = 0;
 
-#undef FUNCNAME
-#define FUNCNAME MPID_nem_choose_netmod
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPID_nem_choose_netmod(void)
 {
     int mpi_errno = MPI_SUCCESS;
     int i;
-    MPIR_FUNC_VERBOSE_STATE_DECL(MPID_STATE_MPID_NEM_CHOOSE_NETMOD);
 
-    MPIR_FUNC_VERBOSE_ENTER(MPID_STATE_MPID_NEM_CHOOSE_NETMOD);
+    MPIR_FUNC_ENTER;
 
     MPIR_Assert(MPIR_CVAR_NEMESIS_NETMOD != NULL);
     if (strcmp(MPIR_CVAR_NEMESIS_NETMOD, "") == 0)
@@ -73,7 +67,7 @@ int MPID_nem_choose_netmod(void)
     MPIR_ERR_SETANDJUMP1(mpi_errno, MPI_ERR_OTHER, "**invalid_netmod", "**invalid_netmod %s", MPIR_CVAR_NEMESIS_NETMOD);
 
  fn_exit:
-    MPIR_FUNC_VERBOSE_EXIT(MPID_STATE_MPID_NEM_CHOOSE_NETMOD);
+    MPIR_FUNC_EXIT;
     return mpi_errno;
  fn_fail:
 

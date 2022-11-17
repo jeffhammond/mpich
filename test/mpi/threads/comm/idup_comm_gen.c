@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test tries to overlap multiple Comm_idups with other communicator
@@ -22,7 +21,7 @@ int errs[NUM_THREADS] = { 0 };
 
 int verbose = 0;
 
-MTEST_THREAD_RETURN_TYPE test_idup(void *arg)
+static MTEST_THREAD_RETURN_TYPE test_idup(void *arg)
 {
     int i;
     int size, rank;

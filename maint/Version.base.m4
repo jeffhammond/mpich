@@ -6,7 +6,7 @@ m4_init
 dnl get the real version values
 m4_include([maint/version.m4])dnl
 
-dnl The m4sugar langauage switches the default diversion to "KILL", and causes
+dnl The m4sugar language switches the default diversion to "KILL", and causes
 dnl all normal output to be thrown away.  We switch to the default (0) diversion
 dnl to restore output.
 m4_divert_push([])dnl
@@ -23,8 +23,8 @@ dnl $MPICH_VERSION as before
 MPICH_VERSION=MPICH_VERSION_m4
 export MPICH_VERSION
 
-if [[ -f src/mpid/ch4/netmod/ofi/libfabric/autogen.sh ]]; then
-    cd src/mpid/ch4/netmod/ofi/libfabric
+if [[ -f modules/libfabric/autogen.sh ]]; then
+    cd modules/libfabric
     LIBFABRIC_VERSION=`git describe --tags`
     export LIBFABRIC_VERSION
     cd -

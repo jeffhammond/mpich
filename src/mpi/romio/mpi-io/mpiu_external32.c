@@ -1,6 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
-/*  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpioimpl.h"
@@ -27,7 +27,7 @@ int MPIU_write_external32_conversion_fn(const void *userbuf, MPI_Datatype dataty
         goto fn_exit;
 
     if (is_contig) {
-#ifdef HAVE_MPIIO_CONST
+#if MPI_VERSION >= 3
         mpi_errno = MPI_Pack_external("external32", userbuf, count,
                                       datatype, filebuf, bytes, &position);
 #else
@@ -43,7 +43,7 @@ int MPIU_write_external32_conversion_fn(const void *userbuf, MPI_Datatype dataty
             mpi_errno = MPI_ERR_NO_MEM;
             goto fn_exit;
         }
-#ifdef HAVE_MPIIO_CONST
+#if MPI_VERSION >= 3
         mpi_errno = MPI_Pack_external("external32", userbuf, count,
                                       datatype, tmp_buf, bytes, &position);
 #else
@@ -124,15 +124,15 @@ int MPIU_datatype_full_size(MPI_Datatype datatype, MPI_Aint * size)
     if (error_code != MPI_SUCCESS)
         goto fn_exit;
 
-    *size = true_extent;
+    *size = true_lb + true_extent;
   fn_exit:
     return error_code;
 }
 
-/* given a buffer, count, and datatype, return an apropriately allocated, sized
+/* given a buffer, count, and datatype, return an appropriately allocated, sized
  * and external32-formatted buffer, suitable for handing off to a subsequent
  * write routine.  Caller is responsible for freeing 'newbuf' */
-int MPIU_external32_buffer_setup(const void *buf, int count, MPI_Datatype type, void **newbuf)
+int MPIU_external32_buffer_setup(const void *buf, MPI_Aint count, MPI_Datatype type, void **newbuf)
 {
 
     MPI_Aint datatype_size = 0, bytes = 0;
@@ -152,8 +152,3 @@ int MPIU_external32_buffer_setup(const void *buf, int count, MPI_Datatype type, 
     }
     return MPI_SUCCESS;
 }
-
-
-/*
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */

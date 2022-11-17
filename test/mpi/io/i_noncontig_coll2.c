@@ -1,14 +1,13 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
+#include "mpitest.h"
 #include "mpi.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "mpitest.h"
 
 /* tests noncontiguous reads/writes using nonblocking collective I/O */
 
@@ -16,7 +15,7 @@
  *
  * . generalized file writing/reading to handle arbitrary number of processors
  * . provides the "cb_config_list" hint with several permutations of the
- *   avaliable processors.
+ *   available processors.
  *   [ makes use of code copied from ROMIO's ADIO code to collect the names of
  *   the processors ]
  */
@@ -24,7 +23,8 @@
 /* we are going to muck with this later to make it evenly divisible by however many compute nodes we have */
 #define STARTING_SIZE 5000
 
-int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char *msg, int verbose);
+int test_file(const char *filename, int mynod, int nprocs, char *cb_hosts, const char *msg,
+              int verbose);
 
 #define ADIOI_Free free
 #define ADIOI_Malloc malloc
@@ -249,8 +249,8 @@ void simple_shuffle_str(int mynod, int len, ADIO_cb_name_array array, char *dest
 
 int main(int argc, char **argv)
 {
-    int i, mynod, nprocs, len, errs = 0, sum_errs = 0, verbose = 0;
-    char *filename;
+    int i, mynod, nprocs, len, errs = 0, verbose = 0;
+    char *filename = NULL;
     char *cb_config_string;
     int cb_config_len;
     ADIO_cb_name_array array;
@@ -264,15 +264,13 @@ int main(int argc, char **argv)
     /* process 0 takes the file name as a command-line argument and
      * broadcasts it to other processes */
     if (!mynod) {
-        filename = "testfile";
+        filename = strdup("testfile");
         len = strlen(filename);
-        MPI_Bcast(&len, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        MPI_Bcast(filename, len + 1, MPI_CHAR, 0, MPI_COMM_WORLD);
-    } else {
-        MPI_Bcast(&len, 1, MPI_INT, 0, MPI_COMM_WORLD);
-        filename = (char *) malloc(len + 1);
-        MPI_Bcast(filename, len + 1, MPI_CHAR, 0, MPI_COMM_WORLD);
     }
+    MPI_Bcast(&len, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (mynod)
+        filename = (char *) malloc(len + 1);
+    MPI_Bcast(filename, len + 1, MPI_CHAR, 0, MPI_COMM_WORLD);
 
     /* want to hint the cb_config_list, but do so in a non-sequential way */
     cb_gather_name_array(MPI_COMM_WORLD, &array);
@@ -322,21 +320,25 @@ int main(int argc, char **argv)
     errs += test_file(filename, mynod, nprocs, cb_config_string,
                       "collective w/ hinting: permutation2", verbose);
 
-    if (mynod)
-        free(filename);
+    free(filename);
     free(cb_config_string);
+    for (i = 0; i < array->namect; i++)
+        free(array->names[i]);
+    free(array->names);
+    free(array);
     MTest_Finalize(errs);
     return MTestReturnValue(errs);
 }
 
 #define SEEDER(x,y,z) ((x)*1000000 + (y) + (x)*(z))
 
-int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char *msg, int verbose)
+int test_file(const char *filename, int mynod, int nprocs, char *cb_hosts, const char *msg,
+              int verbose)
 {
-    MPI_Datatype typevec, newtype, t[3];
-    int *buf, i, b[3], errcode, errors = 0;
+    MPI_Datatype typevec, typevec2, newtype;
+    int *buf, i, blocklength, errcode, errors = 0;
     MPI_File fh;
-    MPI_Aint d[3];
+    MPI_Aint displacement;
     MPI_Request request;
     MPI_Status status;
     int SIZE = (STARTING_SIZE / nprocs) * nprocs;
@@ -361,17 +363,14 @@ int test_file(char *filename, int mynod, int nprocs, char *cb_hosts, const char 
 
     MPI_Type_vector(SIZE / nprocs, 1, nprocs, MPI_INT, &typevec);
 
-    b[0] = b[1] = b[2] = 1;
-    d[0] = 0;
-    d[1] = mynod * sizeof(int);
-    d[2] = SIZE * sizeof(int);
-    t[0] = MPI_LB;
-    t[1] = typevec;
-    t[2] = MPI_UB;
+    blocklength = 1;
+    displacement = mynod * sizeof(int);
 
-    MPI_Type_struct(3, b, d, t, &newtype);
+    MPI_Type_create_struct(1, &blocklength, &displacement, &typevec, &typevec2);
+    MPI_Type_create_resized(typevec2, 0, SIZE * sizeof(int), &newtype);
     MPI_Type_commit(&newtype);
     MPI_Type_free(&typevec);
+    MPI_Type_free(&typevec2);
 
     if (!mynod) {
         if (verbose)

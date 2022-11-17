@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*-
- * vim: ts=8 sts=4 sw=4 noexpandtab
- *
- *   Copyright (C) 2006 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+/*
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #ifndef AD_PVFS2_IO_H_INCLUDED
@@ -18,12 +16,12 @@
 /* #define DEBUG_DTYPE */
 
 /* Contig I/O helper prototypes */
-int ADIOI_PVFS2_Contig(ADIO_File fd, void *buf, int count,
+int ADIOI_PVFS2_Contig(ADIO_File fd, void *buf, MPI_Aint count,
                        MPI_Datatype datatype, int file_ptr_type,
                        ADIO_Offset offset, ADIO_Status * status, int *error_code, int rw_type);
 
 /* List I/O helper prototypes */
-int ADIOI_PVFS2_StridedListIO(ADIO_File fd, void *buf, int count,
+int ADIOI_PVFS2_StridedListIO(ADIO_File fd, void *buf, MPI_Aint count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, ADIO_Status * status,
                               int *error_code, int rw_type);
@@ -55,7 +53,7 @@ void print_buf_file_ol_pairs(int64_t buf_off_arr[],
                              int32_t file_len_arr[], int32_t file_ol_count, void *buf, int rw_type);
 
 /* Datatype I/O helper prototypes */
-int ADIOI_PVFS2_StridedDtypeIO(ADIO_File fd, void *buf, int count,
+int ADIOI_PVFS2_StridedDtypeIO(ADIO_File fd, void *buf, MPI_Aint count,
                                MPI_Datatype datatype, int file_ptr_type,
                                ADIO_Offset offset, ADIO_Status * status,
                                int *error_code, int rw_type);

@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /*
@@ -20,8 +19,6 @@
 #endif
 
 #include "mpiimpl.h"
-
-#include "mpidftb.h"
 
 /* Add the ch3 packet definitions */
 #include "mpidpkt.h"
@@ -44,8 +41,6 @@ int gethostname(char *name, size_t len);
 extern MPIR_Group *MPIDI_Failed_procs_group;
 extern int MPIDI_last_known_failed;
 extern char *MPIDI_failed_procs_string;
-
-extern int MPIDI_Use_pmi2_api;
 
 #if defined(MPL_USE_DBG_LOGGING)
 extern MPL_dbg_class MPIDI_CH3_DBG_CONNECT;
@@ -97,8 +92,8 @@ typedef struct MPIDI_PG
        find a particular process group. */
     void * id;
 
-    /* Flag to mark a procress group which is finalizing. This means thay
-       the VCs for this process group are closing, (normally becuase
+    /* Flag to mark a procress group which is finalizing. This means they
+       the VCs for this process group are closing, (normally because
        MPI_Finalize was called). This is required to avoid a reconnection
        of the VCs when the PG is closed due to unused elements in the event
        queue  */
@@ -164,7 +159,7 @@ extern MPIDI_Process_t MPIDI_Process;
    if we can */
 #define MPIDI_Datatype_get_info(count_, datatype_, dt_contig_out_, data_sz_out_, dt_ptr_, dt_true_lb_)\
 {									\
-    if (HANDLE_GET_KIND(datatype_) == HANDLE_KIND_BUILTIN)		\
+    if (HANDLE_IS_BUILTIN(datatype_))		\
     {									\
 	(dt_ptr_) = NULL;						\
 	(dt_contig_out_) = TRUE;					\
@@ -249,17 +244,6 @@ extern MPIDI_Process_t MPIDI_Process;
  *     cancelled state
  */
 
-/* FIXME XXX DJG for TLS hack */
-#define MPIR_REQUEST_TLS_MAX 128
-
-#  define MPIDI_Request_tls_alloc(req_) \
-    do { \
-	(req_) = MPIR_Handle_obj_alloc(&MPIR_Request_mem); \
-        MPL_DBG_MSG_P(MPIDI_CH3_DBG_CHANNEL,VERBOSE,		\
-	       "allocated request, handle=0x%08x", req_);\
-    } while (0)
-
-
 /* If the channel doesn't initialize anything in the request, 
    provide a dummy */
 #ifndef MPIDI_CH3_REQUEST_INIT
@@ -303,24 +287,6 @@ extern MPIDI_Process_t MPIDI_Process;
     (rreq_)->dev.partner_request   = NULL;                         \
 }
 
-/* creates a new, trivially complete recv request that is suitable for
- * returning when a user passed MPI_PROC_NULL */
-#define MPIDI_Request_create_null_rreq(rreq_, mpi_errno_, FAIL_)           \
-    do {                                                                   \
-        (rreq_) = MPIR_Request_create(MPIR_REQUEST_KIND__RECV);               \
-        if ((rreq_) != NULL) {                                             \
-            MPIR_Object_set_ref((rreq_), 1);                               \
-            /* MT FIXME should these be handled by MPIR_Request_create? */ \
-            MPIR_cc_set(&(rreq_)->cc, 0);                                  \
-            MPIR_Status_set_procnull(&(rreq_)->status);                    \
-        }                                                                  \
-        else {                                                             \
-            MPL_DBG_MSG(MPIDI_CH3_DBG_CHANNEL,TYPICAL,"unable to allocate a request");\
-            (mpi_errno_) = MPIR_ERR_MEMALLOCFAILED;                        \
-            FAIL_;                                                         \
-        }                                                                  \
-    } while (0)
-
 #define MPIDI_REQUEST_MSG_MASK (0x3 << MPIDI_REQUEST_MSG_SHIFT)
 #define MPIDI_REQUEST_MSG_SHIFT 0
 #define MPIDI_REQUEST_NO_MSG 0
@@ -361,7 +327,7 @@ extern MPIDI_Process_t MPIDI_Process;
     (req_)->dev.state |= ((flag_) << MPIDI_REQUEST_SYNC_SEND_SHIFT) & MPIDI_REQUEST_SYNC_SEND_MASK;\
 }
 
-#define MPIDI_REQUEST_TYPE_MASK (0xF << MPIDI_REQUEST_TYPE_SHIFT)
+#define MPIDI_REQUEST_TYPE_MASK (0x3F << MPIDI_REQUEST_TYPE_SHIFT)
 #define MPIDI_REQUEST_TYPE_SHIFT 4
 #define MPIDI_REQUEST_TYPE_RECV 0
 #define MPIDI_REQUEST_TYPE_SEND 1
@@ -380,6 +346,8 @@ extern MPIDI_Process_t MPIDI_Process;
 #define MPIDI_REQUEST_TYPE_GET_ACCUM_RESP 13             /* target is sending GACC response data */
 #define MPIDI_REQUEST_TYPE_FOP_RECV 14                   /* target is receiving FOP data */
 #define MPIDI_REQUEST_TYPE_FOP_RESP 15                   /* target is sending FOP response data */
+/* Request types for persistent collectives */
+#define MPIDI_REQUEST_TYPE_PERSISTENT_COLL 16
 
 
 #define MPIDI_Request_get_type(req_)						\
@@ -423,7 +391,7 @@ extern MPIDI_Process_t MPIDI_Process;
 /* Note: In the current implementation, the mpid_xsend.c routines that
    make use of MPIDI_VC_FAI_send_seqnum are all protected by the 
    SINGLE_CS_ENTER/EXIT macros, so all uses of this macro are 
-   alreay within a critical section when needed.  If/when we move to
+   already within a critical section when needed.  If/when we move to
    a finer-grain model, we'll need to examine whether this requires
    a separate lock. */
 #if defined(MPID_USE_SEQUENCE_NUMBERS)
@@ -496,7 +464,7 @@ void MPIDI_DBG_PrintVCState(MPIDI_VC_t *vc);
 #else
 #   define MPIDI_Pkt_init(pkt_, type_)				\
     {								\
-	memset((void *) (pkt_), 0xfc, sizeof(MPIDI_CH3_Pkt_t));	\
+	memset((void *) (pkt_), 0xfc, sizeof(*(pkt_)));	\
 	(pkt_)->type = (type_);					\
     }
 #endif
@@ -519,13 +487,13 @@ int MPIDI_VCRT_Add_ref(struct MPIDI_VCRT *vcrt);
 int MPIDI_VCRT_Release(struct MPIDI_VCRT *vcrt, int isDisconnect);
 int MPIDI_VCR_Dup(MPIDI_VCR orig_vcr, MPIDI_VCR * new_vcr);
 
-int MPIDI_PG_Init( int *, char ***, 
-		   MPIDI_PG_Compare_ids_fn_t, MPIDI_PG_Destroy_fn_t);
+int MPIDI_PG_Init(MPIDI_PG_Compare_ids_fn_t, MPIDI_PG_Destroy_fn_t);
 int MPIDI_PG_Finalize(void);
 int MPIDI_PG_Create(int vct_sz, void * pg_id, MPIDI_PG_t ** ppg);
 int MPIDI_PG_Destroy(MPIDI_PG_t * pg);
 int MPIDI_PG_Find(void * id, MPIDI_PG_t ** pgp);
 int MPIDI_PG_Id_compare(void *id1, void *id2);
+void MPIDI_PG_set_verbose(int level);
 
 /* Always use the MPIDI_PG_iterator type, never its expansion.  Otherwise it
    will be difficult to make any changes later. */
@@ -633,7 +601,7 @@ typedef struct MPIDI_Comm_ops
     int (*send_init)(struct MPIDI_VC *vc, const void *buf, MPI_Aint count, MPI_Datatype datatype,
 		     int dest, int tag, MPIR_Comm *comm, int context_offset,
 		     struct MPIR_Request **request );
-    int (*bsend_init)(struct MPIDI_VC *vc, const void *buf, int count, MPI_Datatype datatype,
+    int (*bsend_init)(struct MPIDI_VC *vc, const void *buf, MPI_Aint count, MPI_Datatype datatype,
 		      int dest, int tag, MPIR_Comm *comm, int context_offset,
 		      struct MPIR_Request **request);
     int (*rsend_init)(struct MPIDI_VC *vc, const void *buf, MPI_Aint count, MPI_Datatype datatype,
@@ -711,7 +679,7 @@ typedef struct MPIDI_VC
     MPIDI_CH3_Pkt_send_container_t * msg_reorder_queue;
 #endif
 
-    /* rendezvous function pointers.  Called to send a rendevous
+    /* rendezvous function pointers.  Called to send a rendezvous
        message or when one is matched */
     int (* rndvSend_fn)( struct MPIR_Request **sreq_p, const void * buf, MPI_Aint count,
                          MPI_Datatype datatype, int dt_contig, intptr_t data_sz,
@@ -727,9 +695,13 @@ typedef struct MPIDI_VC
     /* noncontiguous send function pointer.  Called to send a
        noncontiguous message.  Caller must initialize
        sreq->dev.segment, _first and _size.  Contiguous messages are
-       called directly from CH3 and cannot be overridden. */
+       called directly from CH3 and cannot be overridden.
+       The optional hdr_iov and n_hdr_iov input parameters are used for
+       variable-length extended header, specify NULL and zero if unused.
+       n_hdr_iov should not exceed MPL_IOV_LIMIT - 2 (one for header and one
+       for packed data).*/
     int (* sendNoncontig_fn)( struct MPIDI_VC *vc, struct MPIR_Request *sreq,
-			      void *header, intptr_t hdr_sz );
+			      void *header, intptr_t hdr_sz, struct iovec *hdr_iov, int n_hdr_iov);
 
 #ifdef ENABLE_COMM_OVERRIDES
     MPIDI_Comm_ops_t *comm_ops;
@@ -876,7 +848,6 @@ extern MPIDI_CH3U_SRBuf_element_t * MPIDI_CH3U_SRBuf_pool;
 #ifdef MPIDI_CH3_HAS_NO_DYNAMIC_PROCESS
 #define MPIDI_CH3_VC_GetStateString( _c ) "none"
 #else
-/* FIXME: This duplicates a value in util/sock/ch3usock.h */
 const char *MPIDI_CH3_VC_GetStateString(struct MPIDI_VC *);
 const char *MPIDI_CH3_VC_SockGetStateString(struct MPIDI_VC *);
 #endif
@@ -887,6 +858,9 @@ int MPIDI_PrintConnStr( const char *file, int line,
 			const char *label, const char *str );
 int MPIDI_PrintConnStrToFile( FILE *fd, const char *file, int line, 
 			      const char *label, const char *str );
+
+/* Defined and used in sock channel. */
+const char * MPIDI_Conn_GetStateString(int state);
 #endif
 
 /* These macros simplify and unify the debugging of changes in the
@@ -964,7 +938,7 @@ extern char *MPIDI_DBG_parent_str;
 #if defined(HAVE_MACRO_VA_ARGS)
 #   define MPIDI_err_printf(func, fmt, ...)				\
     {									\
-        MPL_error_printf("[%d] ERROR - %s(): " fmt "\n", MPIR_Process.comm_world->rank, func, __VA_ARGS__);    \
+        MPL_error_printf("[%d] ERROR - %s(): " fmt "\n", MPIR_Process.rank, func, __VA_ARGS__);    \
         fflush(stdout);							\
     }
 #endif
@@ -1032,6 +1006,7 @@ int MPIDI_CH3I_Port_destroy(int port_name_tag);
   --------------------------*/
 
 #define MPIDI_MAX_KVS_VALUE_LEN    4096
+#define MPIDI_MAX_JOBID_LEN        1024
 
 /* ------------------------------------------------------------------------- */
 /* mpirma.h (in src/mpi/rma?) */
@@ -1104,7 +1079,7 @@ int MPIDI_CH3U_Win_gather_info(void *, MPI_Aint, int, MPIR_Info *, MPIR_Comm *,
 
 
 #ifdef MPIDI_CH3I_HAS_ALLOC_MEM
-void* MPIDI_CH3I_Alloc_mem(size_t size, MPIR_Info *info_ptr);
+void* MPIDI_CH3I_Alloc_mem(MPI_Aint size, MPIR_Info *info_ptr);
 /* fallback to MPL_malloc if channel does not have its own RMA memory allocator */
 #else
 #define MPIDI_CH3I_Alloc_mem(size, info_ptr)    MPL_malloc(size, MPL_MEM_USER)
@@ -1129,22 +1104,22 @@ int MPIDI_CH3I_Progress_finalize(void);
 
 /* Internal RMA operation routines.
  * Called by normal RMA operations and request-based RMA operations . */
-int MPIDI_CH3I_Put(const void *origin_addr, int origin_count, MPI_Datatype
+int MPIDI_CH3I_Put(const void *origin_addr, MPI_Aint origin_count, MPI_Datatype
                    origin_datatype, int target_rank, MPI_Aint target_disp,
-                   int target_count, MPI_Datatype target_datatype, MPIR_Win * win_ptr,
+                   MPI_Aint target_count, MPI_Datatype target_datatype, MPIR_Win * win_ptr,
                    MPIR_Request * ureq);
-int MPIDI_CH3I_Get(void *origin_addr, int origin_count, MPI_Datatype
+int MPIDI_CH3I_Get(void *origin_addr, MPI_Aint origin_count, MPI_Datatype
                    origin_datatype, int target_rank, MPI_Aint target_disp,
-                   int target_count, MPI_Datatype target_datatype, MPIR_Win * win_ptr,
+                   MPI_Aint target_count, MPI_Datatype target_datatype, MPIR_Win * win_ptr,
                    MPIR_Request * ureq);
-int MPIDI_CH3I_Accumulate(const void *origin_addr, int origin_count, MPI_Datatype
+int MPIDI_CH3I_Accumulate(const void *origin_addr, MPI_Aint origin_count, MPI_Datatype
                           origin_datatype, int target_rank, MPI_Aint target_disp,
-                          int target_count, MPI_Datatype target_datatype, MPI_Op op,
+                          MPI_Aint target_count, MPI_Datatype target_datatype, MPI_Op op,
                           MPIR_Win * win_ptr, MPIR_Request * ureq);
-int MPIDI_CH3I_Get_accumulate(const void *origin_addr, int origin_count,
-                              MPI_Datatype origin_datatype, void *result_addr, int result_count,
+int MPIDI_CH3I_Get_accumulate(const void *origin_addr, MPI_Aint origin_count,
+                              MPI_Datatype origin_datatype, void *result_addr, MPI_Aint result_count,
                               MPI_Datatype result_datatype, int target_rank, MPI_Aint target_disp,
-                              int target_count, MPI_Datatype target_datatype, MPI_Op op,
+                              MPI_Aint target_count, MPI_Datatype target_datatype, MPI_Op op,
                               MPIR_Win * win_ptr, MPIR_Request * ureq);
 
 /*@
@@ -1212,7 +1187,7 @@ int MPIDI_CH3I_Get_accumulate(const void *origin_addr, int origin_count,
     void MPIDI_CH3I_Progress_wakeup(void);
     /* MT TODO profiling is needed here.  We currently protect the completion
      * counter with the COMPLETION critical section, which could be a source of
-     * contention.  It should be possible to peform these updates atomically via
+     * contention.  It should be possible to perform these updates atomically via
      * OPA instead, but the additional complexity should be justified by
      * profiling evidence.  [goodell@ 2010-06-29] */
 #   define MPIDI_CH3_Progress_signal_completion()			\
@@ -1264,7 +1239,7 @@ int MPID_PG_BCast( MPIR_Comm *peercomm_p, MPIR_Comm *comm_p, int root );
 + vc - virtual connection to send the message over
 . pkt - pointer to a MPIDI_CH3_Pkt_t structure containing the substructure to 
   be sent
-- pkt_sz - size of the packet substucture
+- pkt_sz - size of the packet substructure
 
   Output Parameters:
 . sreq_ptr - send request or NULL if the send completed immediately
@@ -1315,7 +1290,7 @@ int MPIDI_CH3_iStartMsg(MPIDI_VC_t * vc, void * pkt, intptr_t pkt_sz,
   If the send completes immediately, the channel implementation should return 
   NULL.
 @*/
-int MPIDI_CH3_iStartMsgv(MPIDI_VC_t * vc, MPL_IOV * iov, int iov_n, 
+int MPIDI_CH3_iStartMsgv(MPIDI_VC_t * vc, struct iovec * iov, int iov_n,
 			 MPIR_Request **sreq_ptr);
 
 
@@ -1331,7 +1306,7 @@ int MPIDI_CH3_iStartMsgv(MPIDI_VC_t * vc, MPL_IOV * iov, int iov_n,
 . sreq - pointer to the send request object
 . pkt - pointer to a MPIDI_CH3_Pkt_t structure containing the substructure to 
   be sent
-- pkt_sz - size of the packet substucture
+- pkt_sz - size of the packet substructure
 
   Return value:
   An mpi error code.
@@ -1379,7 +1354,7 @@ int MPIDI_CH3_iSend(MPIDI_VC_t * vc, MPIR_Request * sreq, void * pkt,
   If the send completes immediately, the channel implementation still must 
   call the OnDataAvail routine in the request, if any.
 @*/
-int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, MPL_IOV * iov,
+int MPIDI_CH3_iSendv(MPIDI_VC_t * vc, MPIR_Request * sreq, struct iovec * iov,
 		     int iov_n);
 
 /*@
@@ -1419,7 +1394,7 @@ int MPIDI_CH3U_Clean_recvq(MPIR_Comm *comm_ptr);
 
 
 int MPIDI_CH3U_Request_load_send_iov(MPIR_Request * const sreq,
-				     MPL_IOV * const iov, int * const iov_n);
+				     struct iovec * const iov, int * const iov_n);
 int MPIDI_CH3U_Request_load_recv_iov(MPIR_Request * const rreq);
 int MPIDI_CH3U_Request_unpack_uebuf(MPIR_Request * rreq);
 int MPIDI_CH3U_Request_unpack_srbuf(MPIR_Request * rreq);
@@ -1478,7 +1453,7 @@ int MPIDI_CH3_GetParentPort(char ** parent_port_name);
 
 /*@
    MPIDI_CH3_FreeParentPort - This routine frees the storage associated with
-   a parent port (allocted with MPIDH_CH3_GetParentPort).
+   a parent port (allocated with MPIDH_CH3_GetParentPort).
 
   @*/
 void MPIDI_CH3_FreeParentPort( void );
@@ -1768,7 +1743,7 @@ int MPIDI_CH3_PktPrint_EagerSyncAck( FILE *fp, MPIDI_CH3_Pkt_t *pkt );
 /* Routines to create packets (used in implementing MPI communications */
 int MPIDI_CH3_EagerNoncontigSend( MPIR_Request **, MPIDI_CH3_Pkt_type_t,
 				  const void *, MPI_Aint,
-				  MPI_Datatype, intptr_t, int, int, MPIR_Comm *,
+				  MPI_Datatype, int, int, MPIR_Comm *,
 				  int );
 int MPIDI_CH3_EagerContigSend( MPIR_Request **, MPIDI_CH3_Pkt_type_t,
 			       const void *, intptr_t, int,
@@ -1790,7 +1765,8 @@ int MPIDI_CH3_EagerSyncNoncontigSend( MPIR_Request **, const void *, int,
 int MPIDI_CH3_EagerSyncZero(MPIR_Request **, int, int, MPIR_Comm *, int );
 
 int MPIDI_CH3_SendNoncontig_iov( struct MPIDI_VC *vc, struct MPIR_Request *sreq,
-                                 void *header, intptr_t hdr_sz );
+                                 void *header, intptr_t hdr_sz,
+                                 struct iovec *hdr_iov, int n_hdr_iov);
 
 /* Routines to ack packets, called in the receive routines when a 
    message is matched */
@@ -1845,8 +1821,8 @@ int MPIDI_CH3_Req_handler_rma_op_complete(MPIR_Request *);
 
 #define MPIDI_CH3_GET_EAGER_THRESHOLD(eager_threshold_p, comm, vc)  \
     do {                                                            \
-        if ((comm)->dev.eager_max_msg_sz != -1)                     \
-            *(eager_threshold_p) = (comm)->dev.eager_max_msg_sz;    \
+        if ((comm)->hints[MPIR_COMM_HINT_EAGER_THRESH] != -1)                     \
+            *(eager_threshold_p) = (comm)->hints[MPIR_COMM_HINT_EAGER_THRESH];    \
         else                                                        \
             *(eager_threshold_p) = (vc)->eager_max_msg_sz;          \
     } while (0)

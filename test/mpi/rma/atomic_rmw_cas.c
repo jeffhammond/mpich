@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2015 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 /* This test is going to test the atomicity for "read-modify-write" in CAS
@@ -77,7 +75,7 @@ int main(int argc, char *argv[])
 
         MPI_Barrier(MPI_COMM_WORLD);
 
-        /* perform FOP */
+        /* perform CAS */
         MPI_Win_lock_all(0, win);
         if (rank != dest) {
             MPI_Compare_and_swap(orig_buf, compare_buf, result_buf, MPI_INT, dest, 0, win);

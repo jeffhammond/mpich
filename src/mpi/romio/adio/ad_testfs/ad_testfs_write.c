@@ -1,13 +1,12 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *   Copyright (C) 2001 University of Chicago.
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "ad_testfs.h"
 #include "adioi.h"
 
-void ADIOI_TESTFS_WriteContig(ADIO_File fd, const void *buf, int count,
+void ADIOI_TESTFS_WriteContig(ADIO_File fd, const void *buf, MPI_Aint count,
                               MPI_Datatype datatype, int file_ptr_type,
                               ADIO_Offset offset, ADIO_Status * status, int
                               *error_code)
@@ -39,7 +38,7 @@ void ADIOI_TESTFS_WriteContig(ADIO_File fd, const void *buf, int count,
 #endif
 }
 
-void ADIOI_TESTFS_WriteStrided(ADIO_File fd, const void *buf, int count,
+void ADIOI_TESTFS_WriteStrided(ADIO_File fd, const void *buf, MPI_Aint count,
                                MPI_Datatype datatype, int file_ptr_type,
                                ADIO_Offset offset, ADIO_Status * status, int *error_code)
 {

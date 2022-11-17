@@ -1,7 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2012 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -25,7 +24,7 @@ MTEST_THREAD_LOCK_TYPE comm_lock;
 int rank, size;
 int verbose = 0;
 
-MTEST_THREAD_RETURN_TYPE test_comm_create_group(void *arg)
+static MTEST_THREAD_RETURN_TYPE test_comm_create_group(void *arg)
 {
     int i;
 
@@ -76,7 +75,7 @@ MTEST_THREAD_RETURN_TYPE test_comm_create_group(void *arg)
 int main(int argc, char **argv)
 {
     int thread_args[NUM_THREADS];
-    int i, err, provided;
+    int i, provided;
 
     MTest_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 

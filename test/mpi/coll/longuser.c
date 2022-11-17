@@ -1,26 +1,24 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include "mpi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "mpitest.h"
 
-int add(double *, double *, int *, MPI_Datatype *);
 /*
  * User-defined operation on a long value (tests proper handling of
  * possible pipelining in the implementation of reductions with user-defined
  * operations).
  */
-int add(double *invec, double *inoutvec, int *len, MPI_Datatype * dtype)
+static void add(double *invec, double *inoutvec, int *len, MPI_Datatype * dtype)
 {
     int i, n = *len;
     for (i = 0; i < n; i++) {
         inoutvec[i] = invec[i] + inoutvec[i];
     }
-    return 0;
 }
 
 int main(int argc, char **argv)

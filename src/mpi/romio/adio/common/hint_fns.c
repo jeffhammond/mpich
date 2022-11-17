@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *   Copyright (C) 2013 UChicago/Argonne, LLC
- *   See COPYRIGHT notice in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "adio.h"
@@ -72,6 +70,12 @@ int ADIOI_Info_check_and_install_enabled(ADIO_File fd, MPI_Info info, const char
         } else if (!strcmp(value, "automatic") || !strcmp(value, "AUTOMATIC")) {
             ADIOI_Info_set(fd->info, key, value);
             *local_cache = ADIOI_HINT_AUTO;
+            /* treat the user-provided string like "enabled":  either it is a hint
+             * ROMIO knows about and can support it, or ROMIO will not return the
+             * hint at all in the MPI_File_get_info info object */
+        } else if (!strcmp(value, "requested") || !strcmp(value, "REQUESTED")) {
+            ADIOI_Info_set(fd->info, key, "enable");
+            *local_cache = ADIOI_HINT_ENABLE;
         }
 
         tmp_val = *local_cache;
@@ -146,7 +150,7 @@ int ADIOI_Info_check_and_install_str(ADIO_File fd, MPI_Info info, const char *ke
 
     ADIOI_Info_get(info, key, MPI_MAX_INFO_VAL, value, &flag);
     if (flag) {
-        ADIOI_Info_set(fd->info, "cb_config_list", value);
+        ADIOI_Info_set(fd->info, key, value);
         len = (strlen(value) + 1) * sizeof(char);
         *local_cache = ADIOI_Malloc(len);
         if (*local_cache == NULL) {

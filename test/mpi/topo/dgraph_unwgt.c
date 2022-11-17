@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2011 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include <stdio.h>
@@ -26,12 +24,8 @@ static int validate_dgraph(MPI_Comm dgraph_comm)
 
     comm_topo = MPI_UNDEFINED;
     MPI_Topo_test(dgraph_comm, &comm_topo);
-    switch (comm_topo) {
-        case MPI_DIST_GRAPH:
-            break;
-        default:
-            fprintf(stderr, "dgraph_comm is NOT of type MPI_DIST_GRAPH\n");
-            return 0;
+    if (comm_topo != MPI_DIST_GRAPH) {
+        fprintf(stderr, "dgraph_comm is NOT of type MPI_DIST_GRAPH\n");
     }
 
     ierr = MPI_Dist_graph_neighbors_count(dgraph_comm, &src_sz, &dest_sz, &wgt_flag);

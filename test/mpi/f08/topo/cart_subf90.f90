@@ -1,12 +1,7 @@
-! -*- Mode: Fortran; -*-
 !
-!  (C) 2016 by Argonne National Laboratory.
-!      See COPYRIGHT in top-level directory.
+! Copyright (C) by Argonne National Laboratory
+!     See COPYRIGHT in top-level directory
 !
-!  Portions of this code were written by Intel Corporation.
-!  Copyright (C) 2011-2016 Intel Corporation.  Intel provides this material
-!  to Argonne National Laboratory subject to Software Grant and Corporate
-!  Contributor License Agreement dated February 8, 2012.
 
 program main
 use mpi_f08
@@ -36,6 +31,9 @@ call MPI_Cart_coords(comm_cart, rank, 2, coords)
 
 call MPI_Cart_sub(comm_cart, remain_dims, comm_new)
 call MPI_Comm_size(comm_new, size)
+
+call MPI_Comm_free(comm_cart)
+call MPI_Comm_free(comm_new)
 
 call MTEST_Finalize(errs)
 

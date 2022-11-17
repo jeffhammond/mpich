@@ -1,8 +1,6 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *
- *  (C) 2001 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
 
 #include "mpiimpl.h"
@@ -18,23 +16,19 @@
 
    At the moment this function always scatters a buffer of nbytes starting at
    tmp_buf address. */
-#undef FUNCNAME
-#define FUNCNAME MPII_Scatter_for_bcast
-#undef FCNAME
-#define FCNAME MPL_QUOTE(FUNCNAME)
 int MPII_Scatter_for_bcast(void *buffer ATTRIBUTE((unused)),
-                           int count ATTRIBUTE((unused)),
+                           MPI_Aint count ATTRIBUTE((unused)),
                            MPI_Datatype datatype ATTRIBUTE((unused)),
                            int root,
                            MPIR_Comm * comm_ptr,
-                           int nbytes, void *tmp_buf, int is_contig, MPIR_Errflag_t * errflag)
+                           MPI_Aint nbytes, void *tmp_buf, int is_contig, MPIR_Errflag_t * errflag)
 {
     MPI_Status status;
     int rank, comm_size, src, dst;
     int relative_rank, mask;
     int mpi_errno = MPI_SUCCESS;
     int mpi_errno_ret = MPI_SUCCESS;
-    int scatter_size, recv_size = 0;
+    MPI_Aint scatter_size, recv_size = 0;
     MPI_Aint curr_size, send_size;
 
     comm_size = comm_ptr->local_size;
@@ -93,7 +87,7 @@ int MPII_Scatter_for_bcast(void *buffer ATTRIBUTE((unused)),
     }
 
     /* This process is responsible for all processes that have bits
-     * set from the LSB upto (but not including) mask.  Because of
+     * set from the LSB up to (but not including) mask.  Because of
      * the "not including", we start by shifting mask back down
      * one. */
 

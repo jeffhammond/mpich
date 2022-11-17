@@ -1,10 +1,9 @@
 			MPICH Release %VERSION%
 
 MPICH is a high-performance and widely portable implementation of the
-MPI-3.1 standard from the Argonne National Laboratory.  This release
-has all MPI 3.1 functions and features required by the standard with
-the exception of support for the "external32" portable I/O format and
-user-defined data representations for I/O.
+MPI-4.0 standard from the Argonne National Laboratory.  This release
+has all MPI 4.0 functions and features required by the standard with
+the exception of support for user-defined data representations for I/O.
 
 This README file should contain enough information to get you started
 with MPICH. More extensive installation and user guides can be found
@@ -36,6 +35,11 @@ information on bug fixes and new releases.
 1. Getting Started
 ==================
 
+Note: this guide assumes you are building MPICH from one of the MPICH
+release tarballs. If you are starting from a git checkout, you will need
+a few additional steps. Please refer to the wiki page --
+https://wiki.mpich.org. 
+
 The following instructions take you through a sequence of steps to get
 the default configuration (ch3 device, nemesis channel (with TCP and
 shared memory), Hydra process management) of MPICH up and running.
@@ -43,6 +47,8 @@ shared memory), Hydra process management) of MPICH up and running.
 (a) You will need the following prerequisites.
 
     - REQUIRED: This tar file mpich-%VERSION%.tar.gz
+
+    - REQUIRED: Perl
 
     - REQUIRED: A C compiler (C99 support is required. See
       https://wiki.mpich.org/mpich/index.php/Shifting_toward_C99)
@@ -58,6 +64,8 @@ shared memory), Hydra process management) of MPICH up and running.
       Fortran applications, you can disable this support using
       --disable-fortran (configuring MPICH is described in step 1(d)
       below).
+
+    - OPTIONAL: Python 3. Python 3 is needed to generate Fortran bindings.
 
     Also, you need to know what shell you are using since different shell
     has different command syntax. Command "echo $SHELL" prints out the
@@ -81,7 +89,7 @@ shared memory), Hydra process management) of MPICH up and running.
     you will have to duplicate it on the other machines after
     installation.
 
-(d) Configure MPICH specifying the installation directory:
+(d) Configure MPICH specifying the installation directory and device:
 
     for csh and tcsh:
 
@@ -90,6 +98,19 @@ shared memory), Hydra process management) of MPICH up and running.
     for bash and sh:
 
       ./configure --prefix=/home/<USERNAME>/mpich-install 2>&1 | tee c.txt
+
+    The configure will try to determine the best device (the internal
+    network modules) based on system environment. You may also supply
+    a device configuration. E.g.
+
+      ./configure --prefix=... --with-device=ch4:ofi |...
+
+    or:
+
+      ./configure --prefix=... --with-device=ch4:ucx |...
+
+    Refer to section below -- Alternate Channels and Devices -- for
+    more details.
 
     Bourne-like shells, sh and bash, accept "2>&1 |".  Csh-like shell,
     csh and tcsh, accept "|&". If a failure occurs, the configure
@@ -249,10 +270,8 @@ exist.
     mpich-%VERSION%/m.txt (generated in step 1(e) above)
     mpich-%VERSION%/mi.txt (generated in step 1(f) above)
     mpich-%VERSION%/config.log (generated in step 1(d) above)
-    mpich-%VERSION%/src/openpa/config.log (generated in step 1(d) above)
     mpich-%VERSION%/src/mpl/config.log (generated in step 1(d) above)
     mpich-%VERSION%/src/pm/hydra/config.log (generated in step 1(d) above)
-    mpich-%VERSION%/src/pm/hydra/tools/topo/hwloc/hwloc/config.log (generated in step 1(d) above)
 
     DID WE MENTION? DO NOT FORGET TO COMPRESS THESE FILES!
 
@@ -373,7 +392,7 @@ will be included in the mpicc and other MPI wrapper script.
 =================================
 
 The communication mechanisms in MPICH are called "devices". MPICH
-supports ch3 (default) and ch4 (experimental), as well as many
+supports ch3 and ch4 (default), as well as many
 third-party devices that are released and maintained by other
 institutes.
 
@@ -410,70 +429,6 @@ then mmap() the file.  The default is "auto". Note that System V
 shared memory has limits on the size of shared memory segments so
 using this for Nemesis may limit the number of processes that can be
 started on a single node.
-
-mxm network module
-``````````````````
-The mxm netmod provides support for Mellanox InfiniBand adapters.  It
-can be built with the following configure option:
-
-  --with-device=ch3:nemesis:mxm
-
-If your MXM library is installed in a non-standard location, you might
-need to help configure find it using the following configure option
-(assuming the libraries are present in /path/to/mxm/lib and the
-include headers are present in /path/to/mxm/include):
-
-  --with-mxm=/path/to/mxm
-
-(or)
-
-  --with-mxm-lib=/path/to/mxm/lib
-  --with-mxm-include=/path/to/mxm/include
-
-By default, the mxm library throws warnings when the system does not
-enable certain features that might hurt performance.  These are
-important warnings that might cause performance degradation on your
-system.  But you might need root privileges to fix some of them.  If
-you would like to disable such warnings, you can set the MXM log level
-to "error" instead of the default "warn" by using:
-
-  MXM_LOG_LEVEL=error
-  export MXM_LOG_LEVEL
-
-
-portals4 network module
-```````````````````````
-The portals4 netmod provides support for the Portals 4 network
-programming interface. To enable, configure with the following option:
-
-  --with-device=ch3:nemesis:portals4
-
-If the Portals 4 include files and libraries are not in the normal
-search paths, you can specify them with the following options:
-
-  --with-portals4-include= and --with-portals4-lib=
-
-... or the if lib/ and include/ are in the same directory, you can use
-the following option:
-
-  --with-portals4=
-
-If the Portals libraries are shared libraries, they need to be in the
-shared library search path. This can be done by adding the path to
-/etc/ld.so.conf, or by setting the LD_LIBRARY_PATH variable in your
-environment. It's also possible to set the shared library search path
-in the binary. If you're using gcc, you can do this by adding
-
-  LD_LIBRARY_PATH=/path/to/lib
-
-  (and)
-
-  LDFLAGS="-Wl,-rpath -Wl,/path/to/lib"
-
-... as arguments to configure.
-
-Currently, use of MPI_ANY_SOURCE and MPI dynamic processes are unsupported
-with the portals4 netmod.
 
 ofi network module
 ```````````````````
@@ -546,8 +501,7 @@ for the requested provider by removing runtime branches to determine
 provider capabilities. Note that using this feature with a version of the
 libfabric library older than that recommended with this version of MPICH is
 unsupported and may result in unexpected behavior. This is also true when
-using the environment variable MPIR_CVAR_OFI_USE_PROVIDER, which will also
-do some optimization for the requested provider.
+using the environment variable FI_PROVIDER.
 
 The currently expected version of libfabric is: %LIBFABRIC_VERSION%.
 
@@ -578,6 +532,28 @@ to "error" instead of the default "warn" by using:
   UCX_LOG_LEVEL=error
   export UCX_LOG_LEVEL
 
+GPU support
+***********
+
+GPU support is automatically enabled if CUDA, ZE, or HIP runtime is
+detected during configure. To specify where your GPU runtime is
+installed, use:
+
+  --with-cuda=<path>  or --with-ze=<path> or --with-hip=<path>
+
+If the lib/ and include/ are not in the same path, both can be specified
+separately, for example:
+
+  --with-cuda-include= and --with-cuda-lib=
+
+In addition, GPU support can be explicitly disabled by using:
+
+  --without-cuda  or  --without-ze or --without-hip
+
+If desirable, GPU support can be disabled during runtime by setting
+environment variable MPIR_CVAR_ENABLE_GPU=0. This may help avoid the GPU
+initialization and detection overhead for non-GPU applications.
+
 -------------------------------------------------------------------------
 
 5. Alternate Process Managers
@@ -599,15 +575,15 @@ is only meant for single-node systems.
 
 slurm
 -----
-SLURM is an external process manager not distributed with
+Slurm is an external process manager not distributed with
 MPICH. MPICH's default process manager, hydra, has native support
-for slurm and you can directly use it in slurm environments (it will
-automatically detect slurm and use slurm capabilities). However, if
-you want to use the slurm provided "srun" process manager, you can use
+for Slurm and you can directly use it in Slurm environments (it will
+automatically detect Slurm and use Slurm capabilities). However, if
+you want to use the Slurm-provided "srun" process manager, you can use
 the "--with-pmi=slurm --with-pm=no" option with configure. Note that
-the "srun" process manager that comes with slurm uses an older PMI
+the "srun" process manager that comes with Slurm uses an older PMI
 standard which does not have some of the performance enhancements that
-hydra provides in slurm environments.
+hydra provides in Slurm environments.
 
 -------------------------------------------------------------------------
 
@@ -627,11 +603,18 @@ configuration options can be found using:
 ==================================
 
 To test MPICH, we package the MPICH test suite in the MPICH
-distribution. You can run the test suite using:
+distribution. You can run the test suite after "make install" using:
 
      make testing
 
-The results summary will be placed in test/summary.xml
+The results summary will be placed in test/summary.xml.
+
+The test suite can be used independently to test any installed MPI
+implementations:
+
+     cd test/mpi
+     ./configure --with-mpi=/path/to/mpi
+     make testing
 
 -------------------------------------------------------------------------
 
@@ -776,7 +759,7 @@ If the C compiler that is used to build MPICH libraries supports both
 multiple weak symbols and multiple aliases of common symbols, the
 Fortran binding can support multiple Fortran compilers. The
 multiple weak symbols support allow MPICH to provide different name
-mangling scheme (of subroutine names) required by differen Fortran
+mangling scheme (of subroutine names) required by different Fortran
 compilers. The multiple aliases of common symbols support enables
 MPICH to equal different common block symbols of the MPI Fortran
 constant, e.g. MPI_IN_PLACE, MPI_STATUS_IGNORE. So they are understood
@@ -858,27 +841,25 @@ This will setup the OFI netmod to use the optimal configuration for the
 sockets provider, and will set various compile time constants. These settings
 cannot be changed at runtime.
 
-If runtime configuration is needed, continue to use the device string as before
-(without the OFI provider extension) and set various environment variables to
+If runtime configuration is needed, use:
+
+    --with-device=ch4:ofi
+
+i.e. without the OFI provider extension, and set various environment variables to
 achieve a similar configuration. To select the desired provider:
 
-    % export MPIR_CVAR_OFI_USE_PROVIDER=sockets
+    % export FI_PROVIDER=sockets
 
 This will select the OFI provider and the associated MPICH capability set. To
 change the preset configuration, there exists an extended set of environment
-variables. As an example, the immediate data fields can be disabled by using
+variables. As an example, native provider RMA atomics can be disabled by using
 the environment variable:
 
-    % export MPIR_CVAR_OFI_ENABLE_TAGGED=0
+    % export MPIR_CVAR_CH4_OFI_ENABLE_ATOMICS=0
 
-For some configuration options (in particular, MPIR_CVAR_OFI_ENABLE_TAGGED and
-MPIR_CVAR_OFI_ENABLE_RMA), a default build of MPICH using the CH4 OFI netmod
-will fail if these options are not enabled. This is so that, for performance,
-MPICH can assume that some commonly available features are enabled by the OFI
-provider. If using a provider that does not support FI_TAGGED, FI_RMA, or
-FI_DELIVERY_COMPLETE, a special configure flag must be provided to build in
-support for workarounds for such features. Compile with --enable-legacy-ofi
-to enable such workarounds.
+For some configuration options (in particular, MPIR_CVAR_CH4_OFI_ENABLE_TAGGED and
+MPIR_CVAR_CH4_OFI_ENABLE_RMA), if disabled, some functionality may fallback to
+generic implementations.
 
 A full list of capability set configuration variables can be found in the
 environment variables README.envvar.
@@ -887,6 +868,37 @@ environment variables README.envvar.
 
 13. Threads
 ===========
+
+The supported thread level are configured by option:
+
+    --enable-threads={single,funneled,serialized,multiple}
+
+The default depends on the configured device. With ch4, "multiple" is the
+default. Set thread level to "single" provides best performance when application
+does not use multiple threads. Use "multiple" to allow application to access
+MPI from multiple threads concurrently.
+
+With "multiple" thread level, there are a few choices for the internal critical
+section models. This is controlled by configure option:
+
+    --enable-thread-cs={global,per-vci}
+
+Current default is to use "global" cs. Applications that do heavy concurrent
+MPI communications may experience slow down due to this global cs. The
+"per-vci" cs internally will use multiple VCI (virtual communication
+interface) critical sections, thus can provide much better performance. To
+achieve the best performance, applications should try to expose as much
+parallel information to MPI as possible. For example, if each threads use
+separate communicators, MPICH may be able to assign separate VCI for each
+thread, thus achieving the maximum performance.
+
+The multiple VCI support may increase the resource allocation and overheads
+during initialization. By default, only a single vci is used. Set
+
+    MPIR_CVAR_CH4_NUM_VCIS=<N>
+
+to enable multiple vcis at runtime. For best performance, match number of VCIs
+to the number threads application is using.
 
 MPICH supports multiple threading packages.  The default is posix
 threads (pthreads), but solaris threads, windows threads and argobots

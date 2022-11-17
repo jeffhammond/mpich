@@ -1,8 +1,8 @@
-/* -*- Mode: C; c-basic-offset:4 ; indent-tabs-mode:nil ; -*- */
 /*
- *  (C) 2014 by Argonne National Laboratory.
- *      See COPYRIGHT in top-level directory.
+ * Copyright (C) by Argonne National Laboratory
+ *     See COPYRIGHT in top-level directory
  */
+
 #include <mpi.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,7 +15,7 @@
 #define HEADER 144
 #define BLK_COUNT 3
 
-static void handle_error(int errcode, char *str)
+static void handle_error(int errcode, const char *str)
 {
     char msg[MPI_MAX_ERROR_STRING];
     int resultlen;
@@ -35,8 +35,7 @@ int main(int argc, char **argv)
     int data_size = DATA_SIZE;
     int i, j, k, errs = 0;
     MPI_Aint disp[BLK_COUNT];
-    int block_lens[BLK_COUNT];
-    char *filename = "unnamed.dat";
+    const char *filename = "unnamed.dat";
     MPI_Status status;
     MPI_Request request;
 
@@ -44,10 +43,6 @@ int main(int argc, char **argv)
     disp[0] = (MPI_Aint) (PAD);
     disp[1] = (MPI_Aint) (data_size * 1 + PAD);
     disp[2] = (MPI_Aint) (data_size * 2 + PAD);
-
-    block_lens[0] = data_size;
-    block_lens[1] = data_size;
-    block_lens[2] = data_size;
 
     data = malloc(data_size);
     verify = malloc(data_size * BLK_COUNT + HEADER + PAD);
@@ -93,7 +88,7 @@ int main(int argc, char **argv)
             if (verify[(HEADER + PAD) / sizeof(int) + k + j * (DATA_SIZE / sizeof(int))]
                 != data[k]) {
                 errs++;
-                fprintf(stderr, "expcted %d, read %d\n", data[k],
+                fprintf(stderr, "expected %d, read %d\n", data[k],
                         verify[(HEADER + PAD) / sizeof(int) + k + j * (DATA_SIZE / sizeof(int))]);
             }
             i++;
