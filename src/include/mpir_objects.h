@@ -501,6 +501,10 @@ typedef MPL_atomic_int_t Handle_ref_count;
     int handle;                                                         \
     Handle_ref_count ref_count  /*semicolon intentionally omitted */
 
+#define MPIR_OBJECT_HEADER_JEFF                                         \
+    intptr_t handle;                                                    \
+    Handle_ref_count ref_count  /*semicolon intentionally omitted */
+
 /* ALL objects have the handle as the first value. */
 /* Inactive (unused and stored on the appropriate avail list) objects
    have MPIR_Handle_common as the head */

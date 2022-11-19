@@ -84,7 +84,7 @@ typedef struct MPIR_Datatype_contents {
   S*/
 struct MPIR_Datatype {
     /* handle and ref_count are filled in by MPIR_Handle_obj_alloc() */
-    MPIR_OBJECT_HEADER;         /* adds handle and ref_count fields */
+    MPIR_OBJECT_HEADER_JEFF;         /* adds handle and ref_count fields */
 
     /* user-visible parameters */
     MPI_Aint size;              /* MPI_Count could be 128 bits, so use MPI_Aint */
