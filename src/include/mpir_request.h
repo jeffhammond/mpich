@@ -232,6 +232,8 @@ struct MPIR_Request {
 
     struct MPIR_Request *next, *prev;
 
+    struct MPIR_Attribute * attributes;
+
     /* Other, device-specific information */
 #ifdef MPID_DEV_REQUEST_DECL
      MPID_DEV_REQUEST_DECL
