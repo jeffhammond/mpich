@@ -38,6 +38,12 @@ int MPIR_Win_free_keyval_impl(MPII_Keyval * keyval_ptr)
     return MPI_SUCCESS;
 }
 
+int MPIR_Request_free_keyval_impl(MPII_Keyval * keyval_ptr)
+{
+    MPIR_free_keyval(keyval_ptr);
+    return MPI_SUCCESS;
+}
+
 int MPIR_Comm_create_keyval_impl(MPI_Comm_copy_attr_function * comm_copy_attr_fn,
                                  MPI_Comm_delete_attr_function * comm_delete_attr_fn,
                                  int *comm_keyval, void *extra_state)
@@ -143,6 +149,43 @@ int MPIR_Win_create_keyval_impl(MPI_Win_copy_attr_function * win_copy_attr_fn,
     keyval_ptr->delfn.proxy = MPII_Attr_delete_c_proxy;
 
     MPIR_OBJ_PUBLISH_HANDLE(*win_keyval, keyval_ptr->handle);
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+int MPIR_Request_create_keyval_impl(MPIX_Request_copy_attr_function * req_copy_attr_fn,
+                                    MPIX_Request_delete_attr_function * req_delete_attr_fn,
+                                    int *req_keyval, void *extra_state)
+{
+    int mpi_errno = MPI_SUCCESS;
+    MPII_Keyval *keyval_ptr;
+
+    keyval_ptr = (MPII_Keyval *) MPIR_Handle_obj_alloc(&MPII_Keyval_mem);
+    MPIR_ERR_CHKANDJUMP(!keyval_ptr, mpi_errno, MPI_ERR_OTHER, "**nomem");
+
+    /* Initialize the attribute dup function */
+    if (!MPIR_Process.attr_dup) {
+        MPIR_Process.attr_dup = MPIR_Attr_dup_list;
+        MPIR_Process.attr_free = MPIR_Attr_delete_list;
+    }
+
+    /* The handle encodes the keyval kind.  Modify it to have the correct
+     * field */
+#warning FIXME
+    keyval_ptr->handle = (keyval_ptr->handle & ~(0x03c00000)) | (MPIR_REQUEST << 22);
+    MPIR_Object_set_ref(keyval_ptr, 1);
+    keyval_ptr->was_freed = 0;
+    keyval_ptr->kind = MPIR_REQUEST;
+    keyval_ptr->extra_state = extra_state;
+    keyval_ptr->copyfn.user_function = req_copy_attr_fn;
+    keyval_ptr->copyfn.proxy = MPII_Attr_copy_c_proxy;
+    keyval_ptr->delfn.user_function = req_delete_attr_fn;
+    keyval_ptr->delfn.proxy = MPII_Attr_delete_c_proxy;
+
+    MPIR_OBJ_PUBLISH_HANDLE(*req_keyval, keyval_ptr->handle);
 
   fn_exit:
     return mpi_errno;
@@ -844,6 +887,203 @@ int MPIR_Win_delete_attr_impl(MPIR_Win * win_ptr, MPII_Keyval * keyval_ptr)
          * test suite says we should return the user return code.  So
          * we must not ERR_POP here. */
         mpi_errno = MPIR_Call_attr_delete(win_ptr->handle, p);
+        if (mpi_errno)
+            goto fn_fail;
+
+        /* We found the attribute.  Remove it from the list */
+        *old_p = p->next;
+        /* Decrement the use of the keyval */
+        MPII_Keyval_release_ref(p->keyval, &in_use);
+        if (!in_use) {
+            MPIR_Handle_obj_free(&MPII_Keyval_mem, p->keyval);
+        }
+        MPID_Attr_free(p);
+    }
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+int MPIR_Request_get_attr_impl(MPIR_Request * request_ptr, int request_keyval, void *attribute_val,
+                               int *flag, MPIR_Attr_type outAttrType)
+{
+    int mpi_errno = MPI_SUCCESS;
+
+    /* Check for builtin attribute */
+    /* This code is ok for correct programs, but it would be better
+     * to copy the values from the per-process block and pass the user
+     * a pointer to a copy */
+    /* Note that if we are called from Fortran, we must return the values,
+     * not the addresses, of these attributes */
+    if (HANDLE_IS_BUILTIN(request_keyval)) {
+        void **attr_val_p = (void **) attribute_val;
+#ifdef HAVE_FORTRAN_BINDING
+        /* Note that this routine only has a Fortran 90 binding,
+         * so the attribute value is an address-sized int */
+        intptr_t *attr_int = (intptr_t *) attribute_val;
+#endif
+        *flag = 1;
+
+        /*
+         * The C versions of the attributes return the address of a
+         * *COPY* of the value (to prevent the user from changing it)
+         * and the Fortran versions provide the actual value (as a Fint)
+         */
+        switch (request_keyval) {
+#ifdef HAVE_FORTRAN_BINDING
+#endif
+            default:
+                MPIR_Assert(FALSE);
+                break;
+        }
+    } else {
+        MPIR_Attribute *p = request_ptr->attributes;
+
+        *flag = 0;
+        while (p) {
+            if (p->keyval->handle == request_keyval) {
+                *flag = 1;
+                if (outAttrType == MPIR_ATTR_PTR) {
+                    if (p->attrType == MPIR_ATTR_INT) {
+                        /* This is the tricky case: if the system is
+                         * bigendian, and we have to return a pointer to
+                         * an int, then we may need to point to the
+                         * correct location in the word. */
+#if defined(WORDS_LITTLEENDIAN) || (SIZEOF_VOID_P == SIZEOF_INT)
+                        *(void **) attribute_val = &(p->value);
+#else
+                        int *p_loc = (int *) &(p->value);
+#if SIZEOF_VOID_P == 2 * SIZEOF_INT
+                        p_loc++;
+#else
+#error Expected sizeof(void*) to be either sizeof(int) or 2*sizeof(int)
+#endif
+                        *(void **) attribute_val = p_loc;
+#endif
+                    } else if (p->attrType == MPIR_ATTR_AINT) {
+                        *(void **) attribute_val = &(p->value);
+                    } else {
+                        *(void **) attribute_val = (void *) (intptr_t) (p->value);
+                    }
+                } else
+                    *(void **) attribute_val = (void *) (intptr_t) (p->value);
+
+                break;
+            }
+            p = p->next;
+        }
+    }
+
+    MPIR_FUNC_EXIT;
+    return mpi_errno;
+}
+
+int MPIR_Request_set_attr_impl(MPIR_Request * request_ptr, MPII_Keyval * keyval_ptr, void *attribute_val,
+                           MPIR_Attr_type attrType)
+{
+    int mpi_errno = MPI_SUCCESS;
+    MPIR_Attribute *p, **old_p;
+
+    /* Look for attribute.  They are ordered by keyval handle.  This uses
+     * a simple linear list algorithm because few applications use more than a
+     * handful of attributes */
+
+    old_p = &request_ptr->attributes;
+    p = request_ptr->attributes;
+    while (p) {
+        if (p->keyval->handle == keyval_ptr->handle) {
+            /* If found, call the delete function before replacing the
+             * attribute */
+            mpi_errno = MPIR_Call_attr_delete(request_ptr->handle, p);
+            /* --BEGIN ERROR HANDLING-- */
+            if (mpi_errno) {
+                /* FIXME : communicator of requestdow? */
+                goto fn_fail;
+            }
+            /* --END ERROR HANDLING-- */
+            p->value = (MPII_Attr_val_t) (intptr_t) attribute_val;
+            p->attrType = attrType;
+            /* Does not change the reference count on the keyval */
+            break;
+        } else if (p->keyval->handle > keyval_ptr->handle) {
+            MPIR_Attribute *new_p = MPID_Attr_alloc();
+            MPIR_ERR_CHKANDJUMP1(!new_p, mpi_errno, MPI_ERR_OTHER,
+                                 "**nomem", "**nomem %s", "MPIR_Attribute");
+            new_p->keyval = keyval_ptr;
+            new_p->attrType = attrType;
+            new_p->pre_sentinal = 0;
+            new_p->value = (MPII_Attr_val_t) (intptr_t) attribute_val;
+            new_p->post_sentinal = 0;
+            new_p->next = p->next;
+            MPII_Keyval_add_ref(keyval_ptr);
+            p->next = new_p;
+            break;
+        }
+        old_p = &p->next;
+        p = p->next;
+    }
+    if (!p) {
+        MPIR_Attribute *new_p = MPID_Attr_alloc();
+        MPIR_ERR_CHKANDJUMP1(!new_p, mpi_errno, MPI_ERR_OTHER,
+                             "**nomem", "**nomem %s", "MPIR_Attribute");
+        /* Did not find in list.  Add at end */
+        new_p->attrType = attrType;
+        new_p->keyval = keyval_ptr;
+        new_p->pre_sentinal = 0;
+        new_p->value = (MPII_Attr_val_t) (intptr_t) attribute_val;
+        new_p->post_sentinal = 0;
+        new_p->next = 0;
+        MPII_Keyval_add_ref(keyval_ptr);
+        *old_p = new_p;
+    }
+
+    /* Here is where we could add a hook for the device to detect attribute
+     * value changes, using something like
+     * MPID_Request_attr_hook(request_ptr, keyval, attribute_val);
+     */
+
+  fn_exit:
+    MPIR_FUNC_EXIT;
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+    /* --END ERROR HANDLING-- */
+}
+
+int MPIR_Request_delete_attr_impl(MPIR_Request * request_ptr, MPII_Keyval * keyval_ptr)
+{
+    int mpi_errno = MPI_SUCCESS;
+    MPIR_Attribute *p, **old_p;
+
+    /* Look for attribute.  They are ordered by keyval handle */
+
+    old_p = &request_ptr->attributes;
+    p = request_ptr->attributes;
+    while (p) {
+        if (p->keyval->handle == keyval_ptr->handle) {
+            break;
+        }
+        old_p = &p->next;
+        p = p->next;
+    }
+
+    /* We can't unlock yet, because we must not free the attribute until
+     * we know whether the delete function has returned with a 0 status
+     * code */
+
+    if (p) {
+        int in_use;
+
+        /* Run the delete function, if any, and then free the
+         * attribute storage.  Note that due to an ambiguity in the
+         * standard, if the usr function returns something other than
+         * MPI_SUCCESS, we should either return the user return code,
+         * or an mpich error code.  The precedent set by the Intel
+         * test suite says we should return the user return code.  So
+         * we must not ERR_POP here. */
+        mpi_errno = MPIR_Call_attr_delete(request_ptr->handle, p);
         if (mpi_errno)
             goto fn_fail;
 
