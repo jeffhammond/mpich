@@ -90,7 +90,6 @@ extern "C" {
 #define MPI_OP_NULL        ((MPI_Op)0x18000000)
 #define MPI_GROUP_NULL     ((MPI_Group)0x08000000)
 #define MPI_DATATYPE_NULL  ((MPI_Datatype)0x0c000000)
-#define MPI_REQUEST_NULL   ((MPI_Request)0x2c000000)
 #define MPI_ERRHANDLER_NULL ((MPI_Errhandler)0x14000000)
 #define MPI_MESSAGE_NULL   ((MPI_Message)0x2c000000)
 #define MPI_MESSAGE_NO_PROC ((MPI_Message)0x6c000000)
@@ -292,6 +291,10 @@ typedef int MPI_Win;
 typedef int MPI_Session;
 #define MPI_SESSION_NULL     ((MPI_Session)0x38000000)
 
+/* MPI request objects */
+typedef int MPI_Request;
+#define MPI_REQUEST_NULL   ((MPI_Request)0x2c000000)
+
 /* File and IO */
 /* This define lets ROMIO know that MPI_File has been defined */
 #define MPI_FILE_DEFINED
@@ -407,6 +410,9 @@ typedef int (MPI_Type_delete_attr_function)(MPI_Datatype, int, void *, void *);
 typedef int (MPI_Win_copy_attr_function)(MPI_Win, int, void *, void *, void *,
 					 int *);
 typedef int (MPI_Win_delete_attr_function)(MPI_Win, int, void *, void *);
+typedef int (MPIX_Request_copy_attr_function)(MPI_Request, int, void *, void *, void *,
+					 int *);
+typedef int (MPIX_Request_delete_attr_function)(MPI_Request, int, void *, void *);
 /* added in MPI-2.2 */
 typedef void (MPI_Comm_errhandler_function)(MPI_Comm *, int *, ...);
 typedef void (MPI_File_errhandler_function)(MPI_File *, int *, ...);
@@ -447,9 +453,6 @@ typedef int MPI_Errhandler;
 #define MPI_TYPE_NULL_COPY_FN ((MPI_Type_copy_attr_function*)0)
 #define MPI_TYPE_NULL_DELETE_FN ((MPI_Type_delete_attr_function*)0)
 #define MPI_TYPE_DUP_FN ((MPI_Type_copy_attr_function*)MPI_DUP_FN)
-
-/* MPI request objects */
-typedef int MPI_Request;
 
 /* MPI message objects for Mprobe and related functions */
 typedef int MPI_Message;
