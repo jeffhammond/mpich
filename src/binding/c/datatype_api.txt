@@ -110,12 +110,6 @@ MPI_Pack:
     the communicator that will be subsequently used for sending the packed
     message.
 */
-{ -- error_check -- inbuf, outbuf
-    /* MPI_BOTTOM cannot be used when count > 1 */
-    if (incount > 1) {
-        MPIR_ERRTEST_ARGNULL(inbuf, "inbuf", mpi_errno);
-    }
-}
 { -- early_return --
     MPI_Aint dt_size;
     MPIR_Datatype_get_size_macro(datatype, dt_size);
