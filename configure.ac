@@ -2848,16 +2848,25 @@ AC_CHECK_SIZEOF(int8_t)
 AC_CHECK_SIZEOF(int16_t)
 AC_CHECK_SIZEOF(int32_t)
 AC_CHECK_SIZEOF(int64_t)
+AC_CHECK_SIZEOF(intptr_t)
 
 AC_CHECK_SIZEOF(uint8_t)
 AC_CHECK_SIZEOF(uint16_t)
 AC_CHECK_SIZEOF(uint32_t)
 AC_CHECK_SIZEOF(uint64_t)
+AC_CHECK_SIZEOF(uintptr_t)
+
+AC_CHECK_SIZEOF(__int128)
+AC_CHECK_SIZEOF(__int128_t)
+AC_CHECK_SIZEOF(__uint128)
+AC_CHECK_SIZEOF(__uint128_t)
+AC_CHECK_SIZEOF(unsigned __int128)
 
 AC_CHECK_ALIGNOF(int8_t)
 AC_CHECK_ALIGNOF(int16_t)
 AC_CHECK_ALIGNOF(int32_t)
 AC_CHECK_ALIGNOF(int64_t)
+AC_CHECK_ALIGNOF(intptr_t)
 
 if test "$ac_cv_sizeof_int8_t" -eq 1 ; then
     AC_DEFINE(HAVE_INT8_T,1,[Define if int8_t is supported by the C compiler])
@@ -2871,6 +2880,12 @@ fi
 if test "$ac_cv_sizeof_int64_t" -eq 8 ; then
     AC_DEFINE(HAVE_INT64_T,1,[Define if int64_t is supported by the C compiler])
 fi
+if test "$ac_cv_sizeof_intptr_t" -ge 8 ; then
+    AC_DEFINE(HAVE_INTPTR_T,1,[Define if intptr_t is supported by the C compiler])
+fi
+if test "$ac_cv_sizeof___int128" -eq 16 ; then
+    AC_DEFINE(HAVE_INT128_T,1,[Define if int128_t is supported by the C compiler])
+fi
 
 if test "$ac_cv_sizeof_uint8_t" -eq 1 ; then
     AC_DEFINE(HAVE_UINT8_T,1,[Define if uint8_t is supported by the C compiler])
@@ -2883,6 +2898,12 @@ if test "$ac_cv_sizeof_uint32_t" -eq 4 ; then
 fi
 if test "$ac_cv_sizeof_uint64_t" -eq 8 ; then
     AC_DEFINE(HAVE_UINT64_T,1,[Define if uint64_t is supported by the C compiler])
+fi
+if test "$ac_cv_sizeof_uintptr_t" -ge 8 ; then
+    AC_DEFINE(HAVE_UINTPTR_T,1,[Define if uintptr_t is supported by the C compiler])
+fi
+if test "$ac_cv_sizeof___uint128" -eq 16 ; then
+    AC_DEFINE(HAVE_UINT128_T,1,[Define if uint128_t is supported by the C compiler])
 fi
 
 # Other C99 types.
@@ -3747,6 +3768,12 @@ AC_SUBST(LPMPILIBNAME)
 # Get the size for the bsendoverhead
 AC_CHECK_SIZEOF(MPII_Bsend_data_t,0,[
 #define MPI_Datatype int
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
 typedef $MPI_AINT MPI_Aint;
 
 struct MPIR_Request;
@@ -3754,13 +3781,6 @@ typedef struct MPIR_Request MPIR_Request;
 
 struct MPIR_Comm;
 typedef struct MPIR_Comm MPIR_Comm;
-
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-#ifdef HAVE_STDINT_H
-#include <stdint.h>
-#endif
 
 #include "${main_top_srcdir}/src/include/mpir_bsend.h"]
 )
