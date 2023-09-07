@@ -155,7 +155,7 @@ enum MPIR_sched_type {
 
   S*/
 
-#define MPIR_REQUEST_UNION_SIZE  40
+#define MPIR_REQUEST_UNION_SIZE  64
 struct MPIR_Request {
     MPIR_OBJECT_HEADER;         /* adds handle and ref_count fields */
 
