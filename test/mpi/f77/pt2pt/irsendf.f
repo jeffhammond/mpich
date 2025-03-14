@@ -86,7 +86,7 @@ C
 C
          call rq_check( requests(1), 1, 'irsend and irecv' )
 C
-         call msg_check( recv_buf, next, tag, count, statuses,
+         call msg_check( recv_buf, next, tag, count, status,
      .           TEST_SIZE, 'irsend and irecv', errs )
 C
       else if (prev .eq. 0) then
