@@ -27,6 +27,7 @@ noinst_PROGRAMS =     \
     icm               \
     cmsplit           \
     cmsplit2          \
+    cmsplit_scale     \
     cmsplit_type      \
     comm_create_group \
     comm_group_half   \
