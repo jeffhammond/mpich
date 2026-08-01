@@ -8,7 +8,7 @@ include $(top_srcdir)/Makefile_single.mtest
 
 noinst_PROGRAMS = transp_datatype non_zero_root sendrecvl twovec dtpack \
                   allredtrace commcreatep allredtrace commcreatep timer \
-                  manyrma nestvec nestvec2 indexperf gtranksperf
+                  manyrma nestvec nestvec2 indexperf gtranksperf commsplit_sweep
 
 # Force all tests to be compiled with optimization 
 AM_CFLAGS        = -O
