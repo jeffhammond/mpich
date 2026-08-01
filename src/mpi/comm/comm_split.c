@@ -79,6 +79,524 @@ static void MPIU_Sort_inttable(sorttype * keytable, int size)
     }
 }
 
+typedef struct split_record {
+    int color, key, orig_rank;
+} split_record;
+
+typedef struct split_segment {
+    int total, first_color, first_count, last_color, last_count, all_same;
+} split_segment;
+
+static int split_record_compare(const split_record * a, const split_record * b)
+{
+    if (a->color > b->color)
+        return 1;
+    if (a->color < b->color)
+        return -1;
+    if (a->key > b->key)
+        return 1;
+    if (a->key < b->key)
+        return -1;
+    return 0;
+}
+
+static split_record split_record_median(split_record * records, int count)
+{
+    MPIR_Assert(count > 0);
+
+    if (count == 1)
+        return records[0];
+
+    if (count == 2) {
+        if (split_record_compare(&records[0], &records[1]) <= 0)
+            return records[0];
+        else
+            return records[1];
+    }
+
+    if (split_record_compare(&records[0], &records[1]) > 0) {
+        split_record tmp = records[0];
+        records[0] = records[1];
+        records[1] = tmp;
+    }
+    if (split_record_compare(&records[1], &records[2]) > 0) {
+        split_record tmp = records[1];
+        records[1] = records[2];
+        records[2] = tmp;
+    }
+    if (split_record_compare(&records[0], &records[1]) > 0) {
+        split_record tmp = records[0];
+        records[0] = records[1];
+        records[1] = tmp;
+    }
+
+    return records[1];
+}
+
+static split_segment split_segment_make(int color)
+{
+    split_segment segment;
+
+    segment.total = 1;
+    segment.first_color = color;
+    segment.first_count = 1;
+    segment.last_color = color;
+    segment.last_count = 1;
+    segment.all_same = TRUE;
+
+    return segment;
+}
+
+static split_segment split_segment_empty(void)
+{
+    split_segment segment;
+
+    segment.total = 0;
+    segment.first_color = MPI_UNDEFINED;
+    segment.first_count = 0;
+    segment.last_color = MPI_UNDEFINED;
+    segment.last_count = 0;
+    segment.all_same = TRUE;
+
+    return segment;
+}
+
+static split_segment split_segment_combine(split_segment left, split_segment right)
+{
+    split_segment out;
+
+    if (left.total == 0)
+        return right;
+    if (right.total == 0)
+        return left;
+
+    out.total = left.total + right.total;
+    out.first_color = left.first_color;
+    out.first_count = left.first_count;
+    out.last_color = right.last_color;
+    out.last_count = right.last_count;
+    out.all_same = left.all_same && right.all_same && left.first_color == right.first_color;
+
+    if (left.all_same && left.last_color == right.first_color) {
+        out.first_count = left.total + right.first_count;
+    }
+    if (right.all_same && left.last_color == right.first_color) {
+        out.last_count = right.total + left.last_count;
+    }
+
+    return out;
+}
+
+static int comm_split_range_bcast_ints(MPIR_Comm * comm_ptr, int lo, int hi, int *buf, int count,
+                                       int tag)
+{
+    int mpi_errno = MPI_SUCCESS;
+    int rank = comm_ptr->rank;
+    int relrank = rank - lo;
+    int range_size = hi - lo + 1;
+
+    for (int mask = 1; mask < range_size; mask <<= 1) {
+        if (relrank < mask) {
+            int dst_rel = relrank + mask;
+            if (dst_rel < range_size) {
+                mpi_errno = MPIC_Send(buf, count, MPIR_INT_INTERNAL, lo + dst_rel, tag,
+                                      comm_ptr, MPIR_COLL_ATTR_SYNC);
+                MPIR_ERR_CHECK(mpi_errno);
+            }
+        } else if (relrank < 2 * mask) {
+            int src_rel = relrank - mask;
+            mpi_errno = MPIC_Recv(buf, count, MPIR_INT_INTERNAL, lo + src_rel, tag,
+                                  comm_ptr, MPI_STATUS_IGNORE);
+            MPIR_ERR_CHECK(mpi_errno);
+        }
+    }
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+static int comm_split_range_select_pivot(MPIR_Comm * comm_ptr, int lo, int hi,
+                                         split_record local_record, split_record * pivot)
+{
+    int mpi_errno = MPI_SUCCESS;
+    int rank = comm_ptr->rank;
+    int relrank = rank - lo;
+    int range_size = hi - lo + 1;
+    int active_count = range_size;
+    int stride = 1;
+    split_record candidate = local_record;
+
+    while (active_count > 1) {
+        if (relrank % stride == 0) {
+            int candidate_idx = relrank / stride;
+
+            if (candidate_idx < active_count) {
+                int group_pos = candidate_idx % 3;
+                int leader_idx = candidate_idx - group_pos;
+                int leader_rank = lo + leader_idx * stride;
+
+                if (group_pos == 0) {
+                    split_record records[3];
+                    int record_count = 1;
+
+                    records[0] = candidate;
+                    for (int i = 1; i < 3; i++) {
+                        int child_idx = leader_idx + i;
+                        if (child_idx < active_count) {
+                            mpi_errno = MPIC_Recv(&records[record_count], 3, MPIR_INT_INTERNAL,
+                                                  lo + child_idx * stride, MPIR_REDUCE_TAG,
+                                                  comm_ptr, MPI_STATUS_IGNORE);
+                            MPIR_ERR_CHECK(mpi_errno);
+                            record_count++;
+                        }
+                    }
+                    candidate = split_record_median(records, record_count);
+                } else {
+                    mpi_errno = MPIC_Send(&candidate, 3, MPIR_INT_INTERNAL, leader_rank,
+                                          MPIR_REDUCE_TAG, comm_ptr, MPIR_COLL_ATTR_SYNC);
+                    MPIR_ERR_CHECK(mpi_errno);
+                }
+            }
+        }
+
+        active_count = (active_count + 2) / 3;
+        stride *= 3;
+    }
+
+    if (rank == lo)
+        *pivot = candidate;
+
+    mpi_errno = comm_split_range_bcast_ints(comm_ptr, lo, hi, (int *) pivot, 3, MPIR_BCAST_TAG);
+    MPIR_ERR_CHECK(mpi_errno);
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+static int comm_split_range_allreduce_sum3(MPIR_Comm * comm_ptr, int lo, int hi,
+                                           const int local[3], int total[3])
+{
+    int mpi_errno = MPI_SUCCESS;
+    int rank = comm_ptr->rank;
+    int relrank = rank - lo;
+    int range_size = hi - lo + 1;
+    int sent = FALSE;
+
+    total[0] = local[0];
+    total[1] = local[1];
+    total[2] = local[2];
+
+    for (int mask = 1; mask < range_size; mask <<= 1) {
+        if (!sent) {
+            if (relrank % (2 * mask) == 0) {
+                int src_rel = relrank + mask;
+                if (src_rel < range_size) {
+                    int tmp[3];
+
+                    mpi_errno = MPIC_Recv(tmp, 3, MPIR_INT_INTERNAL, lo + src_rel,
+                                          MPIR_ALLREDUCE_TAG, comm_ptr, MPI_STATUS_IGNORE);
+                    MPIR_ERR_CHECK(mpi_errno);
+                    total[0] += tmp[0];
+                    total[1] += tmp[1];
+                    total[2] += tmp[2];
+                }
+            } else if (relrank % (2 * mask) == mask) {
+                int dst_rel = relrank - mask;
+
+                mpi_errno = MPIC_Send(total, 3, MPIR_INT_INTERNAL, lo + dst_rel,
+                                      MPIR_ALLREDUCE_TAG, comm_ptr, MPIR_COLL_ATTR_SYNC);
+                MPIR_ERR_CHECK(mpi_errno);
+                sent = TRUE;
+            }
+        }
+    }
+
+    mpi_errno = comm_split_range_bcast_ints(comm_ptr, lo, hi, total, 3, MPIR_BCAST_TAG);
+    MPIR_ERR_CHECK(mpi_errno);
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+static int comm_split_range_exscan_sum3(MPIR_Comm * comm_ptr, int lo, int hi,
+                                        const int local[3], int prefix[3])
+{
+    int mpi_errno = MPI_SUCCESS;
+    int rank = comm_ptr->rank;
+    int relrank = rank - lo;
+    int range_size = hi - lo + 1;
+    int partial[3] = { local[0], local[1], local[2] };
+
+    prefix[0] = 0;
+    prefix[1] = 0;
+    prefix[2] = 0;
+
+    for (int mask = 1; mask < range_size; mask <<= 1) {
+        int tmp[3] = { 0, 0, 0 };
+        int dst = (relrank + mask < range_size) ? rank + mask : MPI_PROC_NULL;
+        int src = (relrank >= mask) ? rank - mask : MPI_PROC_NULL;
+
+        mpi_errno = MPIC_Sendrecv(partial, 3, MPIR_INT_INTERNAL, dst, MPIR_EXSCAN_TAG,
+                                  tmp, 3, MPIR_INT_INTERNAL, src, MPIR_EXSCAN_TAG,
+                                  comm_ptr, MPI_STATUS_IGNORE, MPIR_COLL_ATTR_SYNC);
+        MPIR_ERR_CHECK(mpi_errno);
+
+        if (src != MPI_PROC_NULL) {
+            prefix[0] += tmp[0];
+            prefix[1] += tmp[1];
+            prefix[2] += tmp[2];
+            partial[0] += tmp[0];
+            partial[1] += tmp[1];
+            partial[2] += tmp[2];
+        }
+    }
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+static int comm_split_range_exscan_segment(MPIR_Comm * comm_ptr, int lo, int hi,
+                                           int reverse, split_segment local,
+                                           split_segment * prefix)
+{
+    int mpi_errno = MPI_SUCCESS;
+    int rank = comm_ptr->rank;
+    int relrank = reverse ? hi - rank : rank - lo;
+    int range_size = hi - lo + 1;
+    split_segment partial = local;
+
+    *prefix = split_segment_empty();
+
+    for (int mask = 1; mask < range_size; mask <<= 1) {
+        split_segment tmp = split_segment_empty();
+        int dst = MPI_PROC_NULL;
+        int src = MPI_PROC_NULL;
+
+        if (relrank + mask < range_size) {
+            dst = reverse ? rank - mask : rank + mask;
+        }
+        if (relrank >= mask) {
+            src = reverse ? rank + mask : rank - mask;
+        }
+
+        mpi_errno = MPIC_Sendrecv(&partial, 6, MPIR_INT_INTERNAL, dst, MPIR_EXSCAN_TAG,
+                                  &tmp, 6, MPIR_INT_INTERNAL, src, MPIR_EXSCAN_TAG,
+                                  comm_ptr, MPI_STATUS_IGNORE, MPIR_COLL_ATTR_SYNC);
+        MPIR_ERR_CHECK(mpi_errno);
+
+        if (src != MPI_PROC_NULL) {
+            *prefix = split_segment_combine(tmp, *prefix);
+            partial = split_segment_combine(tmp, partial);
+        }
+    }
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+static int comm_split_partition_scalable(MPIR_Comm * comm_ptr, int *lo, int *hi,
+                                         split_record * record)
+{
+    int mpi_errno = MPI_SUCCESS;
+    split_record pivot, new_record;
+    int local_class[3] = { 0, 0, 0 };
+    int prefix[3], total[3], dest;
+    int cmp;
+
+    mpi_errno = comm_split_range_select_pivot(comm_ptr, *lo, *hi, *record, &pivot);
+    MPIR_ERR_CHECK(mpi_errno);
+
+    cmp = split_record_compare(record, &pivot);
+    if (cmp < 0) {
+        local_class[0] = 1;
+    } else if (cmp == 0) {
+        local_class[1] = 1;
+    } else {
+        local_class[2] = 1;
+    }
+
+    mpi_errno = comm_split_range_exscan_sum3(comm_ptr, *lo, *hi, local_class, prefix);
+    MPIR_ERR_CHECK(mpi_errno);
+    mpi_errno = comm_split_range_allreduce_sum3(comm_ptr, *lo, *hi, local_class, total);
+    MPIR_ERR_CHECK(mpi_errno);
+
+    if (cmp < 0) {
+        dest = *lo + prefix[0];
+    } else if (cmp == 0) {
+        dest = *lo + total[0] + prefix[1];
+    } else {
+        dest = *lo + total[0] + total[1] + prefix[2];
+    }
+
+    mpi_errno = MPIC_Sendrecv(record, 3, MPIR_INT_INTERNAL, dest, MPIR_ALLTOALL_TAG,
+                              &new_record, 3, MPIR_INT_INTERNAL, MPI_ANY_SOURCE,
+                              MPIR_ALLTOALL_TAG, comm_ptr, MPI_STATUS_IGNORE,
+                              MPIR_COLL_ATTR_SYNC);
+    MPIR_ERR_CHECK(mpi_errno);
+
+    *record = new_record;
+    cmp = split_record_compare(record, &pivot);
+
+    if (cmp < 0) {
+        *hi = *lo + total[0] - 1;
+    } else if (cmp == 0) {
+        *lo = *lo + total[0];
+        *hi = *lo + total[1] - 1;
+    } else {
+        *lo = *lo + total[0] + total[1];
+    }
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+static int comm_split_rank_scalable(MPIR_Comm * comm_ptr, int color, int key,
+                                    int *new_rank, int *new_size)
+{
+    int mpi_errno = MPI_SUCCESS;
+    int rank = comm_ptr->rank;
+    int size = comm_ptr->local_size;
+    int lo = 0, hi = size - 1;
+    split_record record = { color, key, rank };
+    split_segment local_segment, prefix, suffix;
+    int result[2], my_result[2];
+
+    while (lo < hi) {
+        int old_lo = lo;
+        int old_hi = hi;
+
+        mpi_errno = comm_split_partition_scalable(comm_ptr, &lo, &hi, &record);
+        MPIR_ERR_CHECK(mpi_errno);
+
+        if (lo == old_lo && hi == old_hi)
+            break;
+    }
+
+    local_segment = split_segment_make(record.color);
+    mpi_errno = comm_split_range_exscan_segment(comm_ptr, 0, size - 1, FALSE, local_segment,
+                                                &prefix);
+    MPIR_ERR_CHECK(mpi_errno);
+    mpi_errno = comm_split_range_exscan_segment(comm_ptr, 0, size - 1, TRUE, local_segment,
+                                                &suffix);
+    MPIR_ERR_CHECK(mpi_errno);
+
+    if (record.color == MPI_UNDEFINED) {
+        result[0] = MPI_UNDEFINED;
+        result[1] = 0;
+    } else {
+        int before = (prefix.last_color == record.color) ? prefix.last_count : 0;
+        int after = (suffix.last_color == record.color) ? suffix.last_count : 0;
+
+        result[0] = before;
+        result[1] = before + 1 + after;
+    }
+
+    mpi_errno = MPIC_Sendrecv(result, 2, MPIR_INT_INTERNAL, record.orig_rank,
+                              MPIR_LOCALCOPY_TAG, my_result, 2, MPIR_INT_INTERNAL,
+                              MPI_ANY_SOURCE, MPIR_LOCALCOPY_TAG, comm_ptr, MPI_STATUS_IGNORE,
+                              MPIR_COLL_ATTR_SYNC);
+    MPIR_ERR_CHECK(mpi_errno);
+
+    *new_rank = my_result[0];
+    *new_size = my_result[1];
+
+  fn_exit:
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
+static int comm_split_intra_scalable(MPIR_Comm * comm_ptr, int color, int key,
+                                     MPIR_Comm ** newcomm_ptr)
+{
+    int mpi_errno = MPI_SUCCESS;
+    int rank = comm_ptr->rank;
+    int size = comm_ptr->local_size;
+    int new_size, my_new_rank, new_context_id;
+    int in_newcomm;
+    int *ranktable = NULL, *local_ranks = NULL;
+    MPIR_CHKLMEM_DECL();
+
+    mpi_errno = comm_split_rank_scalable(comm_ptr, color, key, &my_new_rank, &new_size);
+    MPIR_ERR_CHECK(mpi_errno);
+
+    in_newcomm = (color != MPI_UNDEFINED);
+
+    MPIR_CHKLMEM_MALLOC(ranktable, 3 * size * sizeof(int));
+    int myinfo[3] = { color, my_new_rank, rank };
+
+    mpi_errno = MPIR_Allgather_fallback(myinfo, 3, MPIR_INT_INTERNAL,
+                                        ranktable, 3, MPIR_INT_INTERNAL,
+                                        comm_ptr, MPIR_COLL_ATTR_SYNC);
+    MPIR_ERR_CHECK(mpi_errno);
+
+    if (in_newcomm) {
+        MPIR_CHKLMEM_MALLOC(local_ranks, new_size * sizeof(int));
+        for (int i = 0; i < size; i++) {
+            int *entry = &ranktable[3 * i];
+            if (entry[0] == color) {
+                MPIR_Assert(entry[1] >= 0 && entry[1] < new_size);
+                local_ranks[entry[1]] = entry[2];
+            }
+        }
+    }
+
+    mpi_errno = MPIR_Get_contextid_sparse(comm_ptr, &new_context_id, !in_newcomm);
+    MPIR_ERR_CHECK(mpi_errno);
+    MPIR_Assert(new_context_id != 0);
+
+    *newcomm_ptr = NULL;
+
+    if (in_newcomm) {
+        mpi_errno = MPIR_Comm_create(newcomm_ptr);
+        if (mpi_errno)
+            goto fn_fail;
+
+        (*newcomm_ptr)->recvcontext_id = new_context_id;
+        (*newcomm_ptr)->local_size = new_size;
+        (*newcomm_ptr)->comm_kind = MPIR_COMM_KIND__INTRACOMM;
+
+        MPIR_Comm_set_session_ptr(*newcomm_ptr, comm_ptr->session_ptr);
+
+        (*newcomm_ptr)->context_id = (*newcomm_ptr)->recvcontext_id;
+        (*newcomm_ptr)->remote_size = new_size;
+        (*newcomm_ptr)->rank = my_new_rank;
+
+        mpi_errno = MPIR_Group_incl_impl(comm_ptr->local_group, new_size, local_ranks,
+                                         &(*newcomm_ptr)->local_group);
+        MPIR_ERR_CHECK(mpi_errno);
+
+        MPID_THREAD_CS_ENTER(VCI, comm_ptr->mutex);
+        (*newcomm_ptr)->errhandler = comm_ptr->errhandler;
+        if (comm_ptr->errhandler) {
+            MPIR_Errhandler_add_ref(comm_ptr->errhandler);
+        }
+        MPID_THREAD_CS_EXIT(VCI, comm_ptr->mutex);
+
+        (*newcomm_ptr)->vcis_enabled = comm_ptr->vcis_enabled;
+        mpi_errno = MPIR_Comm_commit(*newcomm_ptr);
+        MPIR_ERR_CHECK(mpi_errno);
+    }
+
+  fn_exit:
+    MPIR_CHKLMEM_FREEALL();
+    return mpi_errno;
+  fn_fail:
+    goto fn_exit;
+}
+
 int MPIR_Comm_split_impl(MPIR_Comm * comm_ptr, int color, int key, MPIR_Comm ** newcomm_ptr)
 {
     int mpi_errno = MPI_SUCCESS;
@@ -94,6 +612,12 @@ int MPIR_Comm_split_impl(MPIR_Comm * comm_ptr, int color, int key, MPIR_Comm ** 
     rank = comm_ptr->rank;
     size = comm_ptr->local_size;
     remote_size = comm_ptr->remote_size;
+
+    if (comm_ptr->comm_kind == MPIR_COMM_KIND__INTRACOMM &&
+        MPIR_CVAR_COMM_SPLIT_SCALABLE_THRESHOLD >= 0 &&
+        size >= MPIR_CVAR_COMM_SPLIT_SCALABLE_THRESHOLD) {
+        return comm_split_intra_scalable(comm_ptr, color, key, newcomm_ptr);
+    }
 
     /* Step 1: Find out what color and keys all of the processes have */
     MPIR_CHKLMEM_MALLOC(table, size * sizeof(splittype));

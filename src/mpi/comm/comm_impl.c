@@ -23,6 +23,20 @@ cvars:
       description : >-
         Use qsort(3) in the implementation of MPI_Comm_split instead of bubble sort.
 
+    - name        : MPIR_CVAR_COMM_SPLIT_SCALABLE_THRESHOLD
+      category    : COMMUNICATOR
+      type        : int
+      default     : 131072
+      class       : none
+      verbosity   : MPI_T_VERBOSITY_USER_BASIC
+      scope       : MPI_T_SCOPE_ALL_EQ
+      description : >-
+        Use the scalable divide-and-conquer MPI_Comm_split algorithm for
+        intracommunicators at or above this size.  A negative value disables the
+        scalable path.  The scalable path computes ranks with range collectives,
+        but still builds the existing MPICH full group maps for communicator
+        compatibility.
+
 === END_MPI_T_CVAR_INFO_BLOCK ===
 */
 

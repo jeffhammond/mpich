@@ -15,6 +15,7 @@ cmfree 4
 cmfree2 2
 cmsplit 4
 cmsplit2 12
+cmsplit_scale 16 env=MPIR_CVAR_COMM_SPLIT_SCALABLE_THRESHOLD=0
 probe_intercomm 2
 # one way to split a communicator, if implementation supports it, is by access
 # to a common file system. argument is a directory whose presence or
